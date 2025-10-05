@@ -4,88 +4,72 @@ import com.microservices.log430.authservice.adapters.web.dto.LoginRequest;
 import com.microservices.log430.authservice.adapters.web.dto.LoginResponse;
 import com.microservices.log430.authservice.adapters.web.dto.MfaVerificationRequest;
 import com.microservices.log430.authservice.adapters.web.dto.MfaVerificationResponse;
-import com.microservices.log430.authservice.domain.model.entities.User;
 import com.microservices.log430.authservice.domain.port.in.AuthenticationPort;
-import com.microservices.log430.authservice.domain.port.out.JwtTokenPort;
-import com.microservices.log430.authservice.domain.port.out.UserPort;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import java.util.Optional;
-
-@Controller
+@RestController
 @RequestMapping("/auth")
 public class AuthController {
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
     private final AuthenticationPort authenticationPort;
-    private final JwtTokenPort jwtTokenPort;
-    private final UserPort userPort;
 
     @Autowired
-    public AuthController(AuthenticationPort authenticationPort, JwtTokenPort jwtTokenPort, UserPort userPort) {
+    public AuthController(AuthenticationPort authenticationPort) {
         this.authenticationPort = authenticationPort;
-        this.jwtTokenPort = jwtTokenPort;
-        this.userPort = userPort;
-    }
-
-    @GetMapping("/login")
-    public String showLoginPage() {
-        return "auth/login";
     }
 
     @PostMapping("/login")
-    @ResponseBody
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        logger.info("Tentative de connexion pour l'email : {}", request.getEmail());
         try {
             String ipAddress = getClientIpAddress(httpRequest);
             String userAgent = httpRequest.getHeader("User-Agent");
-
             String challengeId = authenticationPort.authenticate(request.getEmail(), request.getPassword(), ipAddress, userAgent);
-
+            logger.info("Code de vérification MFA envoyé à l'utilisateur : {}", request.getEmail());
             LoginResponse response = new LoginResponse(
                     challengeId,
                     "Code de vérification envoyé par email. Veuillez vérifier votre boîte de réception.",
                     true,
                     true
             );
-
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
+            logger.warn("Échec de la connexion pour l'email {} : {}", request.getEmail(), e.getMessage());
             LoginResponse response = new LoginResponse(null, e.getMessage(), false, false);
-            return ResponseEntity.status(401).body(response);
+            if ("Utilisateur non trouvé".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            } else if ("Mot de passe incorrect".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
         }
     }
 
-    @GetMapping("/mfa")
-    public String showMfaPage(@RequestParam String challengeId, Model model) {
-        model.addAttribute("challengeId", challengeId);
-        return "auth/mfa";
-    }
-
     @PostMapping("/verify-mfa")
-    @ResponseBody
     public ResponseEntity<MfaVerificationResponse> verifyMfa(@RequestBody MfaVerificationRequest request,
                                                              HttpServletRequest httpRequest,
                                                              HttpServletResponse httpResponse) {
+        logger.info("Vérification MFA pour le challengeId : {}", request.getChallengeId());
         try {
             String ipAddress = getClientIpAddress(httpRequest);
             String userAgent = httpRequest.getHeader("User-Agent");
-
-            // Générer le JWT complet (header.payload.signature)
             String jwtTokenString = authenticationPort.verifyMfa(request.getChallengeId(), request.getCode(), ipAddress, userAgent);
-
-            // Stocker le JWT dans un cookie sécurisé
             jakarta.servlet.http.Cookie jwtCookie = new jakarta.servlet.http.Cookie("jwt", jwtTokenString);
             jwtCookie.setHttpOnly(true);
             jwtCookie.setSecure(false); // true en production avec HTTPS
             jwtCookie.setPath("/");
-            jwtCookie.setMaxAge(24 * 60 * 60); // 24 heures
+            jwtCookie.setMaxAge(24 * 60 * 60);
             httpResponse.addCookie(jwtCookie);
-
+            logger.info("Authentification MFA réussie, JWT généré et stocké en cookie pour le challengeId : {}", request.getChallengeId());
             MfaVerificationResponse response = new MfaVerificationResponse(
                     true,
                     "Authentification réussie ! Redirection vers le dashboard...",
@@ -93,65 +77,36 @@ public class AuthController {
             );
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
+            logger.warn("Échec de la vérification MFA pour le challengeId {} : {}", request.getChallengeId(), e.getMessage());
             MfaVerificationResponse response = new MfaVerificationResponse(
                     false,
                     e.getMessage(),
                     null
             );
-            return ResponseEntity.status(401).body(response);
-        }
-    }
-
-    @GetMapping("/dashboard")
-    public String showDashboard(HttpServletRequest request, Model model) {
-        String jwtTokenString = getJwtFromRequest(request);
-
-        if (jwtTokenString == null || !authenticationPort.validateToken(jwtTokenString)) {
-            return "redirect:/auth/login";
-        }
-
-        // Extraire les informations utilisateur du JWT
-        try {
-            Long userId = jwtTokenPort.getUserIdFromToken(jwtTokenString);
-            String userEmail = jwtTokenPort.getEmailFromToken(jwtTokenString);
-
-            // Récupérer l'utilisateur complet pour avoir son nom et son solde
-            Optional<User> userOpt = userPort.findById(userId);
-            if (userOpt.isPresent()) {
-                User user = userOpt.get();
-                model.addAttribute("userName", user.getName());
-                model.addAttribute("userEmail", user.getEmail());
+            if ("Code MFA incorrect".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
             } else {
-                model.addAttribute("userName", "Utilisateur");
-                model.addAttribute("userEmail", userEmail);
-                model.addAttribute("userBalance", java.math.BigDecimal.ZERO);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
             }
-        } catch (Exception e) {
-            model.addAttribute("userName", "Utilisateur");
-            model.addAttribute("userEmail", "");
-            model.addAttribute("userBalance", java.math.BigDecimal.ZERO);
         }
-
-        return "auth/dashboard";
     }
+
 
     @PostMapping("/logout")
-    public String logout(HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
         String jwtTokenString = getJwtFromRequest(request);
-
         if (jwtTokenString != null) {
-            // Auditer la déconnexion
+            logger.info("Déconnexion de l'utilisateur avec JWT : {}", jwtTokenString);
             authenticationPort.logout(jwtTokenString);
+        } else {
+            logger.warn("Tentative de déconnexion sans JWT valide");
         }
-
-        // Supprimer le cookie JWT
         jakarta.servlet.http.Cookie jwtCookie = new jakarta.servlet.http.Cookie("jwt", "");
         jwtCookie.setHttpOnly(true);
         jwtCookie.setPath("/");
-        jwtCookie.setMaxAge(0); // Expirer immédiatement
+        jwtCookie.setMaxAge(0);
         response.addCookie(jwtCookie);
-
-        return "redirect:/auth/login";
+        return ResponseEntity.ok().body("Déconnexion réussie");
     }
 
     private String getJwtFromRequest(HttpServletRequest request) {

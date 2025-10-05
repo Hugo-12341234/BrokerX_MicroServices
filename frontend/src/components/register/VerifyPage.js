@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 
 function VerifyPage() {
   const [searchParams] = useSearchParams();
@@ -21,9 +21,11 @@ function VerifyPage() {
     <div className="register-container">
       <h2>Activation du compte</h2>
       <p>{message}</p>
+      {message === "Votre compte a été activé avec succès !" && (
+        <Link to="/login">Aller à la page de connexion</Link>
+      )}
     </div>
   );
 }
 
 export default VerifyPage;
-

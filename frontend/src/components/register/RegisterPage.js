@@ -58,6 +58,10 @@ function RegisterPage() {
 
         <button type="submit">S'inscrire</button>
       </form>
+      <div className="register-login-link">
+        <span>Déjà un compte ? </span>
+        <a href="/login">Connectez-vous</a>
+      </div>
     </div>
   );
 }
