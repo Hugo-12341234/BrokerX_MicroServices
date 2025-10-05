@@ -121,7 +121,6 @@ public class AuthController {
                 User user = userOpt.get();
                 model.addAttribute("userName", user.getName());
                 model.addAttribute("userEmail", user.getEmail());
-                model.addAttribute("userBalance", user.getBalance());
             } else {
                 model.addAttribute("userName", "Utilisateur");
                 model.addAttribute("userEmail", userEmail);

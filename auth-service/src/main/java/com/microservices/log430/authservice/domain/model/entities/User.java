@@ -11,13 +11,8 @@ public class User {
     private String adresse;
     private LocalDate dateDeNaissance;
     private Status status;
-    private BigDecimal balance;
 
     public enum Status { PENDING, ACTIVE, REJECTED, SUSPENDED }
-
-    public User() {
-        this.balance = BigDecimal.ZERO;
-    }
 
     public User(Long id, String email, String passwordHash, String name, String adresse, LocalDate dateDeNaissance, Status status) {
         this.id = id;
@@ -27,7 +22,6 @@ public class User {
         this.adresse = adresse;
         this.dateDeNaissance = dateDeNaissance;
         this.status = status;
-        this.balance = BigDecimal.ZERO;
     }
 
     public User(Long id, String email, String passwordHash, String name, String adresse, LocalDate dateDeNaissance, Status status, BigDecimal balance) {
@@ -38,17 +32,10 @@ public class User {
         this.adresse = adresse;
         this.dateDeNaissance = dateDeNaissance;
         this.status = status;
-        this.balance = balance != null ? balance : BigDecimal.ZERO;
     }
 
     public void activate() { this.status = Status.ACTIVE; }
     public void reject() { this.status = Status.REJECTED; }
-
-    public void creditBalance(BigDecimal amount) {
-        if (amount != null && amount.compareTo(BigDecimal.ZERO) > 0) {
-            this.balance = this.balance.add(amount);
-        }
-    }
 
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }
@@ -64,7 +51,5 @@ public class User {
     public void setAdresse(String adresse) { this.adresse = adresse; }
     public void setDateDeNaissance(LocalDate dateDeNaissance) { this.dateDeNaissance = dateDeNaissance; }
     public void setStatus(Status status) { this.status = status; }
-    public BigDecimal getBalance() { return balance; }
-    public void setBalance(BigDecimal balance) { this.balance = balance != null ? balance : BigDecimal.ZERO; }
 }
 

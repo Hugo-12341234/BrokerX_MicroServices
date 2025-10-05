@@ -17,14 +17,10 @@ public class UserEntity {
     private LocalDate dateDeNaissance;
     @Enumerated(EnumType.STRING)
     private Status status;
-    @Column(precision = 15, scale = 2)
-    private BigDecimal balance;
+
+    public UserEntity() {}
 
     public enum Status { PENDING, ACTIVE, REJECTED, SUSPENDED }
-
-    public UserEntity() {
-        this.balance = BigDecimal.ZERO;
-    }
 
     public UserEntity(Long id, String email, String passwordHash, String name, String adresse, LocalDate dateDeNaissance, Status status) {
         this.id = id;
@@ -34,7 +30,6 @@ public class UserEntity {
         this.adresse = adresse;
         this.dateDeNaissance = dateDeNaissance;
         this.status = status;
-        this.balance = BigDecimal.ZERO;
     }
     // getters/setters
     public Long getId() { return id; }
@@ -51,7 +46,5 @@ public class UserEntity {
     public void setDateDeNaissance(LocalDate dateDeNaissance) { this.dateDeNaissance = dateDeNaissance; }
     public Status getStatus() { return status; }
     public void setStatus(Status status) { this.status = status; }
-    public BigDecimal getBalance() { return balance; }
-    public void setBalance(BigDecimal balance) { this.balance = balance; }
 }
 

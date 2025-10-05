@@ -15,8 +15,7 @@ public class PersistenceMappers {
                 entity.getName(),
                 entity.getAdresse(),
                 entity.getDateDeNaissance(),
-                User.Status.valueOf(entity.getStatus().name()),
-                entity.getBalance()
+                User.Status.valueOf(entity.getStatus().name())
         );
         return user;
     }
@@ -31,7 +30,6 @@ public class PersistenceMappers {
         entity.setAdresse(user.getAdresse());
         entity.setDateDeNaissance(user.getDateDeNaissance());
         entity.setStatus(UserEntity.Status.valueOf(user.getStatus().name()));
-        entity.setBalance(user.getBalance());
         return entity;
     }
 
