@@ -25,8 +25,8 @@ function RegisterPage() {
         body: JSON.stringify(form)
       });
       if (response.ok) {
-        // Succès, tu peux rediriger ou afficher un message
-        alert('Inscription réussie !');
+        // Succès, affiche le message d'activation
+        alert('Inscription réussie ! Un email d\'activation vous a été envoyé.');
       } else {
         // Erreur, affiche le message d'erreur
         const error = await response.json();

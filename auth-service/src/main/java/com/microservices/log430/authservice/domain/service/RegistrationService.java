@@ -19,9 +19,12 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class RegistrationService implements RegistrationPort {
+    private static final Logger logger = LoggerFactory.getLogger(RegistrationService.class);
     private final UserPort userPort;
     private final PasswordEncoder passwordEncoder;
     private final VerificationTokenPort tokenPort;
@@ -45,33 +48,39 @@ public class RegistrationService implements RegistrationPort {
 
     @Override
     public User register(String email, String rawPassword, String name, String adresse, LocalDate dateDeNaissance) {
+        logger.info("Début de l'inscription pour l'email : {}", email);
         Optional<User> existing = Optional.empty();
         if (email != null && !email.isBlank()) {
             existing = userPort.findByEmail(email);
         }
         if (existing.isPresent()) {
+            logger.warn("Tentative d'inscription avec un email déjà utilisé : {}", email);
             throw new IllegalArgumentException("Email déjà utilisé");
         }
         String hashedPassword = passwordEncoder.encode(rawPassword);
         // Créer l'entité du domaine avec le statut PENDING par défaut
         User user = new User(null, email, hashedPassword, name, adresse, dateDeNaissance, User.Status.PENDING);
         User savedUser = userPort.save(user);
+        logger.info("Utilisateur enregistré avec statut PENDING : {}", savedUser.getId());
 
         // Générer le token brut et le hash
         String rawToken = UUID.randomUUID().toString();
         String tokenHash = hashToken(rawToken);
         VerificationToken verificationToken = new VerificationToken(null, tokenHash, savedUser, LocalDateTime.now().plusDays(1));
         tokenPort.save(verificationToken);
+        logger.info("Token de vérification généré et sauvegardé pour l'utilisateur : {}", savedUser.getId());
 
         // Envoyer l'email avec le lien d'activation
         String link = baseUrl + "/verify?token=" + rawToken;
         emailSenderPort.sendEmail(savedUser.getEmail(), "Activation de votre compte", "Cliquez ici pour activer votre compte : " + link);
+        logger.info("Email d'activation envoyé à : {}", savedUser.getEmail());
 
         return savedUser;
     }
 
     @Override
     public boolean verifyUser(String token) {
+        logger.info("Début de la vérification du token : {}", token);
         String tokenHash = hashToken(token);
         Optional<VerificationToken> optToken = tokenPort.findByTokenHash(tokenHash);
         if (optToken.isPresent() && optToken.get().getExpiryDate().isAfter(LocalDateTime.now())) {
@@ -79,7 +88,7 @@ public class RegistrationService implements RegistrationPort {
             user.activate();
             userPort.save(user);
             tokenPort.delete(optToken.get());
-            // Audit
+            logger.info("Utilisateur activé : {}. Token supprimé.", user.getId());
             String documentHash = hashToken(user.getEmail() + user.getName());
             Audit audit = new Audit(
                     user.getId(),
@@ -88,8 +97,10 @@ public class RegistrationService implements RegistrationPort {
                     documentHash
             );
             auditPort.saveAudit(audit);
+            logger.info("Audit enregistré pour l'utilisateur : {}", user.getId());
             return true;
         }
+        logger.warn("Échec de la vérification du token : {} (invalide ou expiré)", token);
         return false;
     }
 
