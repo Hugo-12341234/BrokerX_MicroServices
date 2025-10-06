@@ -73,18 +73,31 @@ public class AuthController {
             MfaVerificationResponse response = new MfaVerificationResponse(
                     true,
                     "Authentification réussie ! Redirection vers le dashboard...",
-                    jwtTokenString
+                    jwtTokenString,
+                    "success"
             );
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             logger.warn("Échec de la vérification MFA pour le challengeId {} : {}", request.getChallengeId(), e.getMessage());
+            String status = "error";
+            String msg = e.getMessage();
+            if (msg.contains("verrouillé") || msg.contains("bloqué")) {
+                status = "locked";
+            } else if (msg.contains("suspendu")) {
+                status = "suspended";
+            }
             MfaVerificationResponse response = new MfaVerificationResponse(
                     false,
-                    e.getMessage(),
-                    null
+                    msg,
+                    null,
+                    status
             );
-            if ("Code MFA incorrect".equals(e.getMessage())) {
+            if ("Code MFA incorrect".equals(msg)) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            } else if (status.equals("locked")) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+            } else if (status.equals("suspended")) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
             } else {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
             }

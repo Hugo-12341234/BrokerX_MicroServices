@@ -52,6 +52,10 @@ function LoginPage() {
 
         <button type="submit">Se connecter</button>
       </form>
+      <div className="login-register-link">
+        <span>Pas de compte ? </span>
+        <a href="/register">Inscrivez-vous</a>
+      </div>
     </div>
   );
 }
