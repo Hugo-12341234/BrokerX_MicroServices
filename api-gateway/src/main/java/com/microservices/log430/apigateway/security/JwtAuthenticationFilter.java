@@ -21,7 +21,15 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         }
         String token = extractToken(exchange);
         if (token != null && jwtTokenUtil.validateToken(token)) {
-            return chain.filter(exchange);
+            // Extraire le userId du token
+            Long userId = jwtTokenUtil.getUserId(token);
+            // Ajouter le header X-User-Id
+            ServerWebExchange mutatedExchange = exchange.mutate()
+                .request(exchange.getRequest().mutate()
+                    .header("X-User-Id", String.valueOf(userId))
+                    .build())
+                .build();
+            return chain.filter(mutatedExchange);
         } else {
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
@@ -50,4 +58,3 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         return null;
     }
 }
-

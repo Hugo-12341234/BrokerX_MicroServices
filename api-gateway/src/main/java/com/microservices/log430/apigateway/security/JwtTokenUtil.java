@@ -35,5 +35,13 @@ public class JwtTokenUtil {
             .parseClaimsJws(token)
             .getBody();
     }
-}
 
+    public Long getUserId(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(secretKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        return Long.parseLong(claims.getSubject());
+    }
+}
