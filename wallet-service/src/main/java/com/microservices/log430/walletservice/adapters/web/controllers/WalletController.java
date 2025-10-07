@@ -2,6 +2,7 @@ package com.microservices.log430.walletservice.adapters.web.controllers;
 
 import com.microservices.log430.walletservice.adapters.web.dto.DepositResponse;
 import com.microservices.log430.walletservice.domain.port.in.WalletDepositPort;
+import com.microservices.log430.walletservice.adapters.web.dto.DepositRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;

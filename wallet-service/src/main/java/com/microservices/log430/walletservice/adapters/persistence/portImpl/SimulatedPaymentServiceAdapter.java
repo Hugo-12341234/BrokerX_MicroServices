@@ -1,5 +1,6 @@
 package com.microservices.log430.walletservice.adapters.persistence.portImpl;
 
+import com.microservices.log430.walletservice.domain.port.out.PaymentServicePort;
 import org.springframework.stereotype.Component;
 
 @Component
