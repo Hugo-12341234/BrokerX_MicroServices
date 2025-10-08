@@ -5,14 +5,16 @@ public class MfaVerificationResponse {
     private String message;
     private String token;
     private String status; // "error", "locked", "suspended", "success"
+    private Long userId;
 
     public MfaVerificationResponse() {}
 
-    public MfaVerificationResponse(boolean success, String message, String token, String status) {
+    public MfaVerificationResponse(boolean success, String message, String token, String status, Long userId) {
         this.success = success;
         this.message = message;
         this.token = token;
         this.status = status;
+        this.userId = userId;
     }
 
     public boolean isSuccess() { return success; }
@@ -23,4 +25,6 @@ public class MfaVerificationResponse {
     public void setToken(String token) { this.token = token; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
 }

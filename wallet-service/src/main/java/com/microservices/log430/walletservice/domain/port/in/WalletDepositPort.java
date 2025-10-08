@@ -1,9 +1,13 @@
 package com.microservices.log430.walletservice.domain.port.in;
 
+import com.microservices.log430.walletservice.domain.model.entities.Wallet;
+
 import java.math.BigDecimal;
+import java.util.Optional;
 
 public interface WalletDepositPort {
     DepositResult deposit(DepositRequest request);
+    Optional<Wallet> getWalletByUserId(Long userId);
 
     class DepositRequest {
         private final Long userId;
@@ -48,4 +52,3 @@ public interface WalletDepositPort {
         public Long getTransactionId() { return transactionId; }
     }
 }
-

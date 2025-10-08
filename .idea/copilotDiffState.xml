@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CopilotDiffPersistence">
+    <option name="pendingDiffs">
+      <map>
+        <entry key="$PROJECT_DIR$/wallet-service/src/main/resources/db/migration/V3__rename_walletEntity_to_wallet.sql">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/wallet-service/src/main/resources/db/migration/V3__rename_walletEntity_to_wallet.sql" />
+              <option name="updatedContent" value="ALTER TABLE walletEntity RENAME TO wallet;&#10;" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

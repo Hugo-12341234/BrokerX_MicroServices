@@ -90,7 +90,7 @@ public class AuthenticationService implements AuthenticationPort {
                 "Votre code de vérification est : " + mfaCode + "\n\nCe code expire dans 5 minutes."
         );
         logger.info("Email MFA envoyé à {}", user.getEmail());
-        // Retourner l'ID du challenge pour la suite du processus
+        // Retourner l'ID du challenge pour la suite du processus ainsi
         return savedChallenge.getId().toString();
     }
 

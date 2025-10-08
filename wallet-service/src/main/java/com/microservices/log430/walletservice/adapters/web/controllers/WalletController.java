@@ -3,12 +3,10 @@ package com.microservices.log430.walletservice.adapters.web.controllers;
 import com.microservices.log430.walletservice.adapters.web.dto.DepositResponse;
 import com.microservices.log430.walletservice.domain.port.in.WalletDepositPort;
 import com.microservices.log430.walletservice.adapters.web.dto.DepositRequest;
+import com.microservices.log430.walletservice.adapters.web.dto.WalletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
@@ -20,6 +18,29 @@ public class WalletController {
 
     public WalletController(WalletDepositPort walletDepositPort) {
         this.walletDepositPort = walletDepositPort;
+    }
+
+    @GetMapping("")
+    public ResponseEntity<WalletResponse> getWallet(HttpServletRequest httpRequest) {
+        String userIdHeader = httpRequest.getHeader("X-User-Id");
+        if (userIdHeader == null || userIdHeader.trim().isEmpty()) {
+            return ResponseEntity.status(400)
+                    .body(WalletResponse.failure("Header X-User-Id manquant"));
+        }
+        Long userId;
+        try {
+            userId = Long.valueOf(userIdHeader);
+        } catch (NumberFormatException e) {
+            return ResponseEntity.status(400)
+                    .body(WalletResponse.failure("Header X-User-Id invalide"));
+        }
+        var walletOpt = walletDepositPort.getWalletByUserId(userId);
+        if (walletOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(WalletResponse.failure("Portefeuille introuvable"));
+        }
+        var wallet = walletOpt.get();
+        WalletResponse response = new WalletResponse(true, "Portefeuille récupéré avec succès", wallet);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/deposit")

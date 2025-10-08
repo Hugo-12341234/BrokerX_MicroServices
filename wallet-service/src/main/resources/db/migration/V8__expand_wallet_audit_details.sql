@@ -1,0 +1,2 @@
+ALTER TABLE wallet_audit ALTER COLUMN details TYPE VARCHAR(255);
+

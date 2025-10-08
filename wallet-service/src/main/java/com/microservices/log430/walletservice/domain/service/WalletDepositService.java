@@ -132,4 +132,20 @@ public class WalletDepositService implements WalletDepositPort {
             return DepositResult.failure("Erreur technique lors du dépôt");
         }
     }
+
+    public Optional<Wallet> getWalletByUserId(Long userId) {
+        Optional<Wallet> walletOpt = walletPort.findByUserId(userId);
+        if (walletOpt.isPresent()) {
+            return walletOpt;
+        }
+        // Création d'un nouveau portefeuille si inexistant
+        Wallet wallet = new Wallet();
+        wallet.setUserId(userId);
+        wallet.setBalance(BigDecimal.ZERO);
+        wallet.setCreatedAt(LocalDateTime.now());
+        wallet.setUpdatedAt(LocalDateTime.now());
+        Wallet savedWallet = walletPort.save(wallet);
+        logAuditEvent("WALLET_CREATED", userId, "Portefeuille créé automatiquement (getWalletByUserId)");
+        return Optional.of(savedWallet);
+    }
 }

@@ -5,6 +5,7 @@ import com.microservices.log430.authservice.adapters.web.dto.LoginResponse;
 import com.microservices.log430.authservice.adapters.web.dto.MfaVerificationRequest;
 import com.microservices.log430.authservice.adapters.web.dto.MfaVerificationResponse;
 import com.microservices.log430.authservice.domain.port.in.AuthenticationPort;
+import com.microservices.log430.authservice.domain.port.out.MfaChallengePort;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
@@ -20,10 +21,12 @@ import jakarta.servlet.http.HttpServletResponse;
 public class AuthController {
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
     private final AuthenticationPort authenticationPort;
+    private final MfaChallengePort mfaChallengePort;
 
     @Autowired
-    public AuthController(AuthenticationPort authenticationPort) {
+    public AuthController(AuthenticationPort authenticationPort, MfaChallengePort mfaChallengePort) {
         this.authenticationPort = authenticationPort;
+        this.mfaChallengePort = mfaChallengePort;
     }
 
     @PostMapping("/login")
@@ -69,12 +72,24 @@ public class AuthController {
             jwtCookie.setPath("/");
             jwtCookie.setMaxAge(24 * 60 * 60);
             httpResponse.addCookie(jwtCookie);
-            logger.info("Authentification MFA réussie, JWT généré et stocké en cookie pour le challengeId : {}", request.getChallengeId());
+            // Récupérer le userId à partir du challenge
+            Long userId = null;
+            try {
+                Long challengeIdLong = Long.parseLong(request.getChallengeId());
+                var challengeOpt = mfaChallengePort.findById(challengeIdLong);
+                if (challengeOpt.isPresent()) {
+                    userId = challengeOpt.get().getUserId();
+                }
+            } catch (Exception e) {
+                logger.warn("Impossible d'extraire le userId du challenge : {}", e.getMessage());
+            }
+            logger.info("Authentification MFA réussie, JWT généré et stocké en cookie pour le challengeId : {} (userId={})", request.getChallengeId(), userId);
             MfaVerificationResponse response = new MfaVerificationResponse(
                     true,
                     "Authentification réussie ! Redirection vers le dashboard...",
                     jwtTokenString,
-                    "success"
+                    "success",
+                    userId
             );
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
@@ -90,7 +105,8 @@ public class AuthController {
                     false,
                     msg,
                     null,
-                    status
+                    status,
+                    null
             );
             if ("Code MFA incorrect".equals(msg)) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);

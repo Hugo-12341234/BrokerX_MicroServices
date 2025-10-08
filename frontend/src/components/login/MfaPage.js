@@ -28,6 +28,12 @@ function MfaPage() {
       });
       const data = await response.json();
       if (response.ok && data.success && data.status === 'success') {
+        if (data.token) {
+          localStorage.setItem('jwt', data.token);
+        }
+        if (data.userId) {
+            localStorage.setItem('userId', data.userId);
+        }
         alert(data.message);
         navigate('/dashboard');
       } else if (data.status === 'locked') {

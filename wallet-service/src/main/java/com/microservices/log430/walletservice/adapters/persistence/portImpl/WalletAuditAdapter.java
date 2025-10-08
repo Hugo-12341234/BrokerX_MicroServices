@@ -10,17 +10,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class WalletAuditAdapter implements WalletAuditPort {
     private final WalletAuditRepository walletAuditRepository;
-    private final WalletAuditMapper walletAuditMapper;
 
-    public WalletAuditAdapter(WalletAuditRepository walletAuditRepository, WalletAuditMapper walletAuditMapper) {
-        this.walletAuditMapper = walletAuditMapper;
+    public WalletAuditAdapter(WalletAuditRepository walletAuditRepository) {
         this.walletAuditRepository = walletAuditRepository;
     }
 
     @Override
     public void saveAudit(WalletAudit audit) {
-        WalletAuditEntity entity = walletAuditMapper.toEntity(audit);
+        WalletAuditEntity entity = WalletAuditMapper.toEntity(audit);
         walletAuditRepository.save(entity);
     }
 }
-
