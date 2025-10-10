@@ -17,12 +17,17 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     @Autowired
     private JwtTokenUtil jwtTokenUtil;
 
+    private boolean isInternalCall(ServerWebExchange exchange) {
+        String internalHeader = exchange.getRequest().getHeaders().getFirst("X-Internal-Call");
+        return "true".equalsIgnoreCase(internalHeader);
+    }
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, org.springframework.cloud.gateway.filter.GatewayFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
         logger.info("Requête entrante sur le chemin : {}", path);
-        if (isPublicRoute(path)) {
-            logger.debug("Route publique détectée : {}. Authentification ignorée.", path);
+        if (isPublicRoute(path) || isInternalCall(exchange)) {
+            logger.debug("Route publique ou appel interne détecté : {}. Authentification ignorée.", path);
             return chain.filter(exchange);
         }
         String token = extractToken(exchange);

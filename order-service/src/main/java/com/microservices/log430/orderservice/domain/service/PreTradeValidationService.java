@@ -1,5 +1,8 @@
 package com.microservices.log430.orderservice.domain.service;
 
+import com.microservices.log430.orderservice.adapters.external.wallet.StockRule;
+import com.microservices.log430.orderservice.adapters.external.wallet.Wallet;
+import com.microservices.log430.orderservice.adapters.external.wallet.WalletClient;
 import com.microservices.log430.orderservice.domain.model.entities.Order;
 import com.microservices.log430.orderservice.domain.port.in.PreTradeValidationPort;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,24 +13,19 @@ import java.math.BigDecimal;
 @Service
 public class PreTradeValidationService implements PreTradeValidationPort {
 
-    private final StockAdapter stockAdapter;
+    private final WalletClient walletClient;
 
     @Autowired
-    public PreTradeValidationService(StockAdapter stockAdapter) {
-        this.stockAdapter = stockAdapter;
+    public PreTradeValidationService(WalletClient walletClient) {
+        this.walletClient = walletClient;
     }
 
     @Override
     public ValidationResult validateOrder(ValidationRequest request) {
-        // Validation 1: Vérifier que le symbole existe et récupérer le stock
-        Stock stock = validateAndGetStock(request.getSymbol());
+        // Validation 1: Récupérer le stock via WalletClient (microservice wallet)
+        StockRule stock = validateAndGetStock(request.getSymbol());
         if (stock == null) {
-            return ValidationResult.failure("Symbole invalide: '" + request.getSymbol() + "'. Seul 'TEST' est disponible pour le moment");
-        }
-
-        // Validation 2: Vérifier que le stock est actif
-        if (!stock.isActive()) {
-            return ValidationResult.failure("Le stock '" + request.getSymbol() + "' n'est pas disponible pour le trading");
+            return ValidationResult.failure("Symbole invalide: '" + request.getSymbol() + "'.");
         }
 
         // Validation 3: Vérifier le tick size (pour les ordres limite uniquement)
@@ -54,7 +52,7 @@ public class PreTradeValidationService implements PreTradeValidationPort {
                     request.getType(),
                     request.getQuantity(),
                     request.getPrice(),
-                    request.getUser(),
+                    request.getWallet(),
                     stock
             );
             if (!buyingPowerValidation.isValid()) {
@@ -65,14 +63,18 @@ public class PreTradeValidationService implements PreTradeValidationPort {
         return ValidationResult.success();
     }
 
-    private StovalidateAndGetStock(String symbol) {
+    private StockRule validateAndGetStock(String symbol) {
         if (symbol == null || symbol.trim().isEmpty()) {
             return null;
         }
-        return stockAdapter.getStockBySymbol(symbol.trim());
+        try {
+            return walletClient.getStockBySymbol(symbol.trim());
+        } catch (Exception e) {
+            return null;
+        }
     }
 
-    private ValidationResult validateBuyingPower(Order.OrderType type, int quantity, Double price, User user, Stock stock) {
+    private ValidationResult validateBuyingPower(Order.OrderType type, int quantity, Double price, Wallet wallet, StockRule stock) {
         if (quantity <= 0) {
             return ValidationResult.failure("La quantité doit être positive");
         }
@@ -80,7 +82,7 @@ public class PreTradeValidationService implements PreTradeValidationPort {
         BigDecimal requiredAmount;
 
         if (type == Order.OrderType.MARCHE) {
-            requiredAmount = new BigDecimal(stock.getPrice()).multiply(new BigDecimal(quantity));
+            requiredAmount = stock.getPrice().multiply(new BigDecimal(quantity));
         } else if (type == Order.OrderType.LIMITE) {
             if (price == null || price <= 0) {
                 return ValidationResult.failure("Le prix limite doit être spécifié et positif pour un ordre limite");
@@ -90,18 +92,18 @@ public class PreTradeValidationService implements PreTradeValidationPort {
             return ValidationResult.failure("Type d'ordre non supporté: " + type);
         }
 
-        if (user.getBalance().compareTo(requiredAmount) < 0) {
+        if (wallet.getBalance().compareTo(requiredAmount) < 0) {
             return ValidationResult.failure(String.format(
                     "Fonds insuffisants. Requis: $%.2f, Disponible: $%.2f",
                     requiredAmount.doubleValue(),
-                    user.getBalance().doubleValue()
+                    wallet.getBalance().doubleValue()
             ));
         }
 
         return ValidationResult.success();
     }
 
-    private ValidationResult validateTickSize(Double price, Stock stock) {
+    private ValidationResult validateTickSize(Double price, StockRule stock) {
         if (price == null) {
             return ValidationResult.success(); // Déjà géré dans validateBuyingPower
         }
@@ -125,14 +127,14 @@ public class PreTradeValidationService implements PreTradeValidationPort {
         return ValidationResult.success();
     }
 
-    private ValidationResult validatePriceRange(Double price, Stock stock) {
+    private ValidationResult validatePriceRange(Double price, StockRule stock) {
         if (price == null) {
             return ValidationResult.success(); // Déjà géré dans validateBuyingPower
         }
 
         BigDecimal priceDecimal = new BigDecimal(price.toString());
-        BigDecimal minPrice = stock.getMinAllowedPrice();
-        BigDecimal maxPrice = stock.getMaxAllowedPrice();
+        BigDecimal minPrice = stock.getMinBand();
+        BigDecimal maxPrice = stock.getMaxBand();
 
         if (priceDecimal.compareTo(minPrice) < 0) {
             return ValidationResult.failure(String.format(

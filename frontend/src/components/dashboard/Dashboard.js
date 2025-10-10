@@ -72,6 +72,9 @@ function Dashboard() {
           <strong>Date de création :</strong> {wallet.createdAt ? new Date(wallet.createdAt).toLocaleString() : 'N/A'}
         </div>
       ) : null}
+      <button onClick={() => navigate('/order')} style={{ marginBottom: '1rem' }}>
+        Placer un ordre
+      </button>
       <DepositForm onDeposit={handleDeposit} />
     </div>
   );

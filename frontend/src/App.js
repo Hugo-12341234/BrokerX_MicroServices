@@ -6,6 +6,7 @@ import VerifyPage from './components/register/VerifyPage';
 import LoginPage from './components/login/LoginPage';
 import MfaPage from './components/login/MfaPage';
 import Dashboard from './components/dashboard/Dashboard';
+import PlaceOrderPage from './components/order/PlaceOrderPage';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/mfa" element={<MfaPage />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/order" element={<PlaceOrderPage />} />
         {/* D'autres routes pourront être ajoutées ici */}
       </Routes>
     </BrowserRouter>

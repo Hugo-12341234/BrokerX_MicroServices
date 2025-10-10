@@ -1,5 +1,6 @@
 package com.microservices.log430.orderservice.domain.port.in;
 
+import com.microservices.log430.orderservice.adapters.external.wallet.Wallet;
 import com.microservices.log430.orderservice.domain.model.entities.Order;
 
 public interface PreTradeValidationPort {
@@ -11,16 +12,16 @@ public interface PreTradeValidationPort {
         private final Order.OrderType type;
         private final int quantity;
         private final Double price;
-        private final User user;
+        private final Wallet wallet;
 
         public ValidationRequest(String symbol, Order.Side side, Order.OrderType type,
-                                 int quantity, Double price, User user) {
+                                 int quantity, Double price, Wallet wallet) {
             this.symbol = symbol;
             this.side = side;
             this.type = type;
             this.quantity = quantity;
             this.price = price;
-            this.user = user;
+            this.wallet = wallet;
         }
 
         public String getSymbol() { return symbol; }
@@ -28,7 +29,7 @@ public interface PreTradeValidationPort {
         public Order.OrderType getType() { return type; }
         public int getQuantity() { return quantity; }
         public Double getPrice() { return price; }
-        public User getUser() { return user; }
+        public Wallet getWallet() { return wallet; }
     }
 
     class ValidationResult {

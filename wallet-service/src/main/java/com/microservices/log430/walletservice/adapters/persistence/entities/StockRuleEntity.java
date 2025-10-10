@@ -20,6 +20,9 @@ public class StockRuleEntity {
     @Column(nullable = false, precision = 18, scale = 2)
     private BigDecimal maxBand;
 
+    @Column(nullable = false, precision = 18, scale = 2)
+    private BigDecimal price;
+
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
@@ -34,6 +37,8 @@ public class StockRuleEntity {
     public void setMinBand(BigDecimal minBand) { this.minBand = minBand; }
     public BigDecimal getMaxBand() { return maxBand; }
     public void setMaxBand(BigDecimal maxBand) { this.maxBand = maxBand; }
+    public BigDecimal getPrice() { return price; }
+    public void setPrice(BigDecimal price) { this.price = price; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

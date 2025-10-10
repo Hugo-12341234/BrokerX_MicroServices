@@ -1,9 +1,10 @@
-package com.microservices.log430.walletservice.domain.model.entities;
+package com.microservices.log430.orderservice.adapters.external.wallet;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-public class StockRule {
+public class StockRule implements Serializable {
     private String symbol;
     private BigDecimal tickSize;
     private BigDecimal minBand;
@@ -13,16 +14,6 @@ public class StockRule {
 
     public StockRule() {}
 
-    public StockRule(String symbol, BigDecimal tickSize, BigDecimal minBand, BigDecimal maxBand, BigDecimal price, LocalDateTime updatedAt) {
-        this.symbol = symbol;
-        this.tickSize = tickSize;
-        this.minBand = minBand;
-        this.maxBand = maxBand;
-        this.price = price;
-        this.updatedAt = updatedAt;
-    }
-
-    // Getters and setters
     public String getSymbol() { return symbol; }
     public void setSymbol(String symbol) { this.symbol = symbol; }
     public BigDecimal getTickSize() { return tickSize; }

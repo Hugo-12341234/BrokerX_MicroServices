@@ -5,6 +5,7 @@ import com.microservices.log430.walletservice.domain.port.in.WalletDepositPort;
 import com.microservices.log430.walletservice.adapters.web.dto.DepositRequest;
 import com.microservices.log430.walletservice.adapters.web.dto.WalletResponse;
 import com.microservices.log430.walletservice.adapters.web.dto.ErrorResponse;
+import com.microservices.log430.walletservice.domain.port.in.StockPort;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
@@ -18,9 +19,11 @@ import java.time.Instant;
 public class WalletController {
 
     private final WalletDepositPort walletDepositPort;
+    private final StockPort stockPort;
 
-    public WalletController(WalletDepositPort walletDepositPort) {
+    public WalletController(WalletDepositPort walletDepositPort, StockPort stockPort) {
         this.walletDepositPort = walletDepositPort;
+        this.stockPort = stockPort;
     }
 
     @GetMapping("")
@@ -142,5 +145,25 @@ public class WalletController {
 
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
         }
+    }
+
+    @GetMapping("/stock")
+    public ResponseEntity<?> getStockBySymbol(@RequestParam("symbol") String symbol, HttpServletRequest httpRequest) {
+        String path = httpRequest.getRequestURI();
+        String requestId = httpRequest.getHeader("X-Request-Id");
+        var stockRuleOpt = stockPort.getStockRuleBySymbol(symbol);
+        if (stockRuleOpt.isEmpty()) {
+            ErrorResponse err = new ErrorResponse(
+                Instant.now(),
+                path,
+                HttpStatus.NOT_FOUND.value(),
+                "Not Found",
+                "StockRule introuvable pour ce symbole",
+                requestId != null ? requestId : ""
+            );
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(err);
+        }
+        var stockRule = stockRuleOpt.get();
+        return ResponseEntity.ok(stockRule);
     }
 }

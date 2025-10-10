@@ -1,98 +1,82 @@
 package com.microservices.log430.orderservice.adapters.web.controllers;
 
+import com.microservices.log430.orderservice.domain.port.in.OrderPlacementPort;
+import com.microservices.log430.orderservice.adapters.web.dto.OrderRequest;
+import com.microservices.log430.orderservice.adapters.web.dto.OrderResponse;
+import com.microservices.log430.orderservice.adapters.web.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import java.time.Instant;
 
-import java.util.Optional;
-
-@Controller
-@RequestMapping("/orders")
+@RestController
+@RequestMapping("/api/v1/orders")
 public class OrderController {
-    private final OrderService orderService;
-    private final UserPort userPort;
-    private final AuthenticationPort authenticationPort;
-    private final JwtTokenPort jwtTokenPort;
+    private final OrderPlacementPort orderPlacementPort;
 
     @Autowired
-    public OrderController(OrderService orderService,
-                           UserPort userPort,
-                           AuthenticationPort authenticationPort,
-                           JwtTokenPort jwtTokenPort) {
-        this.orderService = orderService;
-        this.userPort = userPort;
-        this.authenticationPort = authenticationPort;
-        this.jwtTokenPort = jwtTokenPort;
-    }
-
-    @GetMapping("/place")
-    public String showOrderForm(Model model) {
-        model.addAttribute("orderRequest", new OrderRequest());
-        return "order/place_order";
+    public OrderController(OrderPlacementPort orderPlacementPort) {
+        this.orderPlacementPort = orderPlacementPort;
     }
 
     @PostMapping("/place")
-    public String placeOrder(@ModelAttribute OrderRequest orderRequest, Model model, HttpServletRequest httpRequest) {
-        String jwtTokenString = getJwtFromRequest(httpRequest);
-        OrderResponse orderResponse;
-        if (jwtTokenString == null || !authenticationPort.validateToken(jwtTokenString)) {
-            orderResponse = new OrderResponse(null, "REJETE", "Non authentifié");
-            model.addAttribute("orderResponse", orderResponse);
-            model.addAttribute("error", orderResponse.getMessage());
-            return "order/order_result";
+    public ResponseEntity<?> placeOrder(@RequestBody OrderRequest orderRequest, HttpServletRequest httpRequest) {
+        String userIdHeader = httpRequest.getHeader("X-User-Id");
+        String path = httpRequest.getRequestURI();
+        String requestId = httpRequest.getHeader("X-Request-Id");
+        if (userIdHeader == null || userIdHeader.trim().isEmpty()) {
+            ErrorResponse err = new ErrorResponse(
+                Instant.now(),
+                path,
+                HttpStatus.BAD_REQUEST.value(),
+                "Bad Request",
+                "Header X-User-Id manquant",
+                requestId != null ? requestId : ""
+            );
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(err);
+        }
+        Long userId;
+        try {
+            userId = Long.valueOf(userIdHeader);
+        } catch (NumberFormatException e) {
+            ErrorResponse err = new ErrorResponse(
+                Instant.now(),
+                path,
+                HttpStatus.BAD_REQUEST.value(),
+                "Bad Request",
+                "Header X-User-Id invalide",
+                requestId != null ? requestId : ""
+            );
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(err);
         }
         try {
-            Long userId = jwtTokenPort.getUserIdFromToken(jwtTokenString);
-            Optional<User> userOpt = userPort.findById(userId);
-            if (userOpt.isEmpty()) {
-                orderResponse = new OrderResponse(null, "REJETE", "Utilisateur non trouvé");
-                model.addAttribute("orderResponse", orderResponse);
-                model.addAttribute("error", orderResponse.getMessage());
-                return "order/order_result";
-            }
-            orderResponse = orderService.placeOrder(orderRequest, userId);
-            model.addAttribute("orderResponse", orderResponse);
-            if ("ACCEPTE".equals(orderResponse.getStatus())) {
-                model.addAttribute("success", orderResponse.getMessage());
+            OrderPlacementPort.OrderPlacementResult result = orderPlacementPort.placeOrder(new OrderPlacementPort.OrderPlacementRequest(orderRequest, userId));
+            OrderResponse orderResponse = result.toOrderResponse();
+            if ("ACCEPTE".equals(result.getStatus())) {
+                return ResponseEntity.ok(orderResponse);
             } else {
-                model.addAttribute("error", orderResponse.getMessage());
+                ErrorResponse err = new ErrorResponse(
+                    Instant.now(),
+                    path,
+                    HttpStatus.BAD_REQUEST.value(),
+                    "Bad Request",
+                    result.getMessage() != null ? result.getMessage() : "Ordre rejeté",
+                    requestId != null ? requestId : ""
+                );
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(err);
             }
-            return "order/order_result";
         } catch (Exception e) {
-            orderResponse = new OrderResponse(null, "REJETE", "Erreur lors du placement de l'ordre : " + e.getMessage());
-            model.addAttribute("orderResponse", orderResponse);
-            model.addAttribute("error", orderResponse.getMessage());
-            return "order/order_result";
+            ErrorResponse err = new ErrorResponse(
+                Instant.now(),
+                path,
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "Internal Server Error",
+                "Erreur lors du placement de l'ordre : " + e.getMessage(),
+                requestId != null ? requestId : ""
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
         }
-    }
-
-    private String getJwtFromRequest(HttpServletRequest request) {
-        // Chercher d'abord dans les attributs de session (pour les tests)
-        Object sessionJwt = request.getSession().getAttribute("jwtToken");
-        if (sessionJwt instanceof String) {
-            return (String) sessionJwt;
-        }
-
-        // Chercher dans les cookies
-        if (request.getCookies() != null) {
-            for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
-                if ("jwt".equals(cookie.getName())) {
-                    return cookie.getValue();
-                }
-            }
-        }
-
-        // Fallback: chercher dans l'en-tête Authorization
-        String bearerToken = request.getHeader("Authorization");
-        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
-        }
-
-        return null;
     }
 }

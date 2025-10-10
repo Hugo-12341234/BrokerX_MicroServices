@@ -11,6 +11,7 @@ public class StockRuleMapper {
             entity.getTickSize(),
             entity.getMinBand(),
             entity.getMaxBand(),
+            entity.getPrice(),
             entity.getUpdatedAt()
         );
     }
@@ -22,6 +23,7 @@ public class StockRuleMapper {
         entity.setTickSize(domain.getTickSize());
         entity.setMinBand(domain.getMinBand());
         entity.setMaxBand(domain.getMaxBand());
+        entity.setPrice(domain.getPrice());
         entity.setUpdatedAt(domain.getUpdatedAt());
         return entity;
     }

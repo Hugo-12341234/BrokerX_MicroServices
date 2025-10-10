@@ -2,9 +2,16 @@ package com.microservices.log430.orderservice.domain.service;
 
 import com.microservices.log430.orderservice.adapters.web.dto.OrderRequest;
 import com.microservices.log430.orderservice.adapters.web.dto.OrderResponse;
+import com.microservices.log430.orderservice.domain.model.entities.Order;
 import com.microservices.log430.orderservice.domain.port.in.OrderPlacementPort;
+import com.microservices.log430.orderservice.domain.port.in.PreTradeValidationPort;
+import com.microservices.log430.orderservice.domain.port.out.OrderPort;
+import com.microservices.log430.orderservice.adapters.external.wallet.WalletClient;
+import com.microservices.log430.orderservice.adapters.external.wallet.WalletResponse;
+import com.microservices.log430.orderservice.adapters.external.wallet.Wallet;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -12,14 +19,17 @@ import java.util.Optional;
 @Service
 public class OrderService implements OrderPlacementPort {
     private final OrderPort orderPort;
-    private final UserPort userPort;
     private final PreTradeValidationPort preTradeValidationPort;
+    private final WalletClient walletClient;
+
+    @Value("${gateway.url:http://localhost:8079}")
+    private String gatewayUrl;
 
     @Autowired
-    public OrderService(OrderPort orderPort, UserPort userPort, PreTradeValidationPort preTradeValidationPort) {
+    public OrderService(OrderPort orderPort, PreTradeValidationPort preTradeValidationPort, WalletClient walletClient) {
         this.orderPort = orderPort;
-        this.userPort = userPort;
         this.preTradeValidationPort = preTradeValidationPort;
+        this.walletClient = walletClient;
     }
 
     @Override
@@ -41,13 +51,18 @@ public class OrderService implements OrderPlacementPort {
             );
         }
 
-        // Récupérer l'utilisateur pour vérifier le balance
-        Optional<User> userOpt = userPort.findById(request.getUserId());
-        if (userOpt.isEmpty()) {
-            return OrderPlacementResult.failure(null, "Utilisateur non trouvé");
+        // Appel au wallet-service via Feign pour récupérer le portefeuille
+        WalletResponse walletResponse;
+        try {
+            walletResponse = walletClient.getWallet(request.getUserId());
+        } catch (Exception ex) {
+            return OrderPlacementResult.failure(null, "Portefeuille introuvable ou inaccessible");
         }
-
-        User user = userOpt.get();
+        if (walletResponse == null || !walletResponse.isSuccess() || walletResponse.getWallet() == null) {
+            return OrderPlacementResult.failure(null, "Portefeuille introuvable");
+        }
+        Wallet wallet = walletResponse.getWallet();
+        // Vérification de la balance pour les ordres d'achat
         OrderRequest orderRequest = request.getOrderRequest();
 
         // Effectuer les contrôles pré-trades
@@ -57,7 +72,7 @@ public class OrderService implements OrderPlacementPort {
                 Order.OrderType.valueOf(orderRequest.getType()),
                 orderRequest.getQuantity(),
                 orderRequest.getPrice(),
-                user
+                wallet
         );
 
         PreTradeValidationPort.ValidationResult validation = preTradeValidationPort.validateOrder(validationRequest);

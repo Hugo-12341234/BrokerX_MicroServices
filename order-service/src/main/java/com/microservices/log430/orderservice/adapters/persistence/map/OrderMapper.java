@@ -1,5 +1,8 @@
 package com.microservices.log430.orderservice.adapters.persistence.map;
 
+import com.microservices.log430.orderservice.adapters.persistence.entities.OrderEntity;
+import com.microservices.log430.orderservice.domain.model.entities.Order;
+
 public class OrderMapper {
     public static OrderEntity toEntity(Order order) {
         if (order == null) return null;

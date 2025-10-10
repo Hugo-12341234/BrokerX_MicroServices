@@ -1,28 +1,30 @@
 package com.microservices.log430.walletservice.domain.service;
 
-import com.microservices.log430.walletservice.domain.model.entities.Stock;
+import com.microservices.log430.walletservice.domain.model.entities.StockRule;
+import com.microservices.log430.walletservice.domain.port.in.StockPort;
+import com.microservices.log430.walletservice.domain.port.out.StockRulePort;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.Optional;
 
-public class StockService {
-    // Stock TEST avec tick size de 0.01 (1 cent) et bande de prix de 5%
-    private static final Stock TEST_STOCK = new Stock(
-            "TEST",
-            "Stock de test",
-            100.00,
-            true,
-            new BigDecimal("0.01"), // Tick size de 1 cent
-            new BigDecimal("0.05")  // Bande de prix de 5% (95$ - 105$)
-    );
+@Service
+public class StockService implements StockPort {
 
-    public Stock getStockBySymbol(String symbol) {
-        if ("TEST".equalsIgnoreCase(symbol)) {
-            return TEST_STOCK;
-        }
-        return null;
+    private final StockRulePort stockRulePort;
+
+    @Autowired
+    public StockService(StockRulePort stockRulePort) {
+        this.stockRulePort = stockRulePort;
     }
 
-    public Stock getTestStock() {
-        return TEST_STOCK;
+    @Override
+    public Optional<StockRule> getStockRuleBySymbol(String symbol) {
+        if (symbol == null || symbol.trim().isEmpty()) {
+            return Optional.empty();
+        }
+        return stockRulePort.findBySymbol(symbol.trim());
     }
 }
