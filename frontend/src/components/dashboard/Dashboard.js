@@ -39,10 +39,10 @@ function Dashboard() {
           setWallet(data.wallet);
           setBalance(data.wallet.balance);
         } else {
-          setError(data.message || 'Erreur lors de la récupération du portefeuille.');
+          setError(data.message || `Erreur (${data.status}) : ${data.error}` || 'Erreur lors de la récupération du portefeuille');
         }
       } catch (err) {
-        setError('Erreur réseau ou serveur.');
+        setError('Erreur réseau ou serveur');
       }
       setLoading(false);
     };

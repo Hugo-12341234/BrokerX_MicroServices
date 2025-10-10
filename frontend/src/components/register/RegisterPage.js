@@ -28,9 +28,9 @@ function RegisterPage() {
         // Succès, affiche le message d'activation
         alert('Inscription réussie ! Un email d\'activation vous a été envoyé.');
       } else {
-        // Erreur, affiche le message d'erreur
+        // Erreur, affiche le message d'erreur normalisé
         const error = await response.json();
-        alert(error.message || 'Erreur lors de l\'inscription');
+        alert(error.message || `Erreur (${error.status}) : ${error.error}` || 'Erreur lors de l\'inscription');
       }
     } catch (err) {
       alert('Erreur réseau ou serveur');

@@ -4,6 +4,7 @@ import com.microservices.log430.authservice.adapters.web.dto.LoginRequest;
 import com.microservices.log430.authservice.adapters.web.dto.LoginResponse;
 import com.microservices.log430.authservice.adapters.web.dto.MfaVerificationRequest;
 import com.microservices.log430.authservice.adapters.web.dto.MfaVerificationResponse;
+import com.microservices.log430.authservice.adapters.web.dto.ErrorResponse;
 import com.microservices.log430.authservice.domain.port.in.AuthenticationPort;
 import com.microservices.log430.authservice.domain.port.out.MfaChallengePort;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,7 +31,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest) {
         logger.info("Tentative de connexion pour l'email : {}", request.getEmail());
         try {
             String ipAddress = getClientIpAddress(httpRequest);
@@ -46,19 +47,31 @@ public class AuthController {
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             logger.warn("Échec de la connexion pour l'email {} : {}", request.getEmail(), e.getMessage());
-            LoginResponse response = new LoginResponse(null, e.getMessage(), false, false);
+            int status = HttpStatus.BAD_REQUEST.value();
+            String error = "Bad Request";
             if ("Utilisateur non trouvé".equals(e.getMessage())) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+                status = HttpStatus.NOT_FOUND.value();
+                error = "Not Found";
             } else if ("Mot de passe incorrect".equals(e.getMessage())) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-            } else {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+                status = HttpStatus.UNAUTHORIZED.value();
+                error = "Unauthorized";
             }
+            String path = httpRequest.getRequestURI();
+            String requestId = httpRequest.getHeader("X-Request-Id");
+            ErrorResponse errResp = new ErrorResponse(
+                java.time.Instant.now(),
+                path,
+                status,
+                error,
+                e.getMessage(),
+                requestId != null ? requestId : ""
+            );
+            return ResponseEntity.status(status).body(errResp);
         }
     }
 
     @PostMapping("/verify-mfa")
-    public ResponseEntity<MfaVerificationResponse> verifyMfa(@RequestBody MfaVerificationRequest request,
+    public ResponseEntity<?> verifyMfa(@RequestBody MfaVerificationRequest request,
                                                              HttpServletRequest httpRequest,
                                                              HttpServletResponse httpResponse) {
         logger.info("Vérification MFA pour le challengeId : {}", request.getChallengeId());
@@ -94,29 +107,30 @@ public class AuthController {
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             logger.warn("Échec de la vérification MFA pour le challengeId {} : {}", request.getChallengeId(), e.getMessage());
-            String status = "error";
+            int status = HttpStatus.BAD_REQUEST.value();
+            String error = "Bad Request";
             String msg = e.getMessage();
             if (msg.contains("verrouillé") || msg.contains("bloqué")) {
-                status = "locked";
+                status = HttpStatus.FORBIDDEN.value();
+                error = "Forbidden";
             } else if (msg.contains("suspendu")) {
-                status = "suspended";
+                status = HttpStatus.FORBIDDEN.value();
+                error = "Forbidden";
+            } else if ("Code MFA incorrect".equals(msg)) {
+                status = HttpStatus.UNAUTHORIZED.value();
+                error = "Unauthorized";
             }
-            MfaVerificationResponse response = new MfaVerificationResponse(
-                    false,
-                    msg,
-                    null,
-                    status,
-                    null
+            String path = httpRequest.getRequestURI();
+            String requestId = httpRequest.getHeader("X-Request-Id");
+            ErrorResponse errResp = new ErrorResponse(
+                java.time.Instant.now(),
+                path,
+                status,
+                error,
+                msg,
+                requestId != null ? requestId : ""
             );
-            if ("Code MFA incorrect".equals(msg)) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-            } else if (status.equals("locked")) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
-            } else if (status.equals("suspended")) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
-            } else {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-            }
+            return ResponseEntity.status(status).body(errResp);
         }
     }
 

@@ -7,6 +7,7 @@ function LoginPage() {
     email: '',
     password: ''
   });
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -15,6 +16,7 @@ function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/login`, {
         method: 'POST',
@@ -32,11 +34,10 @@ function LoginPage() {
           navigate('/mfa', { state: { challengeId: data.challengeId } });
         }
       } else {
-        // Affiche le message d'erreur
-        alert(data.message || 'Erreur lors de la connexion');
+        setError(data.message || `Erreur (${data.status}) : ${data.error}` || 'Erreur lors de la connexion');
       }
     } catch (err) {
-      alert('Erreur réseau ou serveur');
+      setError('Erreur réseau ou serveur');
     }
   };
 
@@ -52,6 +53,7 @@ function LoginPage() {
 
         <button type="submit">Se connecter</button>
       </form>
+      {error && <div style={{ color: 'red', marginTop: '1rem' }}>{error}</div>}
       <div className="login-register-link">
         <span>Pas de compte ? </span>
         <a href="/register">Inscrivez-vous</a>

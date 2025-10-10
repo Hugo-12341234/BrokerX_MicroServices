@@ -49,7 +49,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     }
 
     private boolean isPublicRoute(String path) {
-        return path.startsWith("/auth") || path.startsWith("/users") || path.startsWith("/register") || path.startsWith("/verify");
+        return path.startsWith("/api/v1/auth") || path.startsWith("/api/v1/users") || path.startsWith("/api/v1/register") || path.startsWith("/api/v1/verify");
     }
 
     private String extractToken(ServerWebExchange exchange) {

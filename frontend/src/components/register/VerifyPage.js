@@ -9,8 +9,14 @@ function VerifyPage() {
   useEffect(() => {
     if (token) {
       fetch(`${process.env.REACT_APP_API_URL}/verify?token=${token}`)
-        .then(res => res.json())
-        .then(data => setMessage(data.message || 'Erreur inconnue'))
+        .then(async res => {
+          const data = await res.json();
+          if (res.ok) {
+            setMessage(data.message || 'Activation réussie !');
+          } else {
+            setMessage(data.message || `Erreur (${data.status}) : ${data.error}` || 'Erreur inconnue');
+          }
+        })
         .catch(() => setMessage('Erreur réseau ou serveur'));
     } else {
       setMessage('Token manquant dans l’URL');

@@ -4,11 +4,14 @@ import com.microservices.log430.walletservice.adapters.web.dto.DepositResponse;
 import com.microservices.log430.walletservice.domain.port.in.WalletDepositPort;
 import com.microservices.log430.walletservice.adapters.web.dto.DepositRequest;
 import com.microservices.log430.walletservice.adapters.web.dto.WalletResponse;
+import com.microservices.log430.walletservice.adapters.web.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+import java.time.Instant;
 
 @RestController
 @RequestMapping("/api/v1/wallet")
@@ -21,22 +24,46 @@ public class WalletController {
     }
 
     @GetMapping("")
-    public ResponseEntity<WalletResponse> getWallet(HttpServletRequest httpRequest) {
+    public ResponseEntity<?> getWallet(HttpServletRequest httpRequest) {
         String userIdHeader = httpRequest.getHeader("X-User-Id");
+        String path = httpRequest.getRequestURI();
+        String requestId = httpRequest.getHeader("X-Request-Id");
         if (userIdHeader == null || userIdHeader.trim().isEmpty()) {
-            return ResponseEntity.status(400)
-                    .body(WalletResponse.failure("Header X-User-Id manquant"));
+            ErrorResponse err = new ErrorResponse(
+                Instant.now(),
+                path,
+                HttpStatus.BAD_REQUEST.value(),
+                "Bad Request",
+                "Header X-User-Id manquant",
+                requestId != null ? requestId : ""
+            );
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(err);
         }
         Long userId;
         try {
             userId = Long.valueOf(userIdHeader);
         } catch (NumberFormatException e) {
-            return ResponseEntity.status(400)
-                    .body(WalletResponse.failure("Header X-User-Id invalide"));
+            ErrorResponse err = new ErrorResponse(
+                Instant.now(),
+                path,
+                HttpStatus.BAD_REQUEST.value(),
+                "Bad Request",
+                "Header X-User-Id invalide",
+                requestId != null ? requestId : ""
+            );
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(err);
         }
         var walletOpt = walletDepositPort.getWalletByUserId(userId);
         if (walletOpt.isEmpty()) {
-            return ResponseEntity.status(404).body(WalletResponse.failure("Portefeuille introuvable"));
+            ErrorResponse err = new ErrorResponse(
+                Instant.now(),
+                path,
+                HttpStatus.NOT_FOUND.value(),
+                "Not Found",
+                "Portefeuille introuvable",
+                requestId != null ? requestId : ""
+            );
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(err);
         }
         var wallet = walletOpt.get();
         WalletResponse response = new WalletResponse(true, "Portefeuille récupéré avec succès", wallet);
@@ -44,20 +71,36 @@ public class WalletController {
     }
 
     @PostMapping("/deposit")
-    public ResponseEntity<DepositResponse> deposit(@RequestBody DepositRequest request,
+    public ResponseEntity<?> deposit(@RequestBody DepositRequest request,
                                                    HttpServletRequest httpRequest) {
         try {
             String userIdHeader = httpRequest.getHeader("X-User-Id");
+            String path = httpRequest.getRequestURI();
+            String requestId = httpRequest.getHeader("X-Request-Id");
             if (userIdHeader == null || userIdHeader.trim().isEmpty()) {
-                return ResponseEntity.status(400)
-                        .body(DepositResponse.failure("Header X-User-Id manquant"));
+                ErrorResponse err = new ErrorResponse(
+                        Instant.now(),
+                        path,
+                        HttpStatus.BAD_REQUEST.value(),
+                        "Bad Request",
+                        "Header X-User-Id manquant",
+                        requestId != null ? requestId : ""
+                );
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(err);
             }
             Long userId;
             try {
                 userId = Long.valueOf(userIdHeader);
             } catch (NumberFormatException e) {
-                return ResponseEntity.status(400)
-                        .body(DepositResponse.failure("Header X-User-Id invalide"));
+                ErrorResponse err = new ErrorResponse(
+                        Instant.now(),
+                        path,
+                        HttpStatus.BAD_REQUEST.value(),
+                        "Bad Request",
+                        "Header X-User-Id invalide",
+                        requestId != null ? requestId : ""
+                );
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(err);
             }
             String idempotencyKey = httpRequest.getHeader("Idempotency-Key");
             if (idempotencyKey == null || idempotencyKey.trim().isEmpty()) {
@@ -76,12 +119,28 @@ public class WalletController {
                         result.getTransactionId()
                 ));
             } else {
-                return ResponseEntity.badRequest()
-                        .body(DepositResponse.failure(result.getMessage()));
+                ErrorResponse err = new ErrorResponse(
+                        Instant.now(),
+                        path,
+                        HttpStatus.BAD_REQUEST.value(),
+                        "Bad Request",
+                        result.getMessage(),
+                        requestId != null ? requestId : ""
+                );
+
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(err);
             }
         } catch (Exception e) {
-            return ResponseEntity.status(500)
-                    .body(DepositResponse.failure("Erreur lors du dépôt"));
+            ErrorResponse err = new ErrorResponse(
+                    Instant.now(),
+                    httpRequest.getRequestURI(),
+                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                    "Internal Server Error",
+                    "Erreur lors du dépôt",
+                    httpRequest.getHeader("X-Request-Id") != null ? httpRequest.getHeader("X-Request-Id") : ""
+            );
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
         }
     }
 }

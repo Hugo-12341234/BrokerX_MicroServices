@@ -31,16 +31,23 @@ function DepositForm({ onDeposit }) {
         },
         body: JSON.stringify({ amount: parseFloat(amount) })
       });
+      if (response.status === 401) {
+        alert("Session expirée. Veuillez vous reconnecter.");
+        localStorage.removeItem('jwt');
+        localStorage.removeItem('userId');
+        window.location.href = '/login';
+        return;
+      }
       const data = await response.json();
       if (response.ok && data.success) {
         setSuccess(`Dépôt réussi ! Nouveau solde : ${data.newBalance}`);
         setAmount('');
         if (onDeposit) onDeposit(data);
       } else {
-        setError(data.message || 'Erreur lors du dépôt.');
+        setError(data.message || `Erreur (${data.status}) : ${data.error}` || 'Erreur lors du dépôt.');
       }
     } catch (err) {
-      setError('Erreur réseau ou serveur.');
+      setError('Erreur réseau ou serveur');
     }
     setLoading(false);
   };

@@ -36,31 +36,35 @@ function MfaPage() {
         }
         alert(data.message);
         navigate('/dashboard');
-      } else if (data.status === 'locked') {
-        setError(data.message);
-        setLocked(true);
-        // Extraire le temps restant si présent dans le message
-        const match = data.message.match(/(\d+) secondes/);
-        if (match) {
-          setLockTimer(parseInt(match[1], 10));
-          let seconds = parseInt(match[1], 10);
-          const interval = setInterval(() => {
-            seconds--;
-            setLockTimer(seconds);
-            if (seconds <= 0) {
-              setLocked(false);
-              setLockTimer(0);
-              setError(''); // On retire le message d'erreur et le message de blocage
-              clearInterval(interval);
-            }
-          }, 1000);
+      } else if (response.status === 403) {
+        if (data.message && (data.message.toLowerCase().includes('verrouillé'))) {
+          setError(data.message);
+          setLocked(true);
+          // Extraire le temps restant si présent dans le message
+          const match = data.message.match(/(\d+) secondes/);
+          if (match) {
+            setLockTimer(parseInt(match[1], 10));
+            let seconds = parseInt(match[1], 10);
+            const interval = setInterval(() => {
+              seconds--;
+              setLockTimer(seconds);
+              if (seconds <= 0) {
+                setLocked(false);
+                setLockTimer(0);
+                setError('');
+                clearInterval(interval);
+              }
+            }, 1000);
+          }
+        } else if (data.message && data.message.toLowerCase().includes('suspendu')) {
+          setError(data.message);
+          alert(data.message);
+          setTimeout(() => {
+            navigate('/login');
+          }, 3500);
+        } else {
+          setError(data.message || 'Erreur d’accès au compte.');
         }
-      } else if (data.status === 'suspended') {
-        setError(data.message);
-        alert(data.message);
-        setTimeout(() => {
-          navigate('/login');
-        }, 3500);
       } else {
         setError(data.message || 'Erreur lors de la vérification MFA');
       }
