@@ -13,7 +13,8 @@ const TYPES = [
 ];
 const DURATIONS = [
   { value: 'DAY', label: 'Jour' },
-  { value: 'GTC', label: 'GTC' }
+  { value: 'IOC', label: 'IOC' },
+  { value: 'FOK', label: 'FOK' }
 ];
 
 function PlaceOrderPage() {
