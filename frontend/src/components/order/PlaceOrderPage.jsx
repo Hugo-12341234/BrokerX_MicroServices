@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { v4 as uuidv4 } from 'uuid';
 
 const SYMBOLS = ['AAPL', 'MSFT', 'TSLA', 'GOOG'];
 const SIDES = [
@@ -40,12 +41,14 @@ function PlaceOrderPage() {
     try {
       const token = localStorage.getItem('jwt');
       const userId = localStorage.getItem('userId');
+      const idempotencyKey = uuidv4();
       const res = await fetch(`${process.env.REACT_APP_API_URL}/orders/place`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-          'X-User-Id': userId
+          'X-User-Id': userId,
+          'Idempotency-Key': idempotencyKey
         },
         body: JSON.stringify({
           symbol: form.symbol,

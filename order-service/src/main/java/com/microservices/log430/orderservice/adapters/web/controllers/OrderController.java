@@ -29,7 +29,8 @@ public class OrderController {
         String userIdHeader = httpRequest.getHeader("X-User-Id");
         String path = httpRequest.getRequestURI();
         String requestId = httpRequest.getHeader("X-Request-Id");
-        logger.info("Réception d'une requête de placement d'ordre. Path: {}, RequestId: {}, X-User-Id: {}", path, requestId, userIdHeader);
+        String clientOrderId = httpRequest.getHeader("Idempotency-Key");
+        logger.info("Réception d'une requête de placement d'ordre. Path: {}, RequestId: {}, X-User-Id: {}, clientOrderId: {}", path, requestId, userIdHeader, clientOrderId);
         if (userIdHeader == null || userIdHeader.trim().isEmpty()) {
             logger.warn("Header X-User-Id manquant. Path: {}, RequestId: {}", path, requestId);
             ErrorResponse err = new ErrorResponse(
@@ -59,7 +60,7 @@ public class OrderController {
         }
         try {
             logger.info("Placement de l'ordre pour l'utilisateur {}", userId);
-            OrderPlacementPort.OrderPlacementResult result = orderPlacementPort.placeOrder(new OrderPlacementPort.OrderPlacementRequest(orderRequest, userId));
+            OrderPlacementPort.OrderPlacementResult result = orderPlacementPort.placeOrder(new OrderPlacementPort.OrderPlacementRequest(orderRequest, userId), clientOrderId);
             OrderResponse orderResponse = result.toOrderResponse();
             if ("ACCEPTE".equals(result.getStatus())) {
                 logger.info("Ordre accepté pour l'utilisateur {}. OrderId: {}", userId, orderResponse.getId());

@@ -4,7 +4,7 @@ import com.microservices.log430.orderservice.adapters.web.dto.OrderRequest;
 import com.microservices.log430.orderservice.adapters.web.dto.OrderResponse;
 
 public interface OrderPlacementPort {
-    OrderPlacementResult placeOrder(OrderPlacementRequest request);
+    OrderPlacementResult placeOrder(OrderPlacementRequest request, String clientOrderId);
 
     class OrderPlacementRequest {
         private final OrderRequest orderRequest;

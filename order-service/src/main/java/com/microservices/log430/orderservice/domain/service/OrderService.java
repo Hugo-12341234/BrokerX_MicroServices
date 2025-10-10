@@ -1,7 +1,6 @@
 package com.microservices.log430.orderservice.domain.service;
 
 import com.microservices.log430.orderservice.adapters.web.dto.OrderRequest;
-import com.microservices.log430.orderservice.adapters.web.dto.OrderResponse;
 import com.microservices.log430.orderservice.domain.model.entities.Order;
 import com.microservices.log430.orderservice.domain.port.in.OrderPlacementPort;
 import com.microservices.log430.orderservice.domain.port.in.PreTradeValidationPort;
@@ -11,7 +10,6 @@ import com.microservices.log430.orderservice.adapters.external.wallet.WalletResp
 import com.microservices.log430.orderservice.adapters.external.wallet.Wallet;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -25,9 +23,6 @@ public class OrderService implements OrderPlacementPort {
     private final PreTradeValidationPort preTradeValidationPort;
     private final WalletClient walletClient;
 
-    @Value("${gateway.url:http://localhost:8079}")
-    private String gatewayUrl;
-
     @Autowired
     public OrderService(OrderPort orderPort, PreTradeValidationPort preTradeValidationPort, WalletClient walletClient) {
         this.orderPort = orderPort;
@@ -36,8 +31,7 @@ public class OrderService implements OrderPlacementPort {
     }
 
     @Override
-    public OrderPlacementResult placeOrder(OrderPlacementRequest request) {
-        String clientOrderId = generateClientOrderId(request.getUserId(), request.getOrderRequest());
+    public OrderPlacementResult placeOrder(OrderPlacementRequest request, String clientOrderId) {
         logger.info("Placement d'ordre demandé. userId={}, clientOrderId={}, symbol={}, side={}, type={}, quantité={}, prix={}, durée={}",
             request.getUserId(), clientOrderId,
             request.getOrderRequest().getSymbol(),
@@ -106,32 +100,5 @@ public class OrderService implements OrderPlacementPort {
             Order savedOrder = orderPort.save(order);
             return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé avec succès");
         }
-    }
-
-    // Méthode pour générer un clientOrderId unique basé sur les paramètres de l'ordre
-    private String generateClientOrderId(Long userId, OrderRequest orderRequest) {
-        // Génération déterministe basée sur les paramètres de l'ordre pour assurer l'idempotence
-        // Si les mêmes paramètres sont envoyés, le même clientOrderId sera généré
-        String orderData = String.format("%d-%s-%s-%s-%d-%s-%s",
-                userId,
-                orderRequest.getSymbol() != null ? orderRequest.getSymbol().toUpperCase() : "null",
-                orderRequest.getSide(),
-                orderRequest.getType(),
-                orderRequest.getQuantity(),
-                orderRequest.getPrice() != null ? String.format("%.4f", orderRequest.getPrice()) : "null",
-                orderRequest.getDuration()
-        );
-
-        // Utiliser hashCode() pour générer un ID déterministe
-        // Le même input donnera toujours le même clientOrderId (idempotence)
-        int hash = orderData.hashCode();
-        return String.format("ORD-%d-%08X", userId, Math.abs(hash));
-    }
-
-    // Méthode helper pour compatibilité avec le contrôleur existant
-    public OrderResponse placeOrder(OrderRequest request, Long userId) {
-        OrderPlacementRequest portRequest = new OrderPlacementRequest(request, userId);
-        OrderPlacementPort.OrderPlacementResult result = placeOrder(portRequest);
-        return result.toOrderResponse();
     }
 }

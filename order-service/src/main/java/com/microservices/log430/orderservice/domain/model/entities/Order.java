@@ -103,4 +103,3 @@ public class Order {
         this.rejectReason = rejectReason;
     }
 }
-
