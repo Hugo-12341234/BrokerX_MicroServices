@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const SYMBOLS = ['AAPL', 'MSFT', 'TSLA', 'GOOG'];
 const SIDES = [
@@ -15,6 +16,7 @@ const DURATIONS = [
 ];
 
 function PlaceOrderPage() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     symbol: SYMBOLS[0],
     side: SIDES[0].value,
@@ -36,9 +38,9 @@ function PlaceOrderPage() {
     setError(null);
     setResult(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('jwt');
       const userId = localStorage.getItem('userId');
-      const res = await fetch('/api/v1/orders/place', {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/orders/place`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -64,6 +66,7 @@ function PlaceOrderPage() {
 
   return (
     <div style={{ maxWidth: 400, margin: 'auto' }}>
+      <button onClick={() => navigate('/dashboard')} style={{ marginBottom: '1rem' }}>Retour au dashboard</button>
       <h2>Placer un ordre</h2>
       <form onSubmit={handleSubmit}>
         <label>Symbole&nbsp;
@@ -107,4 +110,3 @@ function PlaceOrderPage() {
 }
 
 export default PlaceOrderPage;
-

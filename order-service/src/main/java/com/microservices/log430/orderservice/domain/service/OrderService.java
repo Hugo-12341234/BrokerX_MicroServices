@@ -15,9 +15,12 @@ import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Instant;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class OrderService implements OrderPlacementPort {
+    private static final Logger logger = LoggerFactory.getLogger(OrderService.class);
     private final OrderPort orderPort;
     private final PreTradeValidationPort preTradeValidationPort;
     private final WalletClient walletClient;
@@ -34,51 +37,54 @@ public class OrderService implements OrderPlacementPort {
 
     @Override
     public OrderPlacementResult placeOrder(OrderPlacementRequest request) {
-        // Générer un clientOrderId unique si pas fourni
         String clientOrderId = generateClientOrderId(request.getUserId(), request.getOrderRequest());
-
-        // Vérification d'idempotence : chercher un ordre existant avec le même clientOrderId
+        logger.info("Placement d'ordre demandé. userId={}, clientOrderId={}, symbol={}, side={}, type={}, quantité={}, prix={}, durée={}",
+            request.getUserId(), clientOrderId,
+            request.getOrderRequest().getSymbol(),
+            request.getOrderRequest().getSide(),
+            request.getOrderRequest().getType(),
+            request.getOrderRequest().getQuantity(),
+            request.getOrderRequest().getPrice(),
+            request.getOrderRequest().getDuration());
         Optional<Order> existingOrder = orderPort.findByClientOrderId(clientOrderId);
         if (existingOrder.isPresent()) {
-            // Retourner le résultat de l'ordre existant (idempotence)
             Order existing = existingOrder.get();
+            logger.info("Idempotence : ordre déjà existant. clientOrderId={}, status={}, orderId={}", clientOrderId, existing.getStatus(), existing.getId());
             return OrderPlacementResult.of(
-                    existing.getStatus() == Order.OrderStatus.ACCEPTE,
-                    existing.getId(),
-                    existing.getStatus().name(),
-                    existing.getStatus() == Order.OrderStatus.ACCEPTE ?
-                            "Ordre placé avec succès" : existing.getRejectReason()
+                existing.getStatus() == Order.OrderStatus.ACCEPTE,
+                existing.getId(),
+                existing.getStatus().name(),
+                existing.getStatus() == Order.OrderStatus.ACCEPTE ?
+                    "Ordre placé avec succès" : existing.getRejectReason()
             );
         }
-
-        // Appel au wallet-service via Feign pour récupérer le portefeuille
         WalletResponse walletResponse;
         try {
+            logger.info("Appel au wallet-service pour userId={}", request.getUserId());
             walletResponse = walletClient.getWallet(request.getUserId());
         } catch (Exception ex) {
+            logger.error("Erreur lors de la récupération du portefeuille pour userId={}: {}", request.getUserId(), ex.getMessage(), ex);
             return OrderPlacementResult.failure(null, "Portefeuille introuvable ou inaccessible");
         }
         if (walletResponse == null || !walletResponse.isSuccess() || walletResponse.getWallet() == null) {
+            logger.warn("Portefeuille introuvable ou réponse invalide pour userId={}", request.getUserId());
             return OrderPlacementResult.failure(null, "Portefeuille introuvable");
         }
         Wallet wallet = walletResponse.getWallet();
-        // Vérification de la balance pour les ordres d'achat
         OrderRequest orderRequest = request.getOrderRequest();
-
-        // Effectuer les contrôles pré-trades
+        logger.info("Validation pré-trade pour userId={}, symbol={}, side={}, type={}, quantité={}, prix={}",
+            request.getUserId(), orderRequest.getSymbol(), orderRequest.getSide(), orderRequest.getType(), orderRequest.getQuantity(), orderRequest.getPrice());
         PreTradeValidationPort.ValidationRequest validationRequest = new PreTradeValidationPort.ValidationRequest(
-                orderRequest.getSymbol(),
-                Order.Side.valueOf(orderRequest.getSide()),
-                Order.OrderType.valueOf(orderRequest.getType()),
-                orderRequest.getQuantity(),
-                orderRequest.getPrice(),
-                wallet
+            orderRequest.getSymbol(),
+            Order.Side.valueOf(orderRequest.getSide()),
+            Order.OrderType.valueOf(orderRequest.getType()),
+            orderRequest.getQuantity(),
+            orderRequest.getPrice(),
+            wallet
         );
-
         PreTradeValidationPort.ValidationResult validation = preTradeValidationPort.validateOrder(validationRequest);
-
         Order order = new Order();
-        order.setClientOrderId(clientOrderId); // Assigner le clientOrderId généré
+        order.setClientOrderId(clientOrderId);
         order.setUserId(request.getUserId());
         order.setSymbol(orderRequest.getSymbol());
         order.setSide(Order.Side.valueOf(orderRequest.getSide()));
@@ -87,15 +93,14 @@ public class OrderService implements OrderPlacementPort {
         order.setPrice(orderRequest.getPrice());
         order.setDuration(Order.DurationType.valueOf(orderRequest.getDuration()));
         order.setTimestamp(Instant.now());
-
         if (!validation.isValid()) {
-            // Ordre rejeté
+            logger.warn("Ordre rejeté pour userId={}, clientOrderId={}, raison={}", request.getUserId(), clientOrderId, validation.getRejectReason());
             order.setStatus(Order.OrderStatus.REJETE);
             order.setRejectReason(validation.getRejectReason());
             Order savedOrder = orderPort.save(order);
             return OrderPlacementResult.failure(savedOrder.getId(), validation.getRejectReason());
         } else {
-            // Ordre accepté
+            logger.info("Ordre accepté pour userId={}, clientOrderId={}, orderId={}", request.getUserId(), clientOrderId, order.getId());
             order.setStatus(Order.OrderStatus.ACCEPTE);
             order.setRejectReason(null);
             Order savedOrder = orderPort.save(order);

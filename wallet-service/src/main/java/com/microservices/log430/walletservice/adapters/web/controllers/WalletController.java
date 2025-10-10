@@ -13,10 +13,13 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/v1/wallet")
 public class WalletController {
+    private static final Logger logger = LoggerFactory.getLogger(WalletController.class);
 
     private final WalletDepositPort walletDepositPort;
     private final StockPort stockPort;
@@ -31,7 +34,9 @@ public class WalletController {
         String userIdHeader = httpRequest.getHeader("X-User-Id");
         String path = httpRequest.getRequestURI();
         String requestId = httpRequest.getHeader("X-Request-Id");
+        logger.info("Requête GET portefeuille reçue. Path: {}, RequestId: {}, X-User-Id: {}", path, requestId, userIdHeader);
         if (userIdHeader == null || userIdHeader.trim().isEmpty()) {
+            logger.warn("Header X-User-Id manquant. Path: {}, RequestId: {}", path, requestId);
             ErrorResponse err = new ErrorResponse(
                 Instant.now(),
                 path,
@@ -46,6 +51,7 @@ public class WalletController {
         try {
             userId = Long.valueOf(userIdHeader);
         } catch (NumberFormatException e) {
+            logger.error("Header X-User-Id invalide: {}. Path: {}, RequestId: {}", userIdHeader, path, requestId);
             ErrorResponse err = new ErrorResponse(
                 Instant.now(),
                 path,
@@ -58,6 +64,7 @@ public class WalletController {
         }
         var walletOpt = walletDepositPort.getWalletByUserId(userId);
         if (walletOpt.isEmpty()) {
+            logger.warn("Portefeuille introuvable pour userId={}. Path: {}, RequestId: {}", userId, path, requestId);
             ErrorResponse err = new ErrorResponse(
                 Instant.now(),
                 path,
@@ -69,6 +76,7 @@ public class WalletController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(err);
         }
         var wallet = walletOpt.get();
+        logger.info("Portefeuille récupéré avec succès pour userId={}", userId);
         WalletResponse response = new WalletResponse(true, "Portefeuille récupéré avec succès", wallet);
         return ResponseEntity.ok(response);
     }
@@ -80,7 +88,9 @@ public class WalletController {
             String userIdHeader = httpRequest.getHeader("X-User-Id");
             String path = httpRequest.getRequestURI();
             String requestId = httpRequest.getHeader("X-Request-Id");
+            logger.info("Requête dépôt reçue. Path: {}, RequestId: {}, X-User-Id: {}", path, requestId, userIdHeader);
             if (userIdHeader == null || userIdHeader.trim().isEmpty()) {
+                logger.warn("Header X-User-Id manquant. Path: {}, RequestId: {}", path, requestId);
                 ErrorResponse err = new ErrorResponse(
                         Instant.now(),
                         path,
@@ -95,6 +105,7 @@ public class WalletController {
             try {
                 userId = Long.valueOf(userIdHeader);
             } catch (NumberFormatException e) {
+                logger.error("Header X-User-Id invalide: {}. Path: {}, RequestId: {}", userIdHeader, path, requestId);
                 ErrorResponse err = new ErrorResponse(
                         Instant.now(),
                         path,
@@ -108,7 +119,11 @@ public class WalletController {
             String idempotencyKey = httpRequest.getHeader("Idempotency-Key");
             if (idempotencyKey == null || idempotencyKey.trim().isEmpty()) {
                 idempotencyKey = UUID.randomUUID().toString();
+                logger.info("Idempotency-Key généré: {}", idempotencyKey);
+            } else {
+                logger.info("Idempotency-Key reçu: {}", idempotencyKey);
             }
+            logger.info("Dépôt demandé: userId={}, montant={}, idempotencyKey={}", userId, request.getAmount(), idempotencyKey);
             WalletDepositPort.DepositRequest domainRequest = new WalletDepositPort.DepositRequest(
                     userId,
                     request.getAmount(),
@@ -116,12 +131,14 @@ public class WalletController {
             );
             WalletDepositPort.DepositResult result = walletDepositPort.deposit(domainRequest);
             if (result.isSuccess()) {
+                logger.info("Dépôt réussi: userId={}, montant={}, nouveau solde={}, transactionId={}", userId, request.getAmount(), result.getNewBalance(), result.getTransactionId());
                 return ResponseEntity.ok(DepositResponse.success(
                         result.getMessage(),
                         result.getNewBalance(),
                         result.getTransactionId()
                 ));
             } else {
+                logger.warn("Dépôt échoué: userId={}, montant={}, raison={}", userId, request.getAmount(), result.getMessage());
                 ErrorResponse err = new ErrorResponse(
                         Instant.now(),
                         path,
@@ -134,6 +151,7 @@ public class WalletController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(err);
             }
         } catch (Exception e) {
+            logger.error("Erreur lors du dépôt: {}", e.getMessage(), e);
             ErrorResponse err = new ErrorResponse(
                     Instant.now(),
                     httpRequest.getRequestURI(),
@@ -151,8 +169,10 @@ public class WalletController {
     public ResponseEntity<?> getStockBySymbol(@RequestParam("symbol") String symbol, HttpServletRequest httpRequest) {
         String path = httpRequest.getRequestURI();
         String requestId = httpRequest.getHeader("X-Request-Id");
+        logger.info("Requête GET stock reçue. Path: {}, RequestId: {}, symbol: {}", path, requestId, symbol);
         var stockRuleOpt = stockPort.getStockRuleBySymbol(symbol);
         if (stockRuleOpt.isEmpty()) {
+            logger.warn("StockRule introuvable pour le symbole '{}'. Path: {}, RequestId: {}", symbol, path, requestId);
             ErrorResponse err = new ErrorResponse(
                 Instant.now(),
                 path,
@@ -164,6 +184,7 @@ public class WalletController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(err);
         }
         var stockRule = stockRuleOpt.get();
+        logger.info("StockRule récupéré avec succès pour le symbole '{}'", symbol);
         return ResponseEntity.ok(stockRule);
     }
 }
