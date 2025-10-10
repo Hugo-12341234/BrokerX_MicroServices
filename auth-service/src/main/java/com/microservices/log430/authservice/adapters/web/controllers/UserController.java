@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/users")
+@RequestMapping("/api/v1/users")
 public class UserController {
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
     private final RegistrationPort registrationPort;

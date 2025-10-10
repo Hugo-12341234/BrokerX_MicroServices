@@ -22,7 +22,7 @@ public class UserVerificationController {
         this.registrationPort = registrationPort;
     }
 
-    @GetMapping("/verify")
+    @GetMapping("/api/v1/verify")
     public ResponseEntity<?> verify(@RequestParam("token") String token) {
         logger.info("Vérification du compte utilisateur avec le token : {}", token);
         boolean success = registrationPort.verifyUser(token);
