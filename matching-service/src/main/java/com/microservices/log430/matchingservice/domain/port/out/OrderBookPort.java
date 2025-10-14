@@ -10,5 +10,5 @@ public interface OrderBookPort {
     Optional<OrderBook> findByClientOrderId(String clientOrderId);
     List<OrderBook> findAllBySymbol(String symbol);
     List<OrderBook> findAll();
+    void deleteById(Long id);
 }
-

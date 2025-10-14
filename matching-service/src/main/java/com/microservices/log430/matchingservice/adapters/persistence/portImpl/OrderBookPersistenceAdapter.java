@@ -45,4 +45,9 @@ public class OrderBookPersistenceAdapter implements OrderBookPort {
     public List<OrderBook> findAll() {
         return repository.findAll().stream().map(OrderBookMapper::toDomain).collect(Collectors.toList());
     }
+
+    @Override
+    public void deleteById(Long id) {
+        repository.deleteById(id);
+    }
 }

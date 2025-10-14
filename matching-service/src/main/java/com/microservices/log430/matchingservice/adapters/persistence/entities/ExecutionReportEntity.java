@@ -25,6 +25,12 @@ public class ExecutionReportEntity {
     @Column(name = "execution_time", nullable = false)
     private LocalDateTime executionTime;
 
+    @Column(name = "buyer_user_id", nullable = false)
+    private Long buyerUserId;
+
+    @Column(name = "seller_user_id", nullable = false)
+    private Long sellerUserId;
+
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -43,4 +49,10 @@ public class ExecutionReportEntity {
 
     public LocalDateTime getExecutionTime() { return executionTime; }
     public void setExecutionTime(LocalDateTime executionTime) { this.executionTime = executionTime; }
+
+    public Long getBuyerUserId() { return buyerUserId; }
+    public void setBuyerUserId(Long buyerUserId) { this.buyerUserId = buyerUserId; }
+
+    public Long getSellerUserId() { return sellerUserId; }
+    public void setSellerUserId(Long sellerUserId) { this.sellerUserId = sellerUserId; }
 }

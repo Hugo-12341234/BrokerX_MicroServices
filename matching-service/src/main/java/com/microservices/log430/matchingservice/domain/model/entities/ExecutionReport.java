@@ -9,6 +9,8 @@ public class ExecutionReport {
     private Double fillPrice;
     private String fillType;
     private LocalDateTime executionTime;
+    private Long buyerUserId;
+    private Long sellerUserId;
 
     // Getters and Setters
     public Long getId() { return id; }
@@ -28,4 +30,10 @@ public class ExecutionReport {
 
     public LocalDateTime getExecutionTime() { return executionTime; }
     public void setExecutionTime(LocalDateTime executionTime) { this.executionTime = executionTime; }
+
+    public Long getBuyerUserId() { return buyerUserId; }
+    public void setBuyerUserId(Long buyerUserId) { this.buyerUserId = buyerUserId; }
+
+    public Long getSellerUserId() { return sellerUserId; }
+    public void setSellerUserId(Long sellerUserId) { this.sellerUserId = sellerUserId; }
 }
