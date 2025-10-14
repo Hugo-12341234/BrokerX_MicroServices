@@ -90,6 +90,7 @@ public class MatchingService implements MatchingPort {
             exec.setFillPrice(candidate.getPrice());
             exec.setFillType(fillQty == savedOrder.getQuantityRemaining() ? "Full" : "Partial");
             exec.setExecutionTime(LocalDateTime.now());
+            exec.setSymbol(savedOrder.getSymbol());
             // Ajout des informations d'utilisateur
             if ("ACHAT".equals(savedOrder.getSide())) {
                 exec.setBuyerUserId(savedOrder.getUserId());

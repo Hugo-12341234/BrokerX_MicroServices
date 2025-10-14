@@ -11,6 +11,7 @@ public class ExecutionReport {
     private LocalDateTime executionTime;
     private Long buyerUserId;
     private Long sellerUserId;
+    private String symbol;
 
     // Getters and Setters
     public Long getId() { return id; }
@@ -36,4 +37,7 @@ public class ExecutionReport {
 
     public Long getSellerUserId() { return sellerUserId; }
     public void setSellerUserId(Long sellerUserId) { this.sellerUserId = sellerUserId; }
+
+    public String getSymbol() { return symbol; }
+    public void setSymbol(String symbol) { this.symbol = symbol; }
 }

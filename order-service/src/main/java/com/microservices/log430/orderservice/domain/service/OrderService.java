@@ -8,10 +8,18 @@ import com.microservices.log430.orderservice.domain.port.out.OrderPort;
 import com.microservices.log430.orderservice.adapters.external.wallet.WalletClient;
 import com.microservices.log430.orderservice.adapters.external.wallet.WalletResponse;
 import com.microservices.log430.orderservice.adapters.external.wallet.Wallet;
+import com.microservices.log430.orderservice.adapters.external.wallet.WalletUpdateRequest;
+import com.microservices.log430.orderservice.adapters.external.matching.MatchingClient;
+import com.microservices.log430.orderservice.adapters.external.matching.dto.OrderDTO;
+import com.microservices.log430.orderservice.adapters.external.matching.dto.MatchingResult;
+import com.microservices.log430.orderservice.adapters.external.matching.dto.ExecutionReportDTO;
+import com.microservices.log430.orderservice.adapters.external.matching.dto.OrderBookDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,12 +30,14 @@ public class OrderService implements OrderPlacementPort {
     private final OrderPort orderPort;
     private final PreTradeValidationPort preTradeValidationPort;
     private final WalletClient walletClient;
+    private final MatchingClient matchingClient;
 
     @Autowired
-    public OrderService(OrderPort orderPort, PreTradeValidationPort preTradeValidationPort, WalletClient walletClient) {
+    public OrderService(OrderPort orderPort, PreTradeValidationPort preTradeValidationPort, WalletClient walletClient, MatchingClient matchingClient) {
         this.orderPort = orderPort;
         this.preTradeValidationPort = preTradeValidationPort;
         this.walletClient = walletClient;
+        this.matchingClient = matchingClient;
     }
 
     @Override
@@ -98,7 +108,73 @@ public class OrderService implements OrderPlacementPort {
             order.setStatus(Order.OrderStatus.ACCEPTE);
             order.setRejectReason(null);
             Order savedOrder = orderPort.save(order);
-            return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé avec succès");
+
+            // Appel au matching-service
+            OrderDTO orderDTO = new OrderDTO(
+                savedOrder.getId(),
+                savedOrder.getClientOrderId(),
+                savedOrder.getUserId(),
+                savedOrder.getSymbol(),
+                savedOrder.getSide().name(),
+                savedOrder.getType().name(),
+                savedOrder.getQuantity(),
+                savedOrder.getPrice(),
+                savedOrder.getDuration().name(),
+                savedOrder.getTimestamp(),
+                savedOrder.getStatus().name(),
+                savedOrder.getRejectReason()
+            );
+            MatchingResult matchingResult = null;
+            try {
+                matchingResult = matchingClient.matchOrder(orderDTO);
+            } catch (Exception e) {
+                logger.error("Erreur lors de l'appel au matching-service : {}", e.getMessage(), e);
+                return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé, mais matching non effectué : " + e.getMessage());
+            }
+            // Mise à jour des portefeuilles pour chaque deal
+            List<String> deals = new ArrayList<>();
+            if (matchingResult != null && matchingResult.executions != null) {
+                for (ExecutionReportDTO exec : matchingResult.executions) {
+                    try {
+                        // Mise à jour acheteur
+                        WalletUpdateRequest buyerUpdate = new WalletUpdateRequest(
+                            exec.getBuyerUserId(),
+                            exec.getSymbol(),
+                            exec.getFillQuantity(),
+                            -exec.getFillPrice() * exec.getFillQuantity()
+                        );
+                        walletClient.updateWallet(buyerUpdate);
+                        // Mise à jour vendeur
+                        WalletUpdateRequest sellerUpdate = new WalletUpdateRequest(
+                            exec.getSellerUserId(),
+                            exec.getSymbol(),
+                            -exec.getFillQuantity(),
+                            exec.getFillPrice() * exec.getFillQuantity()
+                        );
+                        walletClient.updateWallet(sellerUpdate);
+                        deals.add(String.format("Deal: %d %s @ %.2f entre acheteur %d et vendeur %d", exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice(), exec.getBuyerUserId(), exec.getSellerUserId()));
+                    } catch (Exception ex) {
+                        logger.error("Erreur lors de la mise à jour du portefeuille pour le deal : {}", ex.getMessage(), ex);
+                    }
+                }
+            }
+            // Gestion des annulations
+            String annulationInfo = "";
+            if (matchingResult != null && matchingResult.updatedOrder != null) {
+                OrderBookDTO ob = matchingResult.updatedOrder;
+                if ("REJETE".equals(ob.getStatus()) || (ob.getQuantityRemaining() > 0 && ob.getQuantityRemaining() < savedOrder.getQuantity())) {
+                    annulationInfo = ob.getRejectReason() != null ? ob.getRejectReason() : "Ordre partiellement ou totalement annulé.";
+                }
+            }
+            // Construction du message pour le frontend
+            StringBuilder message = new StringBuilder("Ordre placé avec succès.");
+            if (!deals.isEmpty()) {
+                message.append(" Exécutions: ").append(String.join(", ", deals));
+            }
+            if (!annulationInfo.isEmpty()) {
+                message.append(" Annulation: ").append(annulationInfo);
+            }
+            return OrderPlacementResult.success(savedOrder.getId(), message.toString());
         }
     }
 }
