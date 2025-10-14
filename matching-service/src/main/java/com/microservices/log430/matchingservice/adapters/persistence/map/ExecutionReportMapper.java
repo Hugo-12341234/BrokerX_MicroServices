@@ -13,6 +13,9 @@ public class ExecutionReportMapper {
         domain.setFillPrice(entity.getFillPrice());
         domain.setFillType(entity.getFillType());
         domain.setExecutionTime(entity.getExecutionTime());
+        domain.setBuyerUserId(entity.getBuyerUserId());
+        domain.setSellerUserId(entity.getSellerUserId());
+        domain.setSymbol(entity.getSymbol());
         return domain;
     }
 
@@ -25,7 +28,9 @@ public class ExecutionReportMapper {
         entity.setFillPrice(domain.getFillPrice());
         entity.setFillType(domain.getFillType());
         entity.setExecutionTime(domain.getExecutionTime());
+        entity.setBuyerUserId(domain.getBuyerUserId());
+        entity.setSellerUserId(domain.getSellerUserId());
+        entity.setSymbol(domain.getSymbol());
         return entity;
     }
 }
-

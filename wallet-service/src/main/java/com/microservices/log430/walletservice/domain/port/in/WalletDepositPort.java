@@ -8,6 +8,7 @@ import java.util.Optional;
 public interface WalletDepositPort {
     DepositResult deposit(DepositRequest request);
     Optional<Wallet> getWalletByUserId(Long userId);
+    UpdateResult updateWallet(Long userId, String symbol, int quantityChange, double amountChange);
 
     class DepositRequest {
         private final Long userId;
@@ -50,5 +51,19 @@ public interface WalletDepositPort {
         public String getMessage() { return message; }
         public BigDecimal getNewBalance() { return newBalance; }
         public Long getTransactionId() { return transactionId; }
+    }
+
+    class UpdateResult {
+        private final boolean success;
+        private final String message;
+        private final Wallet wallet;
+        public UpdateResult(boolean success, String message, Wallet wallet) {
+            this.success = success;
+            this.message = message;
+            this.wallet = wallet;
+        }
+        public boolean isSuccess() { return success; }
+        public String getMessage() { return message; }
+        public Wallet getWallet() { return wallet; }
     }
 }

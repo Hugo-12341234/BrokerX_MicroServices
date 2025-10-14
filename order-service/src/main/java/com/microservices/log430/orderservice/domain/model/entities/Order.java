@@ -26,7 +26,28 @@ public class Order {
         DAY, IOC, FOK
     }
     public enum OrderStatus {
-        ACCEPTE, REJETE, EN_ATTENTE
+        ACCEPTE, REJETE, EN_ATTENTE, WORKING, PARTIALLYFILLED, FILLED, CANCELLED;
+
+        public static OrderStatus fromString(String status) {
+            if (status == null) return EN_ATTENTE;
+            switch (status.trim().toUpperCase()) {
+                case "ACCEPTE": return ACCEPTE;
+                case "REJETE": return REJETE;
+                case "Working": return WORKING;
+                case "EN_ATTENTE": return EN_ATTENTE;
+                case "WORKING": return WORKING;
+                case "PARTIALLYFILLED":
+                case "PARTIALLY_FILLED":
+                case "PartiallyFilled": return PARTIALLYFILLED;
+                case "PARTIALFILLED": return PARTIALLYFILLED;
+                case "PartialFilled": return PARTIALLYFILLED;
+                case "Filled": return FILLED;
+                case "FILLED": return FILLED;
+                case "Cancelled": return CANCELLED;
+                case "CANCELLED": return CANCELLED;
+                default: return EN_ATTENTE;
+            }
+        }
     }
 
     // Getters et setters

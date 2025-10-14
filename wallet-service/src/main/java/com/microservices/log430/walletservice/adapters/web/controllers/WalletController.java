@@ -6,6 +6,7 @@ import com.microservices.log430.walletservice.adapters.web.dto.DepositRequest;
 import com.microservices.log430.walletservice.adapters.web.dto.WalletResponse;
 import com.microservices.log430.walletservice.adapters.web.dto.ErrorResponse;
 import com.microservices.log430.walletservice.domain.port.in.StockPort;
+import com.microservices.log430.walletservice.adapters.web.dto.WalletUpdateRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
@@ -186,5 +187,42 @@ public class WalletController {
         var stockRule = stockRuleOpt.get();
         logger.info("StockRule récupéré avec succès pour le symbole '{}'", symbol);
         return ResponseEntity.ok(stockRule);
+    }
+
+    @PostMapping("/update")
+    public ResponseEntity<?> updateWallet(@RequestBody WalletUpdateRequest request, HttpServletRequest httpRequest) {
+        String path = httpRequest.getRequestURI();
+        String requestId = httpRequest.getHeader("X-Request-Id");
+        logger.info("Requête MAJ portefeuille reçue. Path: {}, RequestId: {}, userId={}, symbol={}, qtyChange={}, amountChange={}",
+            path, requestId, request.userId, request.symbol, request.quantityChange, request.amountChange);
+        try {
+            var result = walletDepositPort.updateWallet(request.userId, request.symbol, request.quantityChange, request.amountChange);
+            if (result.isSuccess()) {
+                logger.info("MAJ portefeuille réussie pour userId={}", request.userId);
+                return ResponseEntity.ok(new WalletResponse(true, "Portefeuille mis à jour", result.getWallet()));
+            } else {
+                logger.warn("MAJ portefeuille échouée pour userId={}, raison={}", request.userId, result.getMessage());
+                ErrorResponse err = new ErrorResponse(
+                    java.time.Instant.now(),
+                    path,
+                    HttpStatus.BAD_REQUEST.value(),
+                    "Bad Request",
+                    result.getMessage(),
+                    requestId
+                );
+                return ResponseEntity.badRequest().body(err);
+            }
+        } catch (Exception e) {
+            logger.error("Exception technique lors de la MAJ portefeuille pour userId={}, symbol={}, qtyChange={}, amountChange={}: {}", request.userId, request.symbol, request.quantityChange, request.amountChange, e.getMessage(), e);
+            ErrorResponse err = new ErrorResponse(
+                java.time.Instant.now(),
+                path,
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "Internal Server Error",
+                "Erreur lors de la mise à jour du portefeuille : " + e.getMessage(),
+                requestId
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
+        }
     }
 }

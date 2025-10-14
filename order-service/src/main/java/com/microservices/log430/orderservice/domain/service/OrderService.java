@@ -105,7 +105,7 @@ public class OrderService implements OrderPlacementPort {
             return OrderPlacementResult.failure(savedOrder.getId(), validation.getRejectReason());
         } else {
             logger.info("Ordre accepté pour userId={}, clientOrderId={}, orderId={}", request.getUserId(), clientOrderId, order.getId());
-            order.setStatus(Order.OrderStatus.ACCEPTE);
+            order.setStatus(Order.OrderStatus.WORKING);
             order.setRejectReason(null);
             Order savedOrder = orderPort.save(order);
 
@@ -131,27 +131,50 @@ public class OrderService implements OrderPlacementPort {
                 logger.error("Erreur lors de l'appel au matching-service : {}", e.getMessage(), e);
                 return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé, mais matching non effectué : " + e.getMessage());
             }
+            // Mise à jour du statut du Order selon le résultat du matching-service
+            if (matchingResult != null && matchingResult.updatedOrder != null) {
+                OrderBookDTO ob = matchingResult.updatedOrder;
+                savedOrder.setStatus(Order.OrderStatus.fromString(ob.getStatus()));
+                savedOrder.setRejectReason(ob.getRejectReason());
+                // Si applicable, mettre à jour la quantité restante ou autres champs
+                // savedOrder.setQuantityRemaining(ob.getQuantityRemaining()); // si champ présent dans Order
+                orderPort.save(savedOrder);
+            }
             // Mise à jour des portefeuilles pour chaque deal
             List<String> deals = new ArrayList<>();
             if (matchingResult != null && matchingResult.executions != null) {
                 for (ExecutionReportDTO exec : matchingResult.executions) {
                     try {
-                        // Mise à jour acheteur
-                        WalletUpdateRequest buyerUpdate = new WalletUpdateRequest(
-                            exec.getBuyerUserId(),
-                            exec.getSymbol(),
-                            exec.getFillQuantity(),
-                            -exec.getFillPrice() * exec.getFillQuantity()
-                        );
-                        walletClient.updateWallet(buyerUpdate);
-                        // Mise à jour vendeur
-                        WalletUpdateRequest sellerUpdate = new WalletUpdateRequest(
-                            exec.getSellerUserId(),
-                            exec.getSymbol(),
-                            -exec.getFillQuantity(),
-                            exec.getFillPrice() * exec.getFillQuantity()
-                        );
-                        walletClient.updateWallet(sellerUpdate);
+                        // Skip update si userId == 9999 (seed)
+                        if (exec.getBuyerUserId() != null && exec.getBuyerUserId() == 9999L) {
+                            logger.info("Skip update portefeuille pour l'acheteur userId=9999 (seed)");
+                        } else {
+                            WalletUpdateRequest buyerUpdate = new WalletUpdateRequest(
+                                exec.getBuyerUserId(),
+                                exec.getSymbol(),
+                                exec.getFillQuantity(),
+                                -exec.getFillPrice() * exec.getFillQuantity()
+                            );
+                            logger.info("Nous allons mettre à jour le portefeuille de l'acheteur");
+                            walletClient.updateWallet(buyerUpdate);
+                            logger.info("Portefeuille mis à jour pour l'acheteur userId={} : +{} {} et -{} en cash",
+                                exec.getBuyerUserId(), exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice() * exec.getFillQuantity());
+                        }
+                        // Skip update si userId == 9999 (seed)
+                        if (exec.getSellerUserId() != null && exec.getSellerUserId() == 9999L) {
+                            logger.info("Skip update portefeuille pour le vendeur userId=9999 (seed)");
+                        } else {
+                            WalletUpdateRequest sellerUpdate = new WalletUpdateRequest(
+                                exec.getSellerUserId(),
+                                exec.getSymbol(),
+                                -exec.getFillQuantity(),
+                                exec.getFillPrice() * exec.getFillQuantity()
+                            );
+                            logger.info("Nous allons mettre à jour le portefeuille du vendeur");
+                            walletClient.updateWallet(sellerUpdate);
+                            logger.info("Portefeuille mis à jour pour le vendeur userId={} : -{} {} et +{} en cash",
+                                exec.getSellerUserId(), exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice() * exec.getFillQuantity());
+                        }
                         deals.add(String.format("Deal: %d %s @ %.2f entre acheteur %d et vendeur %d", exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice(), exec.getBuyerUserId(), exec.getSellerUserId()));
                     } catch (Exception ex) {
                         logger.error("Erreur lors de la mise à jour du portefeuille pour le deal : {}", ex.getMessage(), ex);

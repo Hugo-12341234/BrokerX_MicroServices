@@ -36,7 +36,7 @@ public class WalletMapper {
         entity.setUpdatedAt(domain.getUpdatedAt());
         if (domain.getStockPositions() != null) {
             List<StockPositionEntity> entities = domain.getStockPositions().stream()
-                .map(StockPositionMapper::toEntity)
+                .map(sp -> StockPositionMapper.toEntity(sp, entity)) // On passe le WalletEntity parent
                 .collect(Collectors.toList());
             entity.setStockPositions(entities);
         }

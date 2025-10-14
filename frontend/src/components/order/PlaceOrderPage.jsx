@@ -106,7 +106,8 @@ function PlaceOrderPage() {
       {result && <div style={{ color: 'green', marginTop: 20 }}>
         <b>Ordre accepté !</b><br />
         ID: {result.id}<br />
-        Statut: {result.status}
+        Statut: {result.status}<br />
+        {result.message && <div style={{ marginTop: 10 }}><b>Détails:</b><br />{result.message}</div>}
       </div>}
       {error && <div style={{ color: 'red', marginTop: 20 }}>{error}</div>}
     </div>

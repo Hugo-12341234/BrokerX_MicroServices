@@ -37,5 +37,34 @@ public class Wallet {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public List<StockPosition> getStockPositions() { return stockPositions; }
     public void setStockPositions(List<StockPosition> stockPositions) { this.stockPositions = stockPositions; }
-}
 
+    public void updateStockQuantity(String symbol, int quantityChange) {
+        if (stockPositions == null) return;
+        StockPosition position = null;
+        for (StockPosition sp : stockPositions) {
+            if (sp.getSymbol().equals(symbol)) {
+                position = sp;
+                break;
+            }
+        }
+        if (position != null) {
+            int newQty = position.getQuantity() + quantityChange;
+            if (newQty <= 0) {
+                stockPositions.remove(position);
+            } else {
+                position.setQuantity(newQty);
+                position.setUpdatedAt(java.time.LocalDateTime.now());
+            }
+        } else if (quantityChange > 0) {
+            StockPosition newPosition = new StockPosition();
+            newPosition.setSymbol(symbol);
+            newPosition.setQuantity(quantityChange);
+            newPosition.setAveragePrice(BigDecimal.ZERO); // à adapter si besoin
+            newPosition.setCreatedAt(java.time.LocalDateTime.now());
+            newPosition.setUpdatedAt(java.time.LocalDateTime.now());
+            newPosition.setWallet(this);
+            stockPositions.add(newPosition);
+        }
+        this.updatedAt = java.time.LocalDateTime.now();
+    }
+}

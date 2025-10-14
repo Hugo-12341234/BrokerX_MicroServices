@@ -61,7 +61,7 @@ public class OrderEntity {
     }
 
     public enum OrderStatus {
-        ACCEPTE, REJETE, EN_ATTENTE
+        ACCEPTE, REJETE, EN_ATTENTE, WORKING, PARTIALLYFILLED, FILLED, CANCELLED
     }
 
     public Long getId() {
@@ -137,4 +137,3 @@ public class OrderEntity {
         this.rejectReason = rejectReason;
     }
 }
-

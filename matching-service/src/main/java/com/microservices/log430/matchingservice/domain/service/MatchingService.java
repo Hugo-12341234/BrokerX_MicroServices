@@ -58,6 +58,8 @@ public class MatchingService implements MatchingPort {
         int totalMatched = 0;
 
         for (OrderBook candidate : oppositeOrders) {
+            // Empêcher le matching avec soi-même
+            if (savedOrder.getUserId().equals(candidate.getUserId())) continue;
             logger.debug("Candidat : id={}, clientOrderId={}, side={}, price={}, qtyRemaining={}, timestamp={}",
                     candidate.getId(), candidate.getClientOrderId(), candidate.getSide(), candidate.getPrice(), candidate.getQuantityRemaining(), candidate.getTimestamp());
 
@@ -99,6 +101,9 @@ public class MatchingService implements MatchingPort {
                 exec.setBuyerUserId(candidate.getUserId());
                 exec.setSellerUserId(savedOrder.getUserId());
             }
+            // log pour savoir ce qui est dans l'exécution
+            logger.info("Création de l'exécution : orderId={}, fillQty={}, fillPrice={}, fillType={}, buyerUserId={}, sellerUserId={}",
+                    exec.getOrderId(), exec.getFillQuantity(), exec.getFillPrice(), exec.getFillType(), exec.getBuyerUserId(), exec.getSellerUserId());
             executionReportPort.save(exec);
             executions.add(exec);
             savedOrder.setQuantityRemaining(savedOrder.getQuantityRemaining() - fillQty);
