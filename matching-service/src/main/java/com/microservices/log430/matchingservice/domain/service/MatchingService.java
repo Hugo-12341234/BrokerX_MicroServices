@@ -40,15 +40,25 @@ public class MatchingService implements MatchingPort {
         // Seuls les ordres actifs (Working ou PartiallyFilled) du côté opposé sont matchables
         oppositeOrders.removeIf(o -> o.getSide().equals(savedOrder.getSide()) || !(o.getStatus().equals("Working") || o.getStatus().equals("PartiallyFilled")));
 
-        // Trier selon la priorité prix/temps
-        Comparator<OrderBook> comparator;
-        if ("ACHAT".equals(savedOrder.getSide())) {
-            comparator = Comparator.comparing(OrderBook::getPrice)
-                                   .thenComparing(OrderBook::getTimestamp);
-        } else {
-            comparator = Comparator.comparing(OrderBook::getPrice, Comparator.reverseOrder())
-                                   .thenComparing(OrderBook::getTimestamp);
-        }
+        // Trier selon la priorité prix/temps, en gérant les ordres "MARCHE" (prix null)
+        Comparator<OrderBook> comparator = (o1, o2) -> {
+            boolean o1IsMarche = o1.getPrice() == null;
+            boolean o2IsMarche = o2.getPrice() == null;
+            if (o1IsMarche && !o2IsMarche) return -1;
+            if (!o1IsMarche && o2IsMarche) return 1;
+            if (o1IsMarche && o2IsMarche) {
+                return o1.getTimestamp().compareTo(o2.getTimestamp());
+            }
+            // Les deux ont un prix, appliquer la logique ACHAT/VENTE
+            if ("ACHAT".equals(savedOrder.getSide())) {
+                int cmp = o1.getPrice().compareTo(o2.getPrice());
+                if (cmp != 0) return cmp;
+            } else {
+                int cmp = o2.getPrice().compareTo(o1.getPrice());
+                if (cmp != 0) return cmp;
+            }
+            return o1.getTimestamp().compareTo(o2.getTimestamp());
+        };
         oppositeOrders.sort(comparator);
 
         int initialQty = savedOrder.getQuantityRemaining();
@@ -58,13 +68,17 @@ public class MatchingService implements MatchingPort {
         int totalMatched = 0;
 
         for (OrderBook candidate : oppositeOrders) {
-            // Empêcher le matching avec soi-même
             if (savedOrder.getUserId().equals(candidate.getUserId())) continue;
+            // Empêcher le matching entre deux ordres de type marché
+            if ("MARCHE".equalsIgnoreCase(savedOrder.getType()) && candidate.getPrice() == null) continue;
+            // Protection : si les deux prix sont null, ignorer le matching
+            if (savedOrder.getPrice() == null && candidate.getPrice() == null) continue;
             logger.debug("Candidat : id={}, clientOrderId={}, side={}, price={}, qtyRemaining={}, timestamp={}",
                     candidate.getId(), candidate.getClientOrderId(), candidate.getSide(), candidate.getPrice(), candidate.getQuantityRemaining(), candidate.getTimestamp());
 
             boolean priceMatch;
-            if ("MARCHE".equalsIgnoreCase(savedOrder.getType())) {
+            if ("MARCHE".equalsIgnoreCase(savedOrder.getType()) || candidate.getPrice() == null || savedOrder.getPrice() == null) {
+                // Si l'un des deux est marché, le matching est toujours possible
                 priceMatch = true;
             } else {
                 if ("ACHAT".equals(savedOrder.getSide())) {
@@ -84,12 +98,21 @@ public class MatchingService implements MatchingPort {
                 continue;
             }
 
+            // Détermination du prix d'exécution
+            Double executionPrice;
+            if (candidate.getPrice() == null && savedOrder.getPrice() != null) {
+                executionPrice = savedOrder.getPrice(); // Si le candidat est marché, prendre le prix de l'ordre limite
+            } else if (candidate.getPrice() != null) {
+                executionPrice = candidate.getPrice(); // Sinon, prendre le prix du candidat
+            } else {
+                continue; // sécurité : aucun prix défini
+            }
             logger.info("Matching trouvé : candidateId={}, candidateClientOrderId={}, fillQty={}, fillPrice={}",
-                    candidate.getId(), candidate.getClientOrderId(), fillQty, candidate.getPrice());
+                    candidate.getId(), candidate.getClientOrderId(), fillQty, executionPrice);
             ExecutionReport exec = new ExecutionReport();
             exec.setOrderId(savedOrder.getId());
             exec.setFillQuantity(fillQty);
-            exec.setFillPrice(candidate.getPrice());
+            exec.setFillPrice(executionPrice);
             exec.setFillType(fillQty == savedOrder.getQuantityRemaining() ? "Full" : "Partial");
             exec.setExecutionTime(LocalDateTime.now());
             exec.setSymbol(savedOrder.getSymbol());
@@ -106,10 +129,23 @@ public class MatchingService implements MatchingPort {
                     exec.getOrderId(), exec.getFillQuantity(), exec.getFillPrice(), exec.getFillType(), exec.getBuyerUserId(), exec.getSellerUserId());
             executionReportPort.save(exec);
             executions.add(exec);
+            // Mise à jour des quantités
+            int savedOrderInitialQty = savedOrder.getQuantity();
+            int candidateInitialQty = candidate.getQuantity();
             savedOrder.setQuantityRemaining(savedOrder.getQuantityRemaining() - fillQty);
             candidate.setQuantityRemaining(candidate.getQuantityRemaining() - fillQty);
-            if (savedOrder.getQuantityRemaining() == 0) savedOrder.setStatus("Filled");
-            if (candidate.getQuantityRemaining() == 0) candidate.setStatus("Filled");
+            // Mise à jour du statut pour savedOrder
+            if (savedOrder.getQuantityRemaining() == 0) {
+                savedOrder.setStatus("Filled");
+            } else if (savedOrder.getQuantityRemaining() < savedOrderInitialQty) {
+                savedOrder.setStatus("PartiallyFilled");
+            }
+            // Mise à jour du statut pour candidate
+            if (candidate.getQuantityRemaining() == 0) {
+                candidate.setStatus("Filled");
+            } else if (candidate.getQuantityRemaining() < candidateInitialQty) {
+                candidate.setStatus("PartiallyFilled");
+            }
             orderBookPort.save(savedOrder);
             orderBookPort.save(candidate);
             logger.debug("Quantités mises à jour : savedOrderRemaining={}, candidateRemaining={}",
