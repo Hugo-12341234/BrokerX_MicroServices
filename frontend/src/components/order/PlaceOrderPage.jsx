@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 
-const SYMBOLS = ['AAPL', 'MSFT', 'TSLA', 'GOOG'];
+const SYMBOLS = ['AAPL', 'MSFT', 'TSLA'];
 const SIDES = [
   { value: 'ACHAT', label: 'Achat' },
   { value: 'VENTE', label: 'Vente' }

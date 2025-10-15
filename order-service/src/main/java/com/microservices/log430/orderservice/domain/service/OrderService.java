@@ -190,12 +190,54 @@ public class OrderService implements OrderPlacementPort {
                 }
             }
             // Construction du message pour le frontend
-            StringBuilder message = new StringBuilder("Ordre placé avec succès.");
-            if (!deals.isEmpty()) {
-                message.append(" Exécutions: ").append(String.join(", ", deals));
-            }
-            if (!annulationInfo.isEmpty()) {
-                message.append(" Annulation: ").append(annulationInfo);
+            StringBuilder message = new StringBuilder();
+            if (matchingResult != null && matchingResult.updatedOrder != null) {
+                OrderBookDTO ob = matchingResult.updatedOrder;
+                int qtyInitial = savedOrder.getQuantity();
+                int qtyFilled = qtyInitial - ob.getQuantityRemaining();
+                int qtyCancelled = ob.getQuantityRemaining();
+                String type = savedOrder.getDuration().name();
+                if ("FOK".equalsIgnoreCase(type)) {
+                    if (qtyFilled == 0) {
+                        message.append("Ordre FOK annulé : la quantité totale n'était pas disponible, aucune exécution.");
+                    } else {
+                        message.append("Ordre FOK exécuté : ").append(qtyFilled).append(" fulfilled.");
+                    }
+                } else if ("IOC".equalsIgnoreCase(type)) {
+                    if (qtyFilled == 0) {
+                        message.append("Ordre IOC annulé : aucune exécution possible.");
+                    } else {
+                        message.append("Ordre IOC partiellement exécuté : ")
+                               .append(qtyFilled).append(" fulfilled, ")
+                               .append(qtyCancelled).append(" annulés.");
+                    }
+                } else if ("DAY".equalsIgnoreCase(type)) {
+                    if (qtyFilled == 0) {
+                        message.append("Ordre DAY ouvert : aucune exécution pour l'instant, reste ouvert 24h.");
+                    } else if (qtyCancelled > 0) {
+                        message.append("Ordre DAY partiellement exécuté : ")
+                               .append(qtyFilled).append(" fulfilled, reste ouvert pour ")
+                               .append(qtyCancelled).append(" jusqu'à expiration (24h).");
+                    } else {
+                        message.append("Ordre DAY entièrement exécuté : ").append(qtyFilled).append(" fulfilled.");
+                    }
+                } else {
+                    message.append("Ordre placé avec succès.");
+                }
+                if (!deals.isEmpty()) {
+                    message.append(" Exécutions: ").append(String.join(", ", deals));
+                }
+                if (ob.getRejectReason() != null && !ob.getRejectReason().isEmpty()) {
+                    message.append(" Raison: ").append(ob.getRejectReason());
+                }
+            } else {
+                message.append("Ordre placé avec succès.");
+                if (!deals.isEmpty()) {
+                    message.append(" Exécutions: ").append(String.join(", ", deals));
+                }
+                if (!annulationInfo.isEmpty()) {
+                    message.append(" Annulation: ").append(annulationInfo);
+                }
             }
             return OrderPlacementResult.success(savedOrder.getId(), message.toString());
         }

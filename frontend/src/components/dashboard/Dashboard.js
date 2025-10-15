@@ -76,6 +76,27 @@ function Dashboard() {
         Placer un ordre
       </button>
       <DepositForm onDeposit={handleDeposit} />
+      {wallet && wallet.stockPositions && wallet.stockPositions.length > 0 && (
+        <div style={{ marginTop: 30 }}>
+          <h3>Vos positions en actions</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Symbole</th>
+                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'right' }}>Quantité</th>
+              </tr>
+            </thead>
+            <tbody>
+              {wallet.stockPositions.map(pos => (
+                <tr key={pos.id}>
+                  <td>{pos.symbol}</td>
+                  <td style={{ textAlign: 'right' }}>{pos.quantity}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
