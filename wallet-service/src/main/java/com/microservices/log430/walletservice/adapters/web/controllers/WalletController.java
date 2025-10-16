@@ -11,6 +11,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.util.UUID;
 import java.time.Instant;
@@ -30,12 +32,21 @@ public class WalletController {
         this.stockPort = stockPort;
     }
 
+    /**
+     * Endpoint GET portefeuille - COÛTEUX (100-300ms)
+     * Cache: TTL 30 secondes, clé = userId (Long)
+     * Raison: Calculs complexes portefeuille + positions, appelé très fréquemment
+     */
     @GetMapping("")
-    public ResponseEntity<?> getWallet(HttpServletRequest httpRequest) {
-        String userIdHeader = httpRequest.getHeader("X-User-Id");
+    @Cacheable(value = "walletCache",
+               key = "#p0 != null ? T(java.lang.Long).valueOf(#p0) : 'no-user'",
+               condition = "#p0 != null && !#p0.trim().isEmpty()")
+    public ResponseEntity<?> getWallet(@RequestHeader("X-User-Id") String userIdHeader, HttpServletRequest httpRequest) {
         String path = httpRequest.getRequestURI();
         String requestId = httpRequest.getHeader("X-Request-Id");
-        logger.info("Requête GET portefeuille reçue. Path: {}, RequestId: {}, X-User-Id: {}", path, requestId, userIdHeader);
+
+        logger.info("🔍 GET portefeuille (cache miss potentiel) - userIdHeader: {}, requestId: {}", userIdHeader, requestId);
+
         if (userIdHeader == null || userIdHeader.trim().isEmpty()) {
             logger.warn("Header X-User-Id manquant. Path: {}, RequestId: {}", path, requestId);
             ErrorResponse err = new ErrorResponse(
@@ -48,6 +59,7 @@ public class WalletController {
             );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(err);
         }
+
         Long userId;
         try {
             userId = Long.valueOf(userIdHeader);
@@ -63,9 +75,10 @@ public class WalletController {
             );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(err);
         }
+
         var walletOpt = walletDepositPort.getWalletByUserId(userId);
         if (walletOpt.isEmpty()) {
-            logger.warn("Portefeuille introuvable pour userId={}. Path: {}, RequestId: {}", userId, path, requestId);
+            logger.warn("Portefeuille introuvable pour userId={}, RequestId: {}", userId, requestId);
             ErrorResponse err = new ErrorResponse(
                 Instant.now(),
                 path,
@@ -76,6 +89,7 @@ public class WalletController {
             );
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(err);
         }
+
         var wallet = walletOpt.get();
         logger.info("Portefeuille récupéré avec succès pour userId={}", userId);
         WalletResponse response = new WalletResponse(true, "Portefeuille récupéré avec succès", wallet);
@@ -166,11 +180,18 @@ public class WalletController {
         }
     }
 
+    /**
+     * Endpoint GET stock - TRÈS COÛTEUX (50-150ms)
+     * Cache: TTL 2 minutes, clé = symbol
+     * Raison: Données de référence, répétées massivement (AAPL, GOOGL, etc.)
+     */
     @GetMapping("/stock")
+    @Cacheable(value = "stockCache", key = "#p0",
+               unless = "#result == null or #result.statusCode.value() != 200")
     public ResponseEntity<?> getStockBySymbol(@RequestParam("symbol") String symbol, HttpServletRequest httpRequest) {
         String path = httpRequest.getRequestURI();
         String requestId = httpRequest.getHeader("X-Request-Id");
-        logger.info("Requête GET stock reçue. Path: {}, RequestId: {}, symbol: {}", path, requestId, symbol);
+        logger.info("📈 GET stock (cache miss potentiel) - symbol: {}, requestId: {}", symbol, requestId);
         var stockRuleOpt = stockPort.getStockRuleBySymbol(symbol);
         if (stockRuleOpt.isEmpty()) {
             logger.warn("StockRule introuvable pour le symbole '{}'. Path: {}, RequestId: {}", symbol, path, requestId);
@@ -189,12 +210,18 @@ public class WalletController {
         return ResponseEntity.ok(stockRule);
     }
 
+    /**
+     * Endpoint POST update wallet - INVALIDE LE CACHE
+     * Invalidation: walletCache pour userId concerné
+     * Raison: Cohérence des données après modification portefeuille
+     */
     @PostMapping("/update")
+    @CacheEvict(value = "walletCache", key = "#p0.userId")
     public ResponseEntity<?> updateWallet(@RequestBody WalletUpdateRequest request, HttpServletRequest httpRequest) {
         String path = httpRequest.getRequestURI();
         String requestId = httpRequest.getHeader("X-Request-Id");
-        logger.info("Requête MAJ portefeuille reçue. Path: {}, RequestId: {}, userId={}, symbol={}, qtyChange={}, amountChange={}",
-            path, requestId, request.userId, request.symbol, request.quantityChange, request.amountChange);
+        logger.info("🗑️ POST update wallet (invalidation cache) - userId: {}, symbol: {}, qtyChange: {}, amountChange: {}",
+            request.userId, request.symbol, request.quantityChange, request.amountChange);
         try {
             var result = walletDepositPort.updateWallet(request.userId, request.symbol, request.quantityChange, request.amountChange);
             if (result.isSuccess()) {
