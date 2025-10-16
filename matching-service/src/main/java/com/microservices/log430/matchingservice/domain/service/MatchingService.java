@@ -30,8 +30,14 @@ public class MatchingService implements MatchingPort {
     public MatchingResult matchOrder(OrderBook orderBook) {
         logger.info("Début du matching pour clientOrderId={}, symbol={}, side={}, type={}, quantity={}, price={}, duration={}",
                 orderBook.getClientOrderId(), orderBook.getSymbol(), orderBook.getSide(), orderBook.getType(), orderBook.getQuantity(), orderBook.getPrice(), orderBook.getDuration());
+
+        // Nettoyer les ordres DAY expirés avant le matching
+        List<OrderBook> wipedCandidates = cleanupExpiredDayOrders(orderBook.getSymbol());
+
         OrderBook savedOrder = orderBookPort.save(orderBook);
         List<ExecutionReport> executions = new ArrayList<>();
+        List<OrderBook> modifiedCandidates = new ArrayList<>(); // Tracker les candidats modifiés
+        modifiedCandidates.addAll(wipedCandidates);
         logger.debug("Ordre inséré dans le carnet : id={}, clientOrderId={}, status={}",
                 savedOrder.getId(), savedOrder.getClientOrderId(), savedOrder.getStatus());
 
@@ -42,19 +48,25 @@ public class MatchingService implements MatchingPort {
 
         // Trier selon la priorité prix/temps, en gérant les ordres "MARCHE" (prix null)
         Comparator<OrderBook> comparator = (o1, o2) -> {
-            boolean o1IsMarche = o1.getPrice() == null;
-            boolean o2IsMarche = o2.getPrice() == null;
-            if (o1IsMarche && !o2IsMarche) return -1;
-            if (!o1IsMarche && o2IsMarche) return 1;
-            if (o1IsMarche && o2IsMarche) {
+            // Vérification null-safe directe sur les prix
+            Double price1 = o1.getPrice();
+            Double price2 = o2.getPrice();
+
+            // Gérer les cas où un ou les deux prix sont null
+            if (price1 == null && price2 == null) {
                 return o1.getTimestamp().compareTo(o2.getTimestamp());
             }
-            // Les deux ont un prix, appliquer la logique ACHAT/VENTE
+            if (price1 == null) return -1; // ordres marché prioritaires
+            if (price2 == null) return 1;
+
+            // Les deux ont un prix non-null, appliquer la logique ACHAT/VENTE
             if ("ACHAT".equals(savedOrder.getSide())) {
-                int cmp = o1.getPrice().compareTo(o2.getPrice());
+                // Pour un ordre d'achat entrant, on veut les prix de vente les plus bas en premier
+                int cmp = price1.compareTo(price2);
                 if (cmp != 0) return cmp;
             } else {
-                int cmp = o2.getPrice().compareTo(o1.getPrice());
+                // Pour un ordre de vente entrant, on veut les prix d'achat les plus hauts en premier
+                int cmp = price2.compareTo(price1);
                 if (cmp != 0) return cmp;
             }
             return o1.getTimestamp().compareTo(o2.getTimestamp());
@@ -69,6 +81,22 @@ public class MatchingService implements MatchingPort {
 
         for (OrderBook candidate : oppositeOrders) {
             if (savedOrder.getUserId().equals(candidate.getUserId())) continue;
+
+            // Vérifier l'expiration des ordres DAY candidats
+            if ("DAY".equalsIgnoreCase(candidate.getDuration())) {
+                LocalDateTime now = LocalDateTime.now();
+                LocalDateTime candidateTime = candidate.getTimestamp();
+                if (candidateTime != null && candidateTime.plusHours(24).isBefore(now)) {
+                    logger.info("Candidat DAY expiré : clientOrderId={}, timestamp={}",
+                            candidate.getClientOrderId(), candidateTime);
+                    candidate.setStatus("Cancelled");
+                    orderBookPort.save(candidate);
+                    orderBookPort.deleteById(candidate.getId());
+                    modifiedCandidates.add(candidate); // Tracker le candidat expiré
+                    continue; // Ignorer ce candidat expiré
+                }
+            }
+
             // Empêcher le matching entre deux ordres de type marché
             if ("MARCHE".equalsIgnoreCase(savedOrder.getType()) && candidate.getPrice() == null) continue;
             // Protection : si les deux prix sont null, ignorer le matching
@@ -81,10 +109,11 @@ public class MatchingService implements MatchingPort {
                 // Si l'un des deux est marché, le matching est toujours possible
                 priceMatch = true;
             } else {
+                // Utiliser Double.compare pour éviter l'unboxing NPE
                 if ("ACHAT".equals(savedOrder.getSide())) {
-                    priceMatch = savedOrder.getPrice() >= candidate.getPrice();
+                    priceMatch = Double.compare(savedOrder.getPrice(), candidate.getPrice()) >= 0;
                 } else {
-                    priceMatch = savedOrder.getPrice() <= candidate.getPrice();
+                    priceMatch = Double.compare(savedOrder.getPrice(), candidate.getPrice()) <= 0;
                 }
             }
             if (!priceMatch) continue;
@@ -110,7 +139,7 @@ public class MatchingService implements MatchingPort {
             logger.info("Matching trouvé : candidateId={}, candidateClientOrderId={}, fillQty={}, fillPrice={}",
                     candidate.getId(), candidate.getClientOrderId(), fillQty, executionPrice);
             ExecutionReport exec = new ExecutionReport();
-            exec.setOrderId(savedOrder.getId());
+            exec.setOrderId(savedOrder.getOrderId());
             exec.setFillQuantity(fillQty);
             exec.setFillPrice(executionPrice);
             exec.setFillType(fillQty == savedOrder.getQuantityRemaining() ? "Full" : "Partial");
@@ -148,6 +177,7 @@ public class MatchingService implements MatchingPort {
             }
             orderBookPort.save(savedOrder);
             orderBookPort.save(candidate);
+            modifiedCandidates.add(candidate); // Tracker le candidat modifié par le matching
             logger.debug("Quantités mises à jour : savedOrderRemaining={}, candidateRemaining={}",
                     savedOrder.getQuantityRemaining(), candidate.getQuantityRemaining());
             totalMatched += fillQty;
@@ -173,7 +203,7 @@ public class MatchingService implements MatchingPort {
         else if (isIOC) {
             if (savedOrder.getQuantityRemaining() > 0) {
                 logger.info("IOC : exécution partielle, annulation du reste pour clientOrderId={}", savedOrder.getClientOrderId());
-                savedOrder.setStatus(executions.isEmpty() ? "Cancelled" : "PartialFilled");
+                savedOrder.setStatus(executions.isEmpty() ? "Cancelled" : "PartiallyFilled");
                 orderBookPort.save(savedOrder);
             }
             // Retirer l'ordre IOC du carnet
@@ -187,15 +217,21 @@ public class MatchingService implements MatchingPort {
                 // Annulation du reste après 24h
                 if (savedOrder.getQuantityRemaining() > 0) {
                     logger.info("DAY : ordre expiré après 24h, annulation du reste pour clientOrderId={}", savedOrder.getClientOrderId());
-                    savedOrder.setStatus(executions.isEmpty() ? "Cancelled" : "PartialFilled");
+                    savedOrder.setStatus(executions.isEmpty() ? "Cancelled" : "PartiallyFilled");
                     orderBookPort.save(savedOrder);
                 }
                 // Retirer l'ordre DAY expiré du carnet
                 orderBookPort.deleteById(savedOrder.getId());
             } else {
                 if (savedOrder.getQuantityRemaining() > 0) {
-                    logger.info("DAY : exécution partielle, reste dans le carnet pour clientOrderId={}", savedOrder.getClientOrderId());
-                    savedOrder.setStatus("PartiallyFilled");
+                    // Si des exécutions ont eu lieu, mettre PartiallyFilled, sinon garder Working
+                    if (!executions.isEmpty()) {
+                        logger.info("DAY : exécution partielle, reste dans le carnet pour clientOrderId={}", savedOrder.getClientOrderId());
+                        savedOrder.setStatus("PartiallyFilled");
+                    } else {
+                        logger.info("DAY : aucune exécution, reste Working dans le carnet pour clientOrderId={}", savedOrder.getClientOrderId());
+                        savedOrder.setStatus("Working");
+                    }
                     orderBookPort.save(savedOrder);
                 } else {
                     // Si rempli, retirer du carnet
@@ -204,8 +240,28 @@ public class MatchingService implements MatchingPort {
             }
         }
 
-        logger.info("Matching terminé pour clientOrderId={}, statut final={}, nombre d'exécutions={}",
-                savedOrder.getClientOrderId(), savedOrder.getStatus(), executions.size());
-        return new MatchingResult(savedOrder, executions);
+        logger.info("Matching terminé pour clientOrderId={}, statut final={}, nombre d'exécutions={}, candidats modifiés={}",
+                savedOrder.getClientOrderId(), savedOrder.getStatus(), executions.size(), modifiedCandidates.size());
+        return new MatchingResult(savedOrder, executions, modifiedCandidates);
+    }
+
+    private List<OrderBook> cleanupExpiredDayOrders(String symbol) {
+        List<OrderBook> dayOrders = orderBookPort.findAllBySymbol(symbol);
+        LocalDateTime now = LocalDateTime.now();
+        List<OrderBook> modifiedOrders = new ArrayList<>();
+        for (OrderBook order : dayOrders) {
+            if ("DAY".equalsIgnoreCase(order.getDuration())) {
+                LocalDateTime orderTime = order.getTimestamp();
+                if (orderTime != null && orderTime.plusHours(24).isBefore(now)) {
+                    logger.info("Ordre DAY expiré détecté et supprimé : clientOrderId={}, timestamp={}",
+                            order.getClientOrderId(), orderTime);
+                    order.setStatus("Cancelled");
+                    orderBookPort.save(order);
+                    modifiedOrders.add(order);
+                    orderBookPort.deleteById(order.getId());
+                }
+            }
+        }
+        return modifiedOrders;
     }
 }

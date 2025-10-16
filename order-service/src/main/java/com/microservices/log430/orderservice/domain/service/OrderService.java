@@ -140,6 +140,32 @@ public class OrderService implements OrderPlacementPort {
                 // savedOrder.setQuantityRemaining(ob.getQuantityRemaining()); // si champ présent dans Order
                 orderPort.save(savedOrder);
             }
+
+            // Synchronisation des ordres candidats modifiés
+            if (matchingResult != null && matchingResult.modifiedCandidates != null && !matchingResult.modifiedCandidates.isEmpty()) {
+                logger.info("Synchronisation de {} ordres candidats modifiés", matchingResult.modifiedCandidates.size());
+                for (OrderBookDTO modifiedCandidate : matchingResult.modifiedCandidates) {
+                    try {
+                        // Trouver l'ordre correspondant dans order-service par clientOrderId
+                        Optional<Order> candidateOrder = orderPort.findByClientOrderId(modifiedCandidate.getClientOrderId());
+                        if (candidateOrder.isPresent()) {
+                            Order candidateOrderEntity = candidateOrder.get();
+                            Order.OrderStatus oldStatus = candidateOrderEntity.getStatus();
+                            candidateOrderEntity.setStatus(Order.OrderStatus.fromString(modifiedCandidate.getStatus()));
+                            orderPort.save(candidateOrderEntity);
+                            logger.info("Ordre candidat synchronisé : clientOrderId={}, userId={}, {} -> {}",
+                                       candidateOrderEntity.getClientOrderId(), candidateOrderEntity.getUserId(), oldStatus, candidateOrderEntity.getStatus());
+                        } else {
+                            logger.warn("Ordre candidat modifié non trouvé dans order-service : clientOrderId={}",
+                                       modifiedCandidate.getClientOrderId());
+                        }
+                    } catch (Exception e) {
+                        logger.error("Erreur lors de la synchronisation de l'ordre candidat clientOrderId={} : {}",
+                                   modifiedCandidate.getClientOrderId(), e.getMessage(), e);
+                    }
+                }
+            }
+
             // Mise à jour des portefeuilles pour chaque deal
             List<String> deals = new ArrayList<>();
             if (matchingResult != null && matchingResult.executions != null) {
