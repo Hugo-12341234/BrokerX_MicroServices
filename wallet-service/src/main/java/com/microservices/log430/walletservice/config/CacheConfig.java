@@ -20,11 +20,13 @@ public class CacheConfig extends CachingConfigurerSupport {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager();
 
         // Configuration pour le cache des portefeuilles
-        // TTL: 30 secondes (données changeantes mais tolérance acceptable)
+        // TTL: 1 heure (très élevé car invalidation manuelle via @CacheEvict)
+        // Stratégie: Cache invalidé uniquement lors de modifications réelles du portefeuille
+        // Avantage: Maximise les cache hits, réduit la charge sur la DB
         cacheManager.registerCustomCache("walletCache",
             Caffeine.newBuilder()
                 .maximumSize(1000)  // Max 1000 portefeuilles en cache
-                .expireAfterWrite(30, TimeUnit.SECONDS)  // TTL 30 secondes
+                .expireAfterWrite(1, TimeUnit.HOURS)  // TTL 1 heure (très élevé)
                 .recordStats()  // Active les métriques pour monitoring
                 .build());
 
@@ -33,7 +35,7 @@ public class CacheConfig extends CachingConfigurerSupport {
         cacheManager.registerCustomCache("stockCache",
             Caffeine.newBuilder()
                 .maximumSize(500)   // Max 500 symboles en cache
-                .expireAfterWrite(2, TimeUnit.MINUTES)  // TTL 2 minutes
+                .expireAfterWrite(1, TimeUnit.HOURS)  // TTL 2 minutes
                 .recordStats()  // Active les métriques pour monitoring
                 .build());
 

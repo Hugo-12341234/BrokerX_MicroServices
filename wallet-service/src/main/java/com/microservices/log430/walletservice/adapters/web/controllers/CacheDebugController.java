@@ -145,4 +145,43 @@ public class CacheDebugController {
 
         return ResponseEntity.ok(result);
     }
+
+    /**
+     * Endpoint de test pour observer le comportement du TTL et des stats
+     */
+    @GetMapping("/test/ttl")
+    public ResponseEntity<Map<String, Object>> testTTLBehavior() {
+        Map<String, Object> result = new HashMap<>();
+
+        // Infos générales sur le cache
+        Cache cache = cacheManager.getCache("walletCache");
+        if (cache instanceof CaffeineCache) {
+            CaffeineCache caffeineCache = (CaffeineCache) cache;
+            com.github.benmanes.caffeine.cache.Cache<Object, Object> nativeCache = caffeineCache.getNativeCache();
+
+            // Stats actuelles (JAMAIS reset par le TTL)
+            CacheStats stats = nativeCache.stats();
+            result.put("cacheStats", Map.of(
+                "hitCount", stats.hitCount(),
+                "missCount", stats.missCount(),
+                "hitRate", String.format("%.2f%%", stats.hitRate() * 100),
+                "evictionCount", stats.evictionCount()  // Nombre d'expirations TTL
+            ));
+
+            // Contenu actuel du cache
+            result.put("currentSize", nativeCache.estimatedSize());
+            result.put("entriesInCache", nativeCache.asMap().keySet().toString());
+
+            result.put("ttlConfig", "1 hour (3600 seconds)");
+            result.put("explanation", Map.of(
+                "strategy", "Cache invalidé UNIQUEMENT par @CacheEvict lors de modifications",
+                "ttlBehavior", "Chaque entrée expire 1h après sa création (sécurité)",
+                "primaryInvalidation", "@CacheEvict sur POST /update quand portefeuille modifié",
+                "advantage", "Maximise cache hits - pas d'expiration inutile",
+                "statsPreserved", "Les stats (hit/miss count) ne sont JAMAIS reset"
+            ));
+        }
+
+        return ResponseEntity.ok(result);
+    }
 }

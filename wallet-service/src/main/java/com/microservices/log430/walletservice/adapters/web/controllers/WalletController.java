@@ -220,8 +220,9 @@ public class WalletController {
     public ResponseEntity<?> updateWallet(@RequestBody WalletUpdateRequest request, HttpServletRequest httpRequest) {
         String path = httpRequest.getRequestURI();
         String requestId = httpRequest.getHeader("X-Request-Id");
-        logger.info("🗑️ POST update wallet (invalidation cache) - userId: {}, symbol: {}, qtyChange: {}, amountChange: {}",
-            request.userId, request.symbol, request.quantityChange, request.amountChange);
+        logger.info("🗑️ POST update wallet (INVALIDATION CACHE) - userId: {}, symbol: {}, qtyChange: {}, amountChange: {}, requestId: {}",
+            request.userId, request.symbol, request.quantityChange, request.amountChange, requestId);
+        logger.warn("⚠️ CACHE INVALIDATED for userId: {} - walletCache entry will be removed", request.userId);
         try {
             var result = walletDepositPort.updateWallet(request.userId, request.symbol, request.quantityChange, request.amountChange);
             if (result.isSuccess()) {
