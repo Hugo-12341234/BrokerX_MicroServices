@@ -1,0 +1,281 @@
+version: '3.8'
+
+services:
+  # ===========================================
+  # BASES DE DONNÉES POSTGRESQL
+  # ===========================================
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: brokerx-postgres-auth
+    environment:
+      POSTGRES_DB: brokerxdb_auth
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # Port externe différent pour éviter les conflits
+    networks:
+      - brokerx-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d brokerxdb_auth"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-order:
+    image: postgres:15-alpine
+    container_name: brokerx-postgres-order
+    environment:
+      POSTGRES_DB: brokerxdb_order
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_order_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - brokerx-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d brokerxdb_order"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-wallet:
+    image: postgres:15-alpine
+    container_name: brokerx-postgres-wallet
+    environment:
+      POSTGRES_DB: brokerxdb_wallet
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_wallet_data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    networks:
+      - brokerx-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d brokerxdb_wallet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-matching:
+    image: postgres:15-alpine
+    container_name: brokerx-postgres-matching
+    environment:
+      POSTGRES_DB: brokerxdb_matching
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_matching_data:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+    networks:
+      - brokerx-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d brokerxdb_matching"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # MICROSERVICES SPRING BOOT
+  # ===========================================
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    container_name: brokerx-auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+    networks:
+      - brokerx-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8081/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  order-service:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+    container_name: brokerx-order-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      postgres-order:
+        condition: service_healthy
+    networks:
+      - brokerx-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8082/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  wallet-service:
+    build:
+      context: .
+      dockerfile: wallet-service/Dockerfile
+    container_name: brokerx-wallet-service
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      postgres-wallet:
+        condition: service_healthy
+    networks:
+      - brokerx-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8083/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  matching-service:
+    build:
+      context: .
+      dockerfile: matching-service/Dockerfile
+    container_name: brokerx-matching-service
+    ports:
+      - "8084:8084"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      postgres-matching:
+        condition: service_healthy
+    networks:
+      - brokerx-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8084/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: brokerx-api-gateway
+    ports:
+      - "8079:8079"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      wallet-service:
+        condition: service_healthy
+      matching-service:
+        condition: service_healthy
+    networks:
+      - brokerx-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8079/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ===========================================
+  # MONITORING - PROMETHEUS & GRAFANA
+  # ===========================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: brokerx-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    networks:
+      - brokerx-network
+    depends_on:
+      - auth-service
+      - order-service
+      - wallet-service
+      - matching-service
+      - api-gateway
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: brokerx-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - brokerx-network
+    depends_on:
+      - prometheus
+
+  # ===========================================
+  # FRONTEND REACT (OPTIONNEL - Décommenter si souhaité)
+  # ===========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: brokerx-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8079
+    networks:
+      - brokerx-network
+    depends_on:
+      - api-gateway
+
+# ===========================================
+# VOLUMES PERSISTANTS
+# ===========================================
+volumes:
+  postgres_auth_data:
+    driver: local
+  postgres_order_data:
+    driver: local
+  postgres_wallet_data:
+    driver: local
+  postgres_matching_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# ===========================================
+# RÉSEAUX
+# ===========================================
+networks:
+  brokerx-network:
+    driver: bridge
+    name: brokerx-network
