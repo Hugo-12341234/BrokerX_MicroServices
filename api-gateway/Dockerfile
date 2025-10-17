@@ -22,12 +22,15 @@ FROM eclipse-temurin:17-jre-alpine
 
 WORKDIR /app
 
+# Installer wget pour les health checks
+RUN apk add --no-cache wget
+
 # Créer un utilisateur non-root pour la sécurité
 RUN addgroup -g 1000 spring && adduser -u 1000 -G spring -s /bin/sh -D spring
 USER spring:spring
 
-# Copier le JAR depuis le stage de build
-COPY --from=builder /app/target/*.jar app.jar
+# Copier le JAR depuis le stage de build (nom spécifique Spring Boot)
+COPY --from=builder /app/target/api-gateway-*.jar app.jar
 
 # Exposer le port
 EXPOSE 8079
