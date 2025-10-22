@@ -179,8 +179,6 @@ services:
     depends_on:
       auth-service:
         condition: service_healthy
-      order-service:
-        condition: service_healthy
       wallet-service:
         condition: service_healthy
       matching-service:

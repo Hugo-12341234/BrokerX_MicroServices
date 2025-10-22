@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
-@FeignClient(name = "wallet-client", url = "${gateway.url:http://localhost:8079}", configuration = GlobalFeignConfig.class)
+@FeignClient(name = "wallet-client", url = "${gateway.url:http://api-gateway:8079}", configuration = GlobalFeignConfig.class)
 public interface WalletClient {
     @GetMapping("/api/v1/wallet")
     WalletResponse getWallet(@RequestHeader("X-User-Id") Long userId);

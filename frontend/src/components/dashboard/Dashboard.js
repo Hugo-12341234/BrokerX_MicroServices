@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import DepositForm from './DepositForm';
+import QuickOrders from './QuickOrders';
 import { useNavigate } from 'react-router-dom';
 
 function Dashboard() {
@@ -76,6 +77,7 @@ function Dashboard() {
         Placer un ordre
       </button>
       <DepositForm onDeposit={handleDeposit} />
+      <QuickOrders wallet={wallet} />
       {wallet && wallet.stockPositions && wallet.stockPositions.length > 0 && (
         <div style={{ marginTop: 30 }}>
           <h3>Vos positions en actions</h3>

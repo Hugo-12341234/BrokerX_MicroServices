@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import com.microservices.log430.orderservice.adapters.external.matching.dto.OrderDTO;
 import com.microservices.log430.orderservice.adapters.external.matching.dto.MatchingResult;
 
-@FeignClient(name = "matching-service", url = "${gateway.url:http://localhost:8079}", configuration = GlobalFeignConfig.class)
+@FeignClient(name = "matching-service", url = "${gateway.url:http://api-gateway:8079}", configuration = GlobalFeignConfig.class)
 public interface MatchingClient {
     @PostMapping("/api/v1/orderbook")
     MatchingResult matchOrder(@RequestBody OrderDTO orderDTO);

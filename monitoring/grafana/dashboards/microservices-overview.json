@@ -17,6 +17,25 @@
   "graphTooltip": 0,
   "id": null,
   "links": [],
+  "templating": {
+    "list": [
+      {
+        "type": "query",
+        "name": "application",
+        "label": "Application",
+        "datasource": "Prometheus",
+        "query": "label_values(http_server_requests_seconds_count, application)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
   "panels": [
     {
       "datasource": "Prometheus",
@@ -90,13 +109,19 @@
       },
       "targets": [
         {
-          "expr": "rate(http_server_requests_seconds_count[5m])",
+          "expr": "sum by (application, method) (rate(http_server_requests_seconds_count{application=~\"$application\", outcome!=\"REDIRECTION\", uri!~\"/actuator.*|/prometheus\"}[1m]))",
           "interval": "",
-          "legendFormat": "{{job}} - {{uri}}",
+          "legendFormat": "{{application}} {{method}}",
           "refId": "A"
+        },
+        {
+          "expr": "sum by (application) (rate(http_server_requests_seconds_count{application=~\"$application\", uri!~\"/actuator.*|/prometheus\"}[1m]))",
+          "interval": "",
+          "legendFormat": "{{application}} - Total",
+          "refId": "B"
         }
       ],
-      "title": "Trafic - Requests Per Second (RPS)",
+      "title": "🚦 Trafic - Requests Per Second (RPS)",
       "type": "timeseries"
     },
     {
@@ -143,8 +168,12 @@
                 "value": null
               },
               {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
                 "color": "red",
-                "value": 80
+                "value": 1
               }
             ]
           },
@@ -171,19 +200,25 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.95, sum by (application, uri, le) (rate(http_server_requests_seconds_bucket{application=~\"$application\", uri!~\"/actuator.*|/prometheus\"}[1m])))",
           "interval": "",
-          "legendFormat": "P95 - {{job}}",
+          "legendFormat": "P95 - {{application}} {{uri}}",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.99, rate(http_server_requests_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.99, sum by (application, uri, le) (rate(http_server_requests_seconds_bucket{application=~\"$application\", uri!~\"/actuator.*|/prometheus\"}[1m])))",
           "interval": "",
-          "legendFormat": "P99 - {{job}}",
+          "legendFormat": "P99 - {{application}} {{uri}}",
           "refId": "B"
+        },
+        {
+          "expr": "sum by (application) (rate(http_server_requests_seconds_sum{application=~\"$application\", uri!~\"/actuator.*|/prometheus\"}[1m])) / sum by (application) (rate(http_server_requests_seconds_count{application=~\"$application\", uri!~\"/actuator.*|/prometheus\"}[1m]))",
+          "interval": "",
+          "legendFormat": "AVG - {{application}}",
+          "refId": "C"
         }
       ],
-      "title": "Latence - P95/P99 Response Time",
+      "title": "⏱️ Latence - P95/P99/AVG Response Time",
       "type": "timeseries"
     },
     {
@@ -230,12 +265,16 @@
                 "value": null
               },
               {
+                "color": "yellow",
+                "value": 1
+              },
+              {
                 "color": "red",
-                "value": 80
+                "value": 5
               }
             ]
           },
-          "unit": "percent"
+          "unit": "reqps"
         },
         "overrides": []
       },
@@ -258,19 +297,19 @@
       },
       "targets": [
         {
-          "expr": "rate(http_server_requests_seconds_count{status=~\"4..\"}[5m]) / rate(http_server_requests_seconds_count[5m]) * 100",
+          "expr": "sum by (application) (rate(http_server_requests_seconds_count{application=~\"$application\", status=~\"4..\"}[1m]))",
           "interval": "",
-          "legendFormat": "4xx Errors - {{job}}",
+          "legendFormat": "{{application}} - 4xx Errors",
           "refId": "A"
         },
         {
-          "expr": "rate(http_server_requests_seconds_count{status=~\"5..\"}[5m]) / rate(http_server_requests_seconds_count[5m]) * 100",
+          "expr": "sum by (application) (rate(http_server_requests_seconds_count{application=~\"$application\", status=~\"5..\"}[1m]))",
           "interval": "",
-          "legendFormat": "5xx Errors - {{job}}",
+          "legendFormat": "{{application}} - 5xx Errors",
           "refId": "B"
         }
       ],
-      "title": "Erreurs - 4xx/5xx Error Rate",
+      "title": "❌ Erreurs - 4xx/5xx per second",
       "type": "timeseries"
     },
     {
@@ -317,12 +356,16 @@
                 "value": null
               },
               {
+                "color": "yellow",
+                "value": 0.7
+              },
+              {
                 "color": "red",
-                "value": 80
+                "value": 0.9
               }
             ]
           },
-          "unit": "percent"
+          "unit": "percentunit"
         },
         "overrides": []
       },
@@ -345,40 +388,226 @@
       },
       "targets": [
         {
-          "expr": "system_cpu_usage * 100",
+          "expr": "sum by (application) (jvm_memory_used_bytes{application=~\"$application\", area=\"heap\"}) / sum by (application) (jvm_memory_max_bytes{application=~\"$application\", area=\"heap\"})",
           "interval": "",
-          "legendFormat": "CPU Usage - {{job}}",
+          "legendFormat": "{{application}} - JVM Heap Usage",
           "refId": "A"
         },
         {
-          "expr": "jvm_memory_used_bytes / jvm_memory_max_bytes * 100",
+          "expr": "sum(process_cpu_usage{application=~\"$application\"}) by (application)",
           "interval": "",
-          "legendFormat": "Memory Usage - {{job}}",
+          "legendFormat": "{{application}} - Process CPU",
           "refId": "B"
         }
       ],
-      "title": "Saturation - CPU/Memory Usage",
+      "title": "📊 Saturation - Memory/CPU Usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "vis": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 200
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(jvm_memory_used_bytes{application=~\"$application\"}) by (application)",
+          "interval": "",
+          "legendFormat": "{{application}} - Memory Used",
+          "refId": "A"
+        }
+      ],
+      "title": "💾 Memory Usage (Bytes)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "vis": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "expr": "jvm_threads_live{application=~\"$application\"}",
+          "interval": "",
+          "legendFormat": "{{application}} - Live Threads",
+          "refId": "A"
+        }
+      ],
+      "title": "🧵 Active Threads",
       "type": "timeseries"
     }
   ],
-  "refresh": "30s",
-  "schemaVersion": 27,
+  "refresh": "5s",
+  "schemaVersion": 39,
   "style": "dark",
   "tags": [
-    "microservices",
-    "brokerx"
+    "brokerx",
+    "micrometer",
+    "golden-signals"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "type": "query",
+        "name": "application",
+        "label": "Application",
+        "datasource": "Prometheus",
+        "query": "label_values(http_server_requests_seconds_count, application)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "",
-  "title": "BrokerX - Microservices Overview (4 Golden Signals)",
+  "timezone": "browser",
+  "title": "🎯 BrokerX - 4 Golden Signals Dashboard",
   "uid": "brokerx-overview",
-  "version": 1
+  "version": 3
 }
-
