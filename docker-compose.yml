@@ -87,9 +87,8 @@ services:
     build:
       context: .
       dockerfile: auth-service/Dockerfile
-    container_name: brokerx-auth-service
-    ports:
-      - "8081:8081"
+    # Pas de ports externes - communication interne uniquement
+    # Pour debug: docker logs <container_name> ou via NGINX sur port 8078
     environment:
       - SPRING_PROFILES_ACTIVE=docker
     depends_on:
@@ -108,9 +107,7 @@ services:
     build:
       context: .
       dockerfile: order-service/Dockerfile
-    container_name: brokerx-order-service
-    ports:
-      - "8082:8082"
+    # Pas de ports externes - communication interne uniquement
     environment:
       - SPRING_PROFILES_ACTIVE=docker
     depends_on:
@@ -129,9 +126,7 @@ services:
     build:
       context: .
       dockerfile: wallet-service/Dockerfile
-    container_name: brokerx-wallet-service
-    ports:
-      - "8083:8083"
+    # Pas de ports externes - communication interne uniquement
     environment:
       - SPRING_PROFILES_ACTIVE=docker
     depends_on:
@@ -150,9 +145,7 @@ services:
     build:
       context: .
       dockerfile: matching-service/Dockerfile
-    container_name: brokerx-matching-service
-    ports:
-      - "8084:8084"
+    # Pas de ports externes - communication interne uniquement
     environment:
       - SPRING_PROFILES_ACTIVE=docker
     depends_on:
@@ -177,12 +170,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
     depends_on:
-      auth-service:
-        condition: service_healthy
-      wallet-service:
-        condition: service_healthy
-      matching-service:
-        condition: service_healthy
+      nginx-load-balancer:
+        condition: service_healthy  # Attendre que NGINX soit healthy
     networks:
       - brokerx-network
     healthcheck:
@@ -191,6 +180,26 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  # ===== NGINX LOAD BALANCER (entre Gateway et Microservices) =====
+  nginx-load-balancer:
+    image: nginx:alpine
+    container_name: nginx-load-balancer
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - brokerx-network
+    expose:
+      - "9001"
+      - "9002"
+      - "9003"
+      - "9004"
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   # ===========================================
   # MONITORING - PROMETHEUS & GRAFANA
@@ -247,7 +256,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:8079
+      - REACT_APP_API_URL=http://localhost:3000/api/v1  # Maintenant le frontend fait du proxy vers l'API Gateway
     networks:
       - brokerx-network
     depends_on:
