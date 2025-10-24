@@ -1,0 +1,69 @@
+name: CD - Deploying to VM
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, vm-lab]
+    steps:
+      - name: Clean workspace
+        run: |
+          cd /home/gha-runner/actions-runner/_work/LOG430_BrokerX/LOG430_BrokerX
+          sudo rm -rf LOG430_BrokerX || true
+          mkdir -p LOG430_BrokerX
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          clean: false
+          fetch-depth: 1
+
+      - name: Stop existing containers
+        run: |
+          cd /home/gha-runner/actions-runner/_work/LOG430_BrokerX/LOG430_BrokerX
+          docker compose down || true
+
+      - name: Deploy application
+        run: |
+          cd /home/gha-runner/actions-runner/_work/LOG430_BrokerX/LOG430_BrokerX
+          docker compose build --no-cache
+          docker compose up -d
+
+      - name: Wait for services to be ready
+        run: |
+          sleep 10
+
+      - name: Verify deployment
+        id: verify_deployment
+        run: |
+          cd /home/gha-runner/actions-runner/_work/LOG430_BrokerX/LOG430_BrokerX
+          if docker compose ps | grep -q "Up"; then
+            echo "✅ Application deployed and running successfully"
+            echo "Running containers:"
+            docker compose ps
+          else
+            echo "❌ Application failed to start"
+            echo "Container status:"
+            docker compose ps
+            echo "Logs:"
+            docker compose logs --tail=20
+            exit 1
+          fi
+
+      - name: Rollback if deployment failed
+        if: failure()
+        run: |
+          cd /home/gha-runner/actions-runner/_work/LOG430_BrokerX/LOG430_BrokerX
+          echo "⏪ Rollback: Arrêt des containers et nettoyage."
+          docker compose down
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "🚀 Deployment completed successfully!"
+          echo "📁 Application path: /home/gha-runner/actions-runner/_work/LOG430_BrokerX/LOG430_BrokerX/"
+          echo "🟢 Running containers:"
+          docker compose ps --format "table {{.Service}}\t{{.Status}}\t{{.Ports}}"
