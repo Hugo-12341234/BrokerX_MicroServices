@@ -1,4 +1,4 @@
-name: CD - Deploying to VM
+name: CD - Deploying to the VM
 
 on:
   push:
