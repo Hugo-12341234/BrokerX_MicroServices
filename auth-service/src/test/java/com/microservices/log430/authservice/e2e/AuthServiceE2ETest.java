@@ -1,4 +1,4 @@
-package com.microservices.log430.authservice.integration;
+package com.microservices.log430.authservice.e2e;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,10 +14,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(classes = com.microservices.log430.authservice.AuthServiceApplication.class)
 @AutoConfigureMockMvc
 @Testcontainers
-class AuthControllerIntegrationTest {
+class AuthServiceE2ETest {
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15")
             .withDatabaseName("testdb")

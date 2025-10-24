@@ -1,4 +1,4 @@
-package com.microservices.log430.authservice.integration;
+package com.microservices.log430.walletservice.e2e;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,13 +11,13 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
-class AuthControllerIntegrationTest {
+class WalletServiceE2ETest {
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15")
             .withDatabaseName("testdb")
@@ -35,11 +35,16 @@ class AuthControllerIntegrationTest {
     private MockMvc mockMvc;
 
     @Test
-    void login_shouldReturnBadRequestForInvalidCredentials() throws Exception {
-        String body = "{\"email\":\"invalid@mail.com\",\"password\":\"wrongpass\"}";
-        mockMvc.perform(post("/api/v1/auth/login")
-                .contentType("application/json")
-                .content(body))
+    void getWallet_shouldReturnBadRequestIfUserIdMissing() throws Exception {
+        mockMvc.perform(get("/api/v1/wallet"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void getWallet_shouldReturn2xxWithUserId() throws Exception {
+        mockMvc.perform(get("/api/v1/wallet")
+                .header("X-User-Id", "1"))
+                .andExpect(status().is2xxSuccessful());
+    }
 }
+

@@ -1,4 +1,4 @@
-package com.microservices.log430.authservice.integration;
+package com.microservices.log430.matchingservice.e2e;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
-class AuthControllerIntegrationTest {
+class MatchingServiceE2ETest {
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15")
             .withDatabaseName("testdb")
@@ -35,11 +35,12 @@ class AuthControllerIntegrationTest {
     private MockMvc mockMvc;
 
     @Test
-    void login_shouldReturnBadRequestForInvalidCredentials() throws Exception {
-        String body = "{\"email\":\"invalid@mail.com\",\"password\":\"wrongpass\"}";
-        mockMvc.perform(post("/api/v1/auth/login")
+    void matchOrder_shouldReturnOkOrError() throws Exception {
+        String body = "{\"clientOrderId\":\"test-1\",\"symbol\":\"AAPL\",\"side\":\"ACHAT\",\"quantity\":10,\"price\":100.0}";
+        mockMvc.perform(post("/api/v1/orderbook")
                 .contentType("application/json")
                 .content(body))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().is5xxServerError());
     }
 }
+

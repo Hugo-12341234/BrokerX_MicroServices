@@ -166,6 +166,7 @@
                 <configuration>
                     <includes>
                         <include>**/*IntegrationTest.java</include>
+                        <include>**/*E2ETest.java</include>
                     </includes>
                 </configuration>
             </plugin>
