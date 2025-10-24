@@ -345,27 +345,21 @@ Chaque interface technique est sécurisée par chiffrement TLS et, selon le cas,
 
 ## 4. Stratégie de solution
 
-L’architecture de BrokerX repose sur des choix technologiques et organisationnels simples, robustes et adaptés aux besoins métier et réglementaires du courtage en ligne.
+L’architecture de BrokerX repose désormais sur une approche microservices, chaque domaine métier étant isolé dans un service indépendant (auth-service, api-gateway, matching-service, order-service, wallet-service, etc.). Cette stratégie permet une évolutivité, une résilience et une flexibilité accrues, tout en facilitant la maintenance et le déploiement.
 
-Le projet est développé en Java avec le framework Spring Boot, sous forme de monolithe. Ce choix permet une gestion centralisée des fonctionnalités, une maintenance facilitée et une intégration rapide des évolutions. La structure en couches (contrôleur, service, repository) favorise la séparation des responsabilités et la testabilité du code, ce qui simplifie la correction des bugs et l’ajout de nouvelles fonctionnalités.
+Chaque microservice est développé principalement en Java avec Spring Boot, et expose ses fonctionnalités via des API REST sécurisées (HTTPS/JSON). L’api-gateway centralise l’accès aux services, gère le routage, l’authentification et la sécurité des échanges. Un load balancer avec NGINX est installé entre le gateway et les microservices, afin de pouvoir créer plusieurs instances de certains microservices. Ceci permet une bonne scalabilité et une tolérance aux pannes. Les communications inter-services se font principalement par API REST, mais peuvent évoluer vers des solutions de messaging (ex : Kafka, RabbitMQ) pour les besoins d’asynchronisme ou de scalabilité.
 
-La persistance des données est assurée par PostgreSQL, garantissant fiabilité, performance et conformité avec les standards du secteur. Ce SGBD est reconnu pour sa robustesse et sa capacité à gérer des transactions critiques, ce qui est essentiel pour un système financier.
+La persistance des données est gérée de façon indépendante : chaque microservice possède sa propre base de données (PostgreSQL), ce qui garantit l’isolation des données, la conformité aux principes DDD et la robustesse des transactions critiques. Cette séparation permet d’éviter les dépendances fortes et facilite l’évolution de chaque service.
 
-Les échanges avec les clients se font via des API REST sécurisées (HTTPS/JSON), assurant une expérience utilisateur fluide et réactive.
+La sécurité est centralisée via l’auth-service, qui gère l’authentification forte (MFA), la gestion des rôles et la journalisation des actions critiques. Les exigences réglementaires (KYC, RGPD) sont respectées grâce à une gestion fine des accès et à la traçabilité des opérations sensibles.
 
-La sécurité est une priorité : authentification forte (MFA) gestion des rôles et journalisation systématique des actions critiques. Ces mesures répondent aux exigences réglementaires (KYC, RGPD) et protègent les données sensibles contre les accès non autorisés et les fraudes.
+Le déploiement et l’orchestration des services sont assurés par Docker et Docker Compose, permettant de gérer facilement les environnements, la scalabilité et la portabilité. Chaque service peut être déployé, mis à jour ou redémarré indépendamment, ce qui réduit les risques et accélère les cycles de livraison.
 
-L’envoi de code et de vérifications par e-mail est externalisé via un fournisseur SMTP (GMail), simplifiant la gestion des communications et garantissant la fiabilité du service. Cela évite de gérer un serveur mail interne et assure une meilleure délivrabilité des messages.
+Un pipeline CI/CD adapté aux microservices automatise les tests (unitaires, d’intégration, E2E) et les livraisons pour chaque service, garantissant la qualité et la rapidité des mises en production. Les tests sont systématisés pour détecter rapidement les régressions et assurer la fiabilité du système global.
 
-Le déploiement s’appuie sur Docker et Docker Compose, facilitant la portabilité, la reproductibilité et la gestion des environnements. Cette approche permet de déployer le système rapidement sur différents serveurs ou dans le cloud, tout en gardant une configuration cohérente.
+La documentation des API et des services est produite en continu, facilitant l’intégration de nouveaux membres et l’évolution du système. L’utilisation de standards ouverts (OpenAPI/Swagger) permet de garder une trace claire des interfaces et des contrats entre services.
 
-Un pipeline CI/CD automatise les tests et les livraisons, assurant la qualité et la rapidité des mises en production. Cela réduit les risques d’erreur humaine et accélère le cycle de développement.
-
-Les tests automatisés (unitaires, d’intégration et E2E) sont systématisés pour garantir la stabilité et la conformité du système. Ils permettent de détecter rapidement les régressions et d’assurer la fiabilité du code à chaque évolution.
-
-La documentation est produite en continu pour accompagner chaque évolution et faciliter la prise en main par l’équipe. Elle permet de garder une trace des choix et des architectures, et d’accélérer l’intégration de nouveaux membres.
-
-Le choix du monolithe, des technologies éprouvées et des processus automatisés permet de répondre efficacement aux objectifs de sécurité, performance, disponibilité et conformité, tout en gardant la solution évolutive pour de futurs besoins. Cette stratégie assure un socle solide pour le projet et prépare l’ouverture vers des intégrations ou des évolutions plus complexes.
+Ce choix d’architecture microservices, associé à des technologies éprouvées et à des processus automatisés, permet de répondre efficacement aux objectifs de sécurité, performance, disponibilité et conformité, tout en gardant la solution évolutive pour de futurs besoins. Cette stratégie assure un socle solide pour BrokerX et prépare l’ouverture vers des intégrations ou des évolutions plus complexes.
 
 ## 5. Vue des blocs de construction
 
@@ -379,24 +373,32 @@ Le diagramme ci-dessus illustre les principaux éléments et interactions du sys
 | Élément                       | Type / Technologie                       | Rôle / Description                                                                                                                        |
 |-------------------------------|------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
 | Utilisateur                   | Acteur externe                           | Interagit avec BrokerX via l’interface web : navigation, formulaires, requêtes REST, réception d’e-mails                                  |
-| Application Serveur           | Container Spring Boot + Thymeleaf        | Fournit l’interface utilisateur web et l’API REST : inscription, KYC, MFA, gestion du portefeuille, passage d’ordres, audit & traçabilité |
-| Base de Données               | PostgreSQL 13             | Stocke : utilisateurs, ordres, transactions, tokens MFA, logs d’audit. Accès via JDBC depuis l’application serveur                        |
+| API Gateway                   | Service dédié (Spring Cloud Gateway, etc.)| Point d’entrée unique : centralise l’accès, la sécurité et le routage des requêtes vers le load balancer                                  |
+| Load Balancer                 | NGINX / Traefik                          | Répartit la charge entre les instances des microservices, assure la haute disponibilité et la résilience du système                       |
+| auth-service                  | Microservice Java/Spring Boot             | Gère l’authentification, MFA, gestion des rôles, journalisation des actions critiques                                                     |
+| matching-service              | Microservice Java/Spring Boot             | Appariement des ordres selon les règles métier, gestion du carnet d’ordres                                                                |
+| order-service                 | Microservice Java/Spring Boot             | Gestion des ordres de trading, validation pré-trade, traçabilité des opérations                                                           |
+| wallet-service                | Microservice Java/Spring Boot             | Gestion du portefeuille virtuel, dépôts, solde, transactions                                                                             |
+| DB Auth                       | PostgreSQL                               | Stocke les données d’authentification, MFA, rôles                                                                                        |
+| DB Matching                   | PostgreSQL                               | Stocke les données d’appariement, carnet d’ordres                                                                                        |
+| DB Order                      | PostgreSQL                               | Stocke les ordres, statuts, logs d’exécution                                                                                             |
+| DB Wallet                     | PostgreSQL                               | Stocke les portefeuilles, transactions, historiques                                                                                      |
 | Système Email (SMTP)          | Service externe                          | Reçoit les demandes d’envoi d’e-mails (liens de vérification, codes MFA) et transmet les courriels à l’utilisateur                       |
 
 **Principales interactions :**
-- L’utilisateur accède à l’application serveur pour toutes les opérations (web, formulaires, API REST)
-- L’application serveur lit/écrit les données métier dans la base PostgreSQL via JDBC
-- L’application serveur envoie des liens et des codes MFA au système email (SMTP)
+- L’utilisateur accède à BrokerX via l’API Gateway, qui centralise l’accès, la sécurité et le routage des requêtes
+- L’API Gateway route les requêtes vers le load balancer, qui répartit la charge vers les microservices
+- Chaque microservice gère un domaine métier spécifique et possède sa propre base PostgreSQL
+- Les microservices communiquent avec le système email (SMTP) pour l’envoi de codes MFA et de notifications
 - Le système email transmet les e-mails de vérification et de codes à l’utilisateur
 
-**Données stockées dans la base :**
-- Utilisateurs
-- Ordres
-- Transactions
-- Tokens & MFA
-- Logs d’audit
+**Données stockées dans les bases :**
+- Auth-service : utilisateurs, MFA, rôles
+- Matching-service : carnet d’ordres, appariements
+- Order-service : ordres, statuts, logs d’exécution
+- Wallet-service : portefeuilles, transactions
 
-Cette vue permet de comprendre les principaux composants, leurs rôles et les flux d’information entre les acteurs, le système et les services externes.
+Cette vue permet de comprendre la structure globale du système, les principaux composants et leurs interactions, ainsi que la répartition des responsabilités entre les microservices.
 
 ### 5.3 Vue interne des composants (Niveau 2)
 ![Diagramme de composants](./BB_2.png)
