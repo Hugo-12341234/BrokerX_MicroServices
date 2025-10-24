@@ -11,9 +11,9 @@ jobs:
     steps:
       - name: Clean workspace
         run: |
-          cd /home/gha-runner/actions-runner/_work/LOG430_BrokerX/LOG430_BrokerX
-          sudo rm -rf LOG430_BrokerX || true
-          mkdir -p LOG430_BrokerX
+          cd /home/gha-runner/actions-runner/_work/LOG430_BrokerX_MicroServices/LOG430_BrokerX_MicroServices
+          sudo rm -rf LOG430_BrokerX_MicroServices || true
+          mkdir -p LOG430_BrokerX_MicroServices
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,12 +23,12 @@ jobs:
 
       - name: Stop existing containers
         run: |
-          cd /home/gha-runner/actions-runner/_work/LOG430_BrokerX/LOG430_BrokerX
+          cd /home/gha-runner/actions-runner/_work/LOG430_BrokerX_MicroServices/LOG430_BrokerX_MicroServices
           docker compose down || true
 
       - name: Deploy application
         run: |
-          cd /home/gha-runner/actions-runner/_work/LOG430_BrokerX/LOG430_BrokerX
+          cd /home/gha-runner/actions-runner/_work/LOG430_BrokerX_MicroServices/LOG430_BrokerX_MicroServices
           docker compose build --no-cache
           docker compose up -d
 
@@ -39,7 +39,7 @@ jobs:
       - name: Verify deployment
         id: verify_deployment
         run: |
-          cd /home/gha-runner/actions-runner/_work/LOG430_BrokerX/LOG430_BrokerX
+          cd /home/gha-runner/actions-runner/_work/LOG430_BrokerX_MicroServices/LOG430_BrokerX_MicroServices
           if docker compose ps | grep -q "Up"; then
             echo "✅ Application deployed and running successfully"
             echo "Running containers:"
@@ -56,7 +56,7 @@ jobs:
       - name: Rollback if deployment failed
         if: failure()
         run: |
-          cd /home/gha-runner/actions-runner/_work/LOG430_BrokerX/LOG430_BrokerX
+          cd /home/gha-runner/actions-runner/_work/LOG430_BrokerX_MicroServices/LOG430_BrokerX_MicroServices
           echo "⏪ Rollback: Arrêt des containers et nettoyage."
           docker compose down
 
@@ -64,6 +64,6 @@ jobs:
         if: success()
         run: |
           echo "🚀 Deployment completed successfully!"
-          echo "📁 Application path: /home/gha-runner/actions-runner/_work/LOG430_BrokerX/LOG430_BrokerX/"
+          echo "📁 Application path: /home/gha-runner/actions-runner/_work/LOG430_BrokerX_MicroServices/LOG430_BrokerX_MicroServices/"
           echo "🟢 Running containers:"
           docker compose ps --format "table {{.Service}}\t{{.Status}}\t{{.Ports}}"
