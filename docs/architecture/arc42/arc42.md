@@ -403,116 +403,136 @@ Cette vue permet de comprendre la structure globale du système, les principaux 
 ### 5.3 Vue interne des composants (Niveau 2)
 ![Diagramme de composants](./BB_2.png)
 
-Le diagramme ci-dessus détaille les principaux composants internes du système :
+Le diagramme ci-dessus détaille l’architecture interne du système BrokerX, organisée en microservices :
 
 | Composant                      | Type / Rôle                                      | Description                                                                 |
 |--------------------------------|--------------------------------------------------|-----------------------------------------------------------------------------|
-| Client (Utilisateur)           | Acteur externe                                   | Accède à l’application web pour toutes les opérations de courtage           |
-| AuthController                 | Contrôleur web                                   | Gère l’authentification et la vérification MFA                              |
-| HomeController                 | Contrôleur web                                   | Affiche la page d’accueil et la navigation principale                       |
-| OrderController                | Contrôleur web                                   | Permet de passer et consulter des ordres de trading                         |
-| UserController                 | Contrôleur web                                   | Gère le profil et les informations utilisateur                              |
-| UserVerificationController     | Contrôleur web                                   | Gère la vérification d’identité (KYC)                                       |
-| WalletController               | Contrôleur web                                   | Gère le portefeuille et les dépôts                                          |
-| AuthenticationService          | Service métier                                   | Logique d’authentification et MFA                                           |
-| OrderService                   | Service métier                                   | Logique métier pour la gestion des ordres                                   |
-| PreTradeValidationService      | Service métier                                   | Valide les ordres avant exécution                                           |
-| RegistrationService            | Service métier                                   | Gère l’inscription et la vérification utilisateur                           |
-| StockService                   | Service métier                                   | Gestion des actifs financiers et cotations                                   |
-| WalletDepositService           | Service métier                                   | Gère les dépôts dans le portefeuille                                        |
-| Base de Données (PostgreSQL)   | Base de données                                  | Stocke toutes les données métier                                                     |
+| Utilisateur (Frontend React)   | Acteur externe                                   | Accède à l’application web pour toutes les opérations de courtage           |
+| API Gateway                    | Proxy/Routage                                    | Point d’entrée unique, route les requêtes vers les microservices            |
+| Load Balancer (NGINX)          | Répartition de charge / proxy                    | Distribue les requêtes vers les instances des microservices, config nginx.conf|
+| AuthController                 | Contrôleur (auth-service)                        | Gère l’authentification et la vérification MFA                              |
+| UserVerificationController     | Contrôleur (auth-service)                        | Gère la vérification d’identité (KYC)                                       |
+| OrderController                | Contrôleur (order-service)                       | Permet de passer et consulter des ordres de trading                         |
+| WalletController               | Contrôleur (wallet-service)                      | Gère le portefeuille et les dépôts                                          |
+| MatchingController             | Contrôleur (matching-service)                    | Gère le matching des ordres                                                 |
+| AuthenticationService          | Service métier (auth-service)                    | Logique d’authentification et MFA                                           |
+| RegistrationService            | Service métier (auth-service)                    | Gère l’inscription et la vérification utilisateur                           |
+| OrderService                   | Service métier (order-service)                   | Logique métier pour la gestion des ordres                                   |
+| PreTradeValidationService      | Service métier (order-service)                   | Valide les ordres avant exécution                                           |
+| StockService                   | Service métier (order-service)                   | Gestion des actifs financiers et cotations                                   |
+| WalletDepositService           | Service métier (wallet-service)                  | Gère les dépôts dans le portefeuille                                        |
+| MatchingService                | Service métier (matching-service)                | Logique de matching d’ordres                                                |
+| DB Auth (PostgreSQL)           | Base de données dédiée                           | Stocke les données d’authentification et utilisateurs                       |
+| DB Order (PostgreSQL)          | Base de données dédiée                           | Stocke les ordres et historiques de trading                                 |
+| DB Wallet (PostgreSQL)         | Base de données dédiée                           | Stocke les informations de portefeuille                                     |
+| DB Matching (PostgreSQL)       | Base de données dédiée                           | Stocke les données de matching                                              |
 | Système Email (SMTP)           | Service externe                                  | Envoie les notifications et codes MFA aux utilisateurs                      |
 
 **Principales interactions :**
-- Le client interagit avec les contrôleurs web pour toutes les opérations (authentification, ordres, profil, portefeuille, etc.)
-- Les contrôleurs délèguent la logique métier aux services Spring correspondants
-- Les services accèdent à la base de données pour lire/écrire les données métier
-- Les services d’inscription et d’authentification envoient des e-mails (liens de vérification, codes MFA) au système SMTP, qui transmet ces messages au client
+- L’utilisateur interagit avec le Frontend React, qui transmet les requêtes à l’API Gateway.
+- L’API Gateway centralise et sécurise l’accès, puis transmet les requêtes au Load Balancer (NGINX).
+- Le Load Balancer distribue les requêtes vers les microservices appropriés (auth-service, order-service, wallet-service, matching-service).
+- Chaque microservice possède ses propres contrôleurs et services métier, ainsi qu’une base de données dédiée.
+- Les services d’inscription et d’authentification envoient des e-mails (liens de vérification, codes MFA) au système SMTP, qui transmet ces messages à l’utilisateur.
 
-Cette vue permet de comprendre la répartition des responsabilités, les flux d’information et la collaboration entre les contrôleurs, les services, la base de données et les systèmes externes.
+Cette vue permet de comprendre la répartition des responsabilités, les flux d’information et la collaboration entre les composants, tout en respectant l’architecture microservices et le routage via API Gateway et NGINX.
 
 ### 5.4 Organisation du code et conventions
-Le code est structuré selon une approche hexagonale : les "adapters" gèrent les interactions externes (web, persistence), le "domain" regroupe la logique métier et les modèles, et "infrastructure" contient la configuration technique. Les conventions de nommage (camelCase) et de structure facilitent l’extension et la maintenance du projet. Les tests automatisés couvrent les fonctionnalités critiques, et la documentation est maintenue à jour pour chaque évolution majeure.
+Le code de chacun des microservices est structuré selon une approche hexagonale : les "adapters" gèrent les interactions externes (web, persistence), le "domain" regroupe la logique métier et les modèles, et "infrastructure" contient la configuration technique. Les conventions de nommage (camelCase) et de structure facilitent l’extension et la maintenance du projet. Les tests automatisés couvrent les fonctionnalités critiques, et la documentation est maintenue à jour pour chaque évolution majeure.
 
 ## 6. Vue d’ensemble des scénarios
 
 ### Diagramme
-- ![Diagramme de cas d’utilisation](docs/architecture/4+1/scenarios/useCaseDiagram-Diagramme_de_cas_d_utilisation__BrokerX.png)
+- ![Diagramme de cas d’utilisation](docs/architecture/4+1/scenarios/useCaseDiagram.png)
 
 ### Contexte
 La vue scénarios expose les principaux cas d’utilisation du système BrokerX, tels qu’ils sont vécus par les utilisateurs et les systèmes externes. Elle permet de visualiser les interactions entre le client et l’application, ainsi que les dépendances fonctionnelles entre les différents UC.
 
 ### Éléments
-- Acteurs externes : Client (utilisateur principal), Service Paiement Simulé (pour le dépôt)
-- Cas d’utilisation : Inscription & vérification d’identité, Authentification & MFA, Dépôt dans le portefeuille, Placement d’un ordre
+- Acteurs externes : Client (utilisateur principal), Service Paiement Simulé (pour le dépôt), Moteur d’appariement interne (matching), Données de Marché
+- Cas d’utilisation : Inscription & vérification d’identité, Authentification & MFA, Dépôt dans le portefeuille, Placement d’un ordre, Appariement interne & Exécution (matching)
 
 ### Relations
-- Le client peut initier chacun des cas d’utilisation
+- Le client peut initier chacun des cas d’utilisation principaux, sauf l'appariement interne qui est enclenché par le moteur d’appariement interne
 - Le dépôt utilise le service de paiement simulé
 - Le placement d’un ordre dépend du solde du portefeuille
+- Le placement d’un ordre déclenche le cas d’utilisation d’appariement interne & exécution
+- L’appariement interne & exécution est réalisé par le moteur d’appariement et utilise les données de marché
 
 ### Rationnel
-Cette vue permet de relier les besoins métier aux fonctionnalités du système, de valider la couverture fonctionnelle et d’illustrer les interactions principales. Elle sert de point de départ pour la modélisation des autres vues et garantit que l’architecture répond bien aux attentes des utilisateurs et des parties prenantes. Elle facilite aussi la communication entre les équipes métier et technique, en offrant une vision synthétique des parcours utilisateurs et des dépendances fonctionnelles. Enfin, elle permet d’identifier rapidement les points d’intégration et les scénarios critiques à tester.
+Cette vue permet de relier les besoins métier aux fonctionnalités du système, de valider la couverture fonctionnelle et d’illustrer les interactions principales, y compris le nouveau processus d’appariement et d’exécution des ordres. L’ajout du cas UC-07 assure que la mécanique centrale de traitement des transactions (matching) est bien couverte, avec la gestion des priorités prix/temps, la génération des transactions et la mise à jour des états d’ordre et des portefeuilles. Les acteurs externes (moteur d’appariement, données de marché, portefeuilles) sont explicitement intégrés pour refléter la réalité technique et métier de la plateforme BrokerX. Cette vue garantit que l’architecture répond bien aux attentes des utilisateurs et des parties prenantes, tout en facilitant la communication entre les équipes métier et technique et en identifiant les scénarios critiques à tester, notamment ceux liés à l’exécution automatique des ordres.
 
 
 ## 7. Vue de déploiement
 
-Le diagramme ci-dessous illustre l’infrastructure technique et la distribution des principaux artefacts du système BrokerX :
+Le diagramme ci-dessous illustre l’infrastructure technique et la distribution des principaux artefacts du système BrokerX dans une architecture microservices :
 
 ![Diagramme de déploiement BrokerX](docs/architecture/4+1/deploymentView/deploymentDiagram.png)
 
 | Nœud / Composant                      | Type / Technologie         | Canal / Protocole      | Sécurité / Persistance         | Explication technique                                                                 |
 |---------------------------------------|----------------------------|------------------------|-------------------------------|--------------------------------------------------------------------------------------|
 | Utilisateur                          | Acteur externe             | -                      | -                             | Interagit via le navigateur web                                                      |
-| Navigateur Web (Chrome, Firefox...)   | Poste utilisateur          | HTTPS/HTTP 8090        | TLS                           | Interface utilisateur, rendu HTML/CSS/JS (Thymeleaf)                                 |
-| Hôte (VM/Serveur)                    | VM/Serveur physique        | -                      | -                             | Héberge le moteur Docker                                                             |
-| Docker Engine                        | Plateforme conteneur       | Interne Docker         | Isolation conteneurs           | Orchestration et isolation des composants applicatifs                                 |
-| Réseau bridge: brokerx-network        | Réseau virtuel Docker      | Interne Docker         | Isolation réseau               | Communication sécurisée entre conteneurs                                              |
-| Conteneur: app (Spring Boot, JRE 17)  | Conteneur applicatif       | HTTPS/HTTP 8090        | TLS, MFA                      | Application principale, expose l’API REST et l’interface utilisateur                  |
-| brokerx.jar (JAR exécutable)          | Artefact Java              | Interne au conteneur   | -                             | Déployé dans le conteneur app                                                        |
-| UI Thymeleaf (/templates)             | Dossier de templates       | Interne au conteneur   | -                             | Rendu côté serveur                                                                   |
-| Actuator /actuator/health             | Endpoint de monitoring     | HTTP interne           | -                             | Monitoring de l’état de l’application                                                |
-| PostgreSQL 13-alpine                  | Base de données            | JDBC 5432              | Authentification, persistance | Stocke toutes les données métier                                                     |
-| Volume: postgres_data                 | Volume Docker              | Interne Docker         | Persistance                    | Persistance des données PostgreSQL                                                    |
-| SMTP Provider (Gmail, Outlook...)     | Service externe (SMTP)     | SMTP 587               | TLS, authentification         | Envoi d’e-mails (notifications, vérification, récupération)                          |
+| Frontend (React)                     | Application web            | HTTPS/HTTP 8090        | TLS                           | Interface utilisateur, communique avec l’API Gateway                                 |
+| API Gateway                          | Microservice Java/Spring   | HTTPS/HTTP 8080        | TLS, routage                  | Point d’entrée unique, centralise la sécurité et le routage vers les microservices   |
+| Load Balancer (NGINX)                | Proxy/Routage              | Interne Docker         | TLS, config nginx.conf         | Répartit la charge entre les microservices, assure la haute disponibilité            |
+| auth-service                         | Microservice Java/Spring   | Interne Docker         | TLS, MFA, DB dédiée           | Gère l’authentification, MFA, gestion des rôles, journalisation                      |
+| order-service                        | Microservice Java/Spring   | Interne Docker         | TLS, DB dédiée                | Gestion des ordres de trading, validation pré-trade, traçabilité                     |
+| wallet-service                       | Microservice Java/Spring   | Interne Docker         | TLS, DB dédiée                | Gestion du portefeuille virtuel, dépôts, solde, transactions                         |
+| matching-service                     | Microservice Java/Spring   | Interne Docker         | TLS, DB dédiée                | Appariement des ordres, gestion du carnet d’ordres                                   |
+| DB Auth                              | PostgreSQL                 | JDBC 5432              | Authentification, persistance | Stocke les données d’authentification, MFA, rôles                                    |
+| DB Order                             | PostgreSQL                 | JDBC 5432              | Persistance                    | Stocke les ordres, statuts, logs d’exécution                                         |
+| DB Wallet                            | PostgreSQL                 | JDBC 5432              | Persistance                    | Stocke les portefeuilles, transactions, historiques                                  |
+| DB Matching                          | PostgreSQL                 | JDBC 5432              | Persistance                    | Stocke les données d’appariement, carnet d’ordres                                    |
+| Volume: postgres_data                | Volume Docker              | Interne Docker         | Persistance                    | Persistance des données PostgreSQL                                                    |
+| SMTP Provider (Gmail, Outlook...)    | Service externe (SMTP)     | SMTP 587               | TLS, authentification         | Envoi d’e-mails (notifications, vérification, récupération)                          |
 
 ### Contexte
-La vue déploiement décrit l’architecture physique du système : comment les composants sont déployés sur l’infrastructure réelle (VM, Docker, réseau, base de données, services externes).
+La vue déploiement décrit l’architecture physique du système : chaque microservice est déployé dans son propre conteneur Docker, tous connectés au même réseau Docker interne (brokerx-network). Le frontend (React) communique avec l’API Gateway, qui centralise la sécurité et le routage. L’API Gateway transmet les requêtes au load balancer (NGINX), qui répartit la charge vers les microservices métier (auth, order, wallet, matching). Chaque microservice possède sa propre base PostgreSQL pour garantir l’isolation des données et la robustesse des transactions. Les volumes Docker assurent la persistance des données, même lors des mises à jour ou redémarrages. Le service SMTP externe gère l’envoi des notifications et des codes MFA. Cette architecture permet une scalabilité horizontale, une haute disponibilité et une maintenance facilitée, chaque service pouvant être mis à jour ou redémarré indépendamment.
 
 ### Éléments
-- Conteneur applicatif Spring Boot
-- Base de données PostgreSQL
-- Service SMTP externe
-- Volumes et réseaux Docker
+- Conteneurs Docker pour chaque microservice (auth-service, order-service, wallet-service, matching-service, api-gateway, frontend)
+- Load Balancer (NGINX) pour la répartition de charge
+- Réseau Docker interne (brokerx-network) pour la communication sécurisée
+- Bases PostgreSQL dédiées pour chaque microservice
+- Volume Docker pour la persistance des données
+- Service SMTP externe pour l’envoi d’e-mails
 
 ### Relations
-- L’application communique avec la base de données via JDBC
-- Les emails sont envoyés via le service SMTP externe
-- Les volumes assurent la persistance des données
-- Le réseau Docker isole et sécurise les communications
+- Le frontend communique avec l’API Gateway via HTTPS
+- L’API Gateway transmet les requêtes au load balancer NGINX
+- NGINX répartit la charge vers les microservices métier
+- Chaque microservice accède à sa propre base PostgreSQL
+- Les volumes Docker assurent la persistance des données
+- Les microservices communiquent avec le service SMTP pour l’envoi d’e-mails
 
 ### Rationnel
-Cette vue permet de comprendre la topologie du système, les points d’intégration, la sécurité et la résilience de l’application BrokerX en production. Elle est essentielle pour la gestion des déploiements, la scalabilité et la supervision. Elle aide à anticiper les besoins d’infrastructure, à optimiser la disponibilité et à garantir la conformité aux exigences de sécurité et de performance. Elle facilite aussi la gestion des incidents, la reprise après sinistre et l’évolution de l’architecture technique.
+Cette vue permet de comprendre la topologie du système BrokerX dans une architecture microservices : chaque service est isolé, scalable et maintenable indépendamment. Le réseau Docker interne garantit la sécurité et la rapidité des communications. La séparation des bases de données assure la conformité, la robustesse et la traçabilité des opérations. Le load balancer et l’API Gateway centralisent le routage et la sécurité, tandis que le service SMTP gère les notifications critiques. Cette organisation facilite la supervision, la gestion des incidents et l’évolution de l’architecture technique.
 
 ## 8. Vue Logique
 
-### Diagramme
-- ![Diagramme de classes](docs/architecture/4+1/logicalView/classDiagram.png)
+### Diagrammes de classes par microservice
+- Auth Service : ![Diagramme de classes Auth-Service](docs/architecture/4+1/logicalView/classDiagramAuth.png)
+- Matching Service : ![Diagramme de classes Matching-Service](docs/architecture/4+1/logicalView/classDiagramMatching.png)
+- Order Service : ![Diagramme de classes Order-Service](docs/architecture/4+1/logicalView/classDiagramOrder.png)
+- Wallet Service : ![Diagramme de classes Wallet-Service](docs/architecture/4+1/logicalView/classDiagramWallet.png)
 
 ### Contexte
-La vue logique présente la structure interne du système, centrée sur le modèle métier et les entités du domaine. Elle met en avant la modélisation des concepts clés, leur organisation et leurs relations.
+La vue logique présente la structure interne du système, organisée autour de quatre microservices principaux : Auth-Service, Matching-Service, Order-Service et Wallet-Service. Chaque service possède son propre modèle métier, adapté à ses responsabilités fonctionnelles : gestion des utilisateurs et de l’authentification, appariement des ordres, gestion des transactions et des ordres, gestion des portefeuilles et des positions boursières.
 
 ### Éléments
-- Classes métier : User, Transaction, Order, MfaChallenge, VerificationToken, UserAudit
-- Enums et value objects utilisés dans le domaine
-- Relations entre les entités (composition, agrégation, associations)
+- **Auth-Service** : User, MfaChallenge, VerificationToken, UserAudit
+- **Matching-Service** : OrderBook, ExecutionReport
+- **Order-Service** : Order
+- **Wallet-Service** : Wallet, StockPosition, StockRule, Transaction, WalletAudit
+- Enums et value objects spécifiques à chaque domaine
 
 ### Relations
-- Les entités sont liées par des relations métier (ex : un User effectue des Transactions, place des Orders, etc.)
-- Les enums et value objects enrichissent la sémantique métier
+- Les entités de chaque microservice sont liées par des relations métier propres à leur domaine (ex : un Wallet possède des StockPositions et des Transactions ; un User possède des MfaChallenges et des UserAudits ; un Order est audité et typé ; le MatchingEngine gère des Reports et des OrderBooks).
+- Les enums et value objects enrichissent la sémantique métier et garantissent la cohérence des règles de gestion.
+- Les diagrammes illustrent la séparation stricte des responsabilités entre les microservices, tout en assurant l’intégrité des processus métier globaux.
 
 ### Rationnel
-Cette vue permet de comprendre la logique métier profonde du système, d’assurer la cohérence du modèle et de faciliter la maintenance et l’évolution du code. Elle sert de base à la validation des règles métier et à la conception des services applicatifs. En explicitant les dépendances et les relations entre les entités, elle aide à anticiper les impacts des évolutions fonctionnelles et à garantir la robustesse du modèle. Elle est aussi essentielle pour la documentation, la formation des nouveaux développeurs et la communication avec les parties prenantes métier.
+Cette vue permet de comprendre la logique métier profonde du système, d’assurer la cohérence du modèle et de faciliter la maintenance et l’évolution du code. La séparation en microservices, chacun doté de son propre modèle, favorise la robustesse, la scalabilité et l’évolutivité. Les diagrammes de classes détaillent les dépendances et les relations entre les entités, ce qui aide à anticiper les impacts des évolutions fonctionnelles et à garantir la solidité du système. Cette documentation est essentielle pour la formation des nouveaux développeurs, la validation des règles métier et la communication avec les parties prenantes. Elle pourra également servir dans le futur quand il faudra ajouter de nouveaux microservices, car on connaîtra déjà le contexte des autres microservices.
 
 ## 9. Vue Processus (C&C)
 

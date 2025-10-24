@@ -1,4 +1,4 @@
-@startuml "BrokerX - Vue Briques Niveau 2"
+@startuml "BrokerX - Vue Briques Niveau 2 (Microservices)"
 !theme spacelab
 skinparam backgroundColor #F8F9FA
 skinparam componentStyle rectangle
@@ -8,58 +8,91 @@ skinparam ArrowColor #000000
 skinparam ranksep 120
 skinparam nodesep 80
 
-title "BrokerX - Vue des Blocs de Construction Niveau 2 (Contrôleurs & Services)"
+title "BrokerX - Vue des Blocs de Construction Niveau 2 (Microservices)"
 
 top to bottom direction
 
-actor "Client (Utilisateur)\nAccède à l'application web pour toutes les opérations de courtage." as User
+actor "Utilisateur\nAccède via le Frontend React" as User
+component "Frontend (React)" as Frontend #B3C6E7
+component "API Gateway" as APIGW #B3C6E7
+component "Load Balancer (NGINX)\n[nginx.conf]" as LB #B3C6E7
 
-rectangle "Contrôleurs Web (Spring MVC)" as Controllers {
-  component "AuthController\nGère l'authentification et la vérification MFA." as AuthC #B3C6E7
-  component "HomeController\nAffiche la page d'accueil et la navigation principale." as HomeC #B3C6E7
-  component "OrderController\nPermet de passer et consulter des ordres de trading." as OrderC #B3C6E7
-  component "UserController\nGère le profil et les informations utilisateur." as UserC #B3C6E7
-  component "UserVerificationController\nGère la vérification d'identité (KYC)." as UserVerifC #B3C6E7
-  component "WalletController\nGère le portefeuille et les dépôts." as WalletC #B3C6E7
+rectangle "auth-service" as AuthService {
+  rectangle "Contrôleurs" as AuthControllers {
+    component "AuthController" as AuthC #B3C6E7
+    component "UserVerificationController" as UserVerifC #B3C6E7
+  }
+  rectangle "Services Métier" as AuthServices {
+    component "AuthenticationService" as AuthS #F7DFA3
+    component "RegistrationService" as RegS #F7DFA3
+  }
+  database "DB Auth (PostgreSQL)" as DBAuth #D6C6F3
 }
 
-rectangle "Services Métier (Spring Bean)" as Services {
-  component "AuthenticationService\nLogique d'authentification et MFA." as AuthS #F7DFA3
-  component "OrderService\nLogique métier pour la gestion des ordres." as OrderS #F7DFA3
-  component "PreTradeValidationService\nValide les ordres avant exécution." as PreTradeS #F7DFA3
-  component "RegistrationService\nGère l'inscription et la vérification utilisateur." as RegS #F7DFA3
-  component "StockService\nGestion des actifs financiers et cotations." as StockS #F7DFA3
-  component "WalletDepositService\nGère les dépôts dans le portefeuille." as WalletS #F7DFA3
+rectangle "order-service" as OrderService {
+  rectangle "Contrôleurs" as OrderControllers {
+    component "OrderController" as OrderC #B3C6E7
+  }
+  rectangle "Services Métier" as OrderServices {
+    component "OrderService" as OrderS #F7DFA3
+    component "PreTradeValidationService" as PreTradeS #F7DFA3
+    component "StockService" as StockS #F7DFA3
+  }
+  database "DB Order (PostgreSQL)" as DBOrder #D6C6F3
 }
 
-database "Base de Données\n(PostgreSQL 13)" as DB #D6C6F3
-cloud "Système Email (SMTP)\nEnvoie les notifications et codes MFA aux utilisateurs." as EmailCloud #D6C6F3
+rectangle "wallet-service" as WalletService {
+  rectangle "Contrôleurs" as WalletControllers {
+    component "WalletController" as WalletC #B3C6E7
+  }
+  rectangle "Services Métier" as WalletServices {
+    component "WalletDepositService" as WalletS #F7DFA3
+  }
+  database "DB Wallet (PostgreSQL)" as DBWallet #D6C6F3
+}
+
+rectangle "matching-service" as MatchingService {
+  rectangle "Contrôleurs" as MatchingControllers {
+    component "MatchingController" as MatchingC #B3C6E7
+  }
+  rectangle "Services Métier" as MatchingServices {
+    component "MatchingService" as MatchingS #F7DFA3
+  }
+  database "DB Matching (PostgreSQL)" as DBMatching #D6C6F3
+}
+
+cloud "Système Email (SMTP)" as EmailCloud #D6C6F3
 
 ' === Connexions ===
-User --> AuthC : "Authentification, MFA"
-User --> HomeC : "Accueil, navigation"
-User --> OrderC : "Passage d'ordres"
-User --> UserC : "Gestion du profil"
-User --> UserVerifC : "Vérification d'identité"
-User --> WalletC : "Gestion du portefeuille"
+User --> Frontend : "Navigation, opérations"
+Frontend --> APIGW : "Requêtes HTTP (REST)"
+APIGW --> LB : "Proxy/Routage"
+LB --> AuthService : "Routage Auth, Inscription, Vérification"
+LB --> OrderService : "Routage Ordres, Validation, Actifs"
+LB --> WalletService : "Routage Portefeuille, Dépôts"
+LB --> MatchingService : "Routage Matching"
 
 AuthC --> AuthS : "Authentification, MFA"
+UserVerifC --> RegS : "Vérification d'identité"
+AuthS --> DBAuth : "Lecture/écriture utilisateur, tokens"
+RegS --> DBAuth : "Lecture/écriture utilisateur"
+RegS --> EmailCloud : "Envoi de liens de vérification"
+AuthS --> EmailCloud : "Envoi de codes MFA"
+
 OrderC --> OrderS : "Gestion des ordres"
 OrderC --> PreTradeS : "Validation pré-trade"
-UserC --> RegS : "Inscription, gestion utilisateur"
-UserVerifC --> RegS : "Vérification d'identité"
-WalletC --> WalletS : "Dépôt portefeuille"
 OrderC --> StockS : "Consultation actifs"
+OrderS --> DBOrder : "Lecture/écriture ordres"
+PreTradeS --> DBOrder : "Lecture ordres, validation"
+StockS --> DBOrder : "Lecture actifs"
 
-AuthS --> DB : "Lecture/écriture utilisateur, tokens"
-OrderS --> DB : "Lecture/écriture ordres"
-PreTradeS --> DB : "Lecture ordres, validation"
-RegS --> DB : "Lecture/écriture utilisateur"
-StockS --> DB : "Lecture actifs"
-WalletS --> DB : "Lecture/écriture utilisateur"
+WalletC --> WalletS : "Dépôt portefeuille"
+WalletS --> DBWallet : "Lecture/écriture utilisateur"
+WalletS --> EmailCloud : "Notifications dépôt"
 
-RegS --> EmailCloud : "Envoi de liens de vérification et notifications par SMTP"
-AuthS --> EmailCloud : "Envoi de codes MFA par SMTP"
+MatchingC --> MatchingS : "Matching d'ordres"
+MatchingS --> DBMatching : "Lecture/écriture matching"
+
 EmailCloud --> User : "Réception d'e-mails de vérification et de codes"
 
 @enduml

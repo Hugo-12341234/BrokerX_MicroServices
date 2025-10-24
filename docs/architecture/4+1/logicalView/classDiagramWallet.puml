@@ -1,0 +1,57 @@
+@startuml
+title Diagramme de classes - Wallet-Service
+
+class Wallet {
+  -id : UUID
+  -userId : Long
+  -balance : BigDecimal
+  -createdAt : LocalDateTime
+  -updatedAt : LocalDateTime
+  -stockPositions : List<StockPosition>
+  +updateStockQuantity(symbol : String, quantityChange : int) : void
+}
+
+class Transaction {
+  -id : Long
+  -userId : Long
+  -idempotencyKey : String
+  -amount : BigDecimal
+  -type : TransactionType {DEPOSIT, WITHDRAWAL, TRADE_BUY, TRADE_SELL}
+  -status : TransactionStatus {PENDING, SETTLED, FAILED, COMPLETED}
+  -description : String
+  -createdAt : LocalDateTime
+  -updatedAt : LocalDateTime
+  +markAsSettled() : void
+  +markAsFailed() : void
+}
+
+class WalletAudit {
+  -id : Long
+  -userId : Long
+  -details : String
+  -createdAt : LocalDateTime
+}
+
+class StockPosition {
+  -id : Long
+  -symbol : String
+  -quantity : int
+  -averagePrice : BigDecimal
+  -createdAt : LocalDateTime
+  -updatedAt : LocalDateTime
+}
+
+class StockRule {
+  -id : Long
+  -symbol : String
+  -minQuantity : int
+  -maxQuantity : int
+  -ruleType : String
+  -description : String
+}
+
+Wallet "1" -- "*" Transaction
+Wallet "1" -- "*" WalletAudit
+Wallet "1" -- "*" StockPosition
+StockPosition "*" -- "1" StockRule
+@enduml

@@ -1,0 +1,52 @@
+@startuml
+title Diagramme de classes - Auth-Service
+
+class User {
+  -id : Long
+  -email : String
+  -passwordHash : String
+  -name : String
+  -adresse : String
+  -dateDeNaissance : LocalDate
+  -status : Status {PENDING, ACTIVE, REJECTED, SUSPENDED}
+  +activate() : void
+  +reject() : void
+}
+
+class VerificationToken {
+  -id : Long
+  -tokenHash : String
+  -user : User
+  -expiryDate : LocalDateTime
+}
+
+class MfaChallenge {
+  -id : Long
+  -userId : Long
+  -code : String
+  -createdAt : LocalDateTime
+  -expiresAt : LocalDateTime
+  -used : boolean
+  -ipAddress : String
+  -failedAttempts : int
+  -lockedUntil : LocalDateTime
+  +isExpired() : boolean
+  +markAsUsed() : void
+  +isValid() : boolean
+}
+
+class Audit {
+  -id : Long
+  -userId : Long
+  -action : String
+  -timestamp : LocalDateTime
+  -documentHash : String
+  -ipAddress : String
+  -userAgent : String
+  -sessionToken : String
+}
+
+User "1" -- "*" VerificationToken
+User "1" -- "*" MfaChallenge
+User "1" -- "*" Audit
+@enduml

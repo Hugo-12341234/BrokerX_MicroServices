@@ -1,0 +1,19 @@
+@startuml
+title Diagramme de classes - Order-Service
+
+class Order {
+  -id : Long
+  -clientOrderId : String
+  -userId : Long
+  -symbol : String
+  -side : Side {ACHAT, VENTE}
+  -type : OrderType {MARCHE, LIMITE}
+  -quantity : int
+  -price : Double
+  -duration : DurationType {DAY, IOC, FOK}
+  -timestamp : Instant
+  -status : OrderStatus
+  -rejectReason : String
+}
+
+@enduml
