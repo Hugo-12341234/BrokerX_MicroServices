@@ -33,7 +33,7 @@ jobs:
           mvn verify
 
       - name: Upload build artefacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-artefacts
           path: |
@@ -41,9 +41,9 @@ jobs:
             **/target/surefire-reports/
             **/target/failsafe-reports/
 
-      - name: Publish test badge
-        uses: schneegans/test-results-badge-action@v2
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          workflow_name: CI - Build, Test & Artefacts
-          test_result_file: '**/target/surefire-reports/*.xml'
+      # - name: Publish test badge
+      #   uses: schneegans/test-results-badge-action@v2
+      #   with:
+      #     github_token: ${{ secrets.GITHUB_TOKEN }}
+      #     workflow_name: CI - Build, Test & Artefacts
+      #     test_result_file: '**/target/surefire-reports/*.xml'
