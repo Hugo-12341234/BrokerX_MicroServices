@@ -7,72 +7,93 @@ skinparam artifactStyle rectangle
 
 'title et contexte
 ' ----------------------------------------------------------------------
-title "BrokerX — Diagramme de Déploiement"
+title "BrokerX — Diagramme de Déploiement (Microservices)"
 
 actor "Utilisateur" as User
 
 node "Navigateur Web\n(Chrome, Firefox, Safari)" as Browser {
-  [Interface utilisateur\n(HTML/CSS/JS, Thymeleaf)]
-}
-
-node "Hôte (VM/Serveur)" as Host {
-  node "Docker Engine" as Docker {
-    node "Réseau bridge: brokerx-network" as Net {
-      node "Conteneur: app\n(Spring Boot, JRE 17)\nport 8090" as AppC {
-        artifact "brokerx.jar\n(JAR exécutable)" as AppJar
-        folder "UI Thymeleaf\n(/templates)" as ThymeleafUI
-        [Actuator /actuator/health]
-      }
-      database "PostgreSQL 13-alpine\nport 5432" as DB
-      frame "Volume: postgres_data\n(persistance Postgres)" as DBVol
-    }
-  }
+  [Interface utilisateur\n(HTML/CSS/JS, React)]
 }
 
 cloud "SMTP Provider\n(Gmail, Outlook...)\nport 587" as SMTP
 
-' Connexions principales
-User --> Browser : Interaction utilisateur
-Browser --> AppC : HTTPS/HTTP 8090
-AppC --> DB : JDBC 5432
-DB .. DBVol : persiste
-AppC --> SMTP : SMTP 587
+node "Hôte (VM/Serveur)" as Host {
+  node "Docker Engine" as Docker {
+    node "Réseau bridge: brokerx-network" as Net {
+      node "Conteneur: frontend\n(React, Node.js)\nport 3000" as FrontendC {
+        artifact "frontend app"
+      }
+      node "Conteneur: nginx-load-balancer\n(NGINX)\nport 8078" as NginxC {
+        artifact "nginx.conf"
+      }
+      node "Conteneur: api-gateway\n(Spring Boot)\nport 8079" as GatewayC {
+        artifact "api-gateway.jar"
+      }
+      node "Conteneur: auth-service\n(Spring Boot)\nport 8081" as AuthC {
+        artifact "auth-service.jar"
+      }
+      node "Conteneur: order-service\n(Spring Boot)\nport 8082" as OrderC {
+        artifact "order-service.jar"
+      }
+      node "Conteneur: wallet-service\n(Spring Boot)\nport 8083" as WalletC {
+        artifact "wallet-service.jar"
+      }
+      node "Conteneur: matching-service\n(Spring Boot)\nport 8084" as MatchingC {
+        artifact "matching-service.jar"
+      }
+      node "Conteneur: swagger-ui\n(port 8085)" as SwaggerC {
+        artifact "swagger-ui"
+      }
+      node "Conteneur: prometheus\n(port 8090)" as PrometheusC {
+        artifact "prometheus.yml"
+      }
+      node "Conteneur: grafana\n(port 3001)" as GrafanaC {
+        artifact "dashboard.json"
+      }
+      database "PostgreSQL Auth\nport 5433" as DBAuth
+      database "PostgreSQL Order\nport 5434" as DBOrder
+      database "PostgreSQL Wallet\nport 5435" as DBWallet
+      database "PostgreSQL Matching\nport 5436" as DBMatching
+      frame "Volumes: persistance" as Volumes
+    }
+  }
+}
 
-note right of AppC
-- Image runtime: eclipse-temurin:17-jre-alpine
-- Spring Boot: 3.5.5
-- JRE: 17
-- HEALTHCHECK: /actuator/health
-- Variables env:
-  • SPRING_PROFILES_ACTIVE=prod
-  • SPRING_DATASOURCE_URL=jdbc:postgresql://database:5432/brokerx
-  • SPRING_DATASOURCE_USERNAME=brokerx_user
-  • SPRING_DATASOURCE_PASSWORD=brokerx_p*******
-  • SPRING_FLYWAY_ENABLED=true
-  • JWT_SECRET=BrokerX**************
-  • JWT_EXPIRATION=86400000
-end note
-
-note right of DB
-- Image: postgres:13-alpine
-- Healthcheck: pg_isready
-- DB: brokerx
-- User: brokerx_user
-- Password: brokerx_p*******
-- Volume: postgres_data
-end note
+' Connexions principales (simplifiées)
+User --> Browser : Utilise
+Browser --> FrontendC : HTTP 3000
+FrontendC --> GatewayC : API REST
+GatewayC --> NginxC : Proxy interne
+NginxC --> AuthC : Microservice
+NginxC --> OrderC : Microservice
+NginxC --> WalletC : Microservice
+NginxC --> MatchingC : Microservice
+AuthC --> DBAuth
+OrderC --> DBOrder
+WalletC --> DBWallet
+MatchingC --> DBMatching
+GatewayC --> SwaggerC : Docs
+PrometheusC --> GatewayC : Récolte des données
+GrafanaC --> PrometheusC
+GatewayC -right-> SMTP
 
 legend right
-Déploiement BrokerX :
-- app : Application monolithique Spring Boot, gère la logique métier, l'API REST et l'interface utilisateur Thymeleaf
-- db : Base de données PostgreSQL 13, stockage persistant des données applicatives
-- SMTP : Service externe pour l'envoi d'e-mails transactionnels
-- Navigateur : Point d'accès utilisateur, interface web dynamique
-
-Ports exposés :
-- 8090 (app) — HTTP
-- 5432 (db) — JDBC
-- 587 (SMTP) — TLS
+Utilisateur : Personne qui utilise la plateforme BrokerX
+Navigateur : Accès web à l'interface utilisateur
+frontend : Application React, interface utilisateur
+api-gateway : Point d'entrée unique, gère la sécurité et le routage
+nginx-load-balancer : Répartition des requêtes vers les microservices
+auth-service : Microservice d'authentification et gestion des utilisateurs
+order-service : Microservice de gestion des ordres de trading
+wallet-service : Microservice de gestion des portefeuilles et soldes
+matching-service : Microservice de matching et exécution des transactions
+swagger-ui : Documentation centralisée des APIs
+prometheus : Collecte des métriques pour le monitoring.
+**Prometheus est réellement connecté à chacun des microservices pour récolter les données à afficher pour l'observabilité,
+mais pour des besoins de clarté, j'ai juste mis le lien avec le gateway.
+grafana : Visualisation des métriques et dashboards
+PostgreSQL Auth/Order/Wallet/Matching : Bases de données dédiées à chaque microservice
+SMTP Provider : Service externe pour l'envoi d'e-mails
 end legend
 
 @enduml
