@@ -1,0 +1,14 @@
+# Priorisation MoSCoW des cas d'utilisation
+
+| Cas d'utilisation                                      | Priorité MoSCoW | Justification                                                                                   |
+|--------------------------------------------------------|-----------------|-----------------------------------------------------------------------------------------------------------|
+| UC-01 — Inscription & Vérification d’identité          | Must            | Sans inscription et vérification, aucun utilisateur ne peut accéder à la plateforme ni respecter les exigences réglementaires (KYC/AML). C'est la base de toute relation de confiance et de conformité légale.|
+| UC-03 — Approvisionnement du portefeuille (dépôt virtuel)| Must            | Les utilisateurs doivent pouvoir disposer de liquidités pour effectuer des opérations : sans dépôt, aucune transaction n'est possible, ce qui bloque toute activité sur la plateforme. |
+| UC-05 — Placement d’un ordre (marché/limite) avec contrôles pré-trade | Must            | Le placement d'ordre est le cœur du métier : sans cette fonctionnalité, la plateforme ne répond à aucun besoin de courtage et perd toute valeur pour les clients.  |
+| UC-02 — Authentification & MFA                         | Should          | La sécurité des accès est importante pour la conformité et la confiance, mais une authentification forte peut être ajoutée après la mise en place des fonctionnalités principales. Une version initiale peut fonctionner avec des contrôles simplifiés.|
+| UC-07 — Appariement interne & Exécution (matching)     | Should          | L'appariement automatique améliore la rapidité et la précision des exécutions : il est recommandé pour optimiser l'expérience utilisateur, mais peut être simplifié ou simulé dans une première version si nécessaire.|
+| UC-04 — Abonnement aux données de marché               | Could           | Permet aux utilisateurs de prendre des décisions informées, mais la plateforme peut fonctionner sans cette fonctionnalité, en mode minimal ou pour des tests.|
+| UC-06 — Modification / Annulation d’un ordre           | Could           | Offre de la flexibilité et réduit les erreurs, mais un MVP peut fonctionner sans cette capacité, en imposant plus de rigueur à l'utilisateur.|
+| UC-08 — Confirmation d’exécution & Notifications       | Won't Have      | Utile pour la transparence et l'information client, mais sera exclu de la première version pour se concentrer sur les fonctionnalités essentielles et réduire la complexité technique.|
+
+> Cette priorisation MoSCoW garantit que les fonctionnalités critiques (Must) sont livrées en priorité pour assurer la valeur métier, la conformité et la sécurité, tandis que les autres (Should/Could) enrichissent l'expérience ou optimisent le service. Les éléments en Won't Have sont explicitement exclus pour permettre une livraison rapide et maîtrisée du périmètre minimal.

@@ -1,0 +1,90 @@
+@startuml
+' UC-03 — Dépôt dans le portefeuille (BrokerX)
+
+title Sequence Diagram\nUC-03 — Dépôt portefeuille avec idempotence
+
+skinparam ParticipantPadding 8
+skinparam BoxPadding 6
+skinparam Shadowing false
+skinparam ArrowColor #2c3e50
+skinparam ActorStyle awesome
+autonumber
+
+actor Client
+participant WalletController
+participant WalletService
+participant "Domain(Audit, Transaction)" as Domain
+participant "Adapters (Transaction, User)" as Adapters
+participant "Persistence (JPA Repos)" as Persistence
+
+== Soumission du dépôt ==
+Client -> WalletController: POST /wallet/deposit\nDepositRequest(amount: BigDecimal, idempotencyKey: String)
+WalletController -> WalletService: deposit(userId, amount, idempotencyKey)
+
+alt erreur de validation (montant invalide, clé manquante, compte introuvable ou inactif)
+  WalletService -> Domain: Créer audit d'échec
+  Domain --> WalletService: Audit
+  WalletService -> Adapters: save(Audit)
+    Adapters -> Persistence: save(Audit)
+    Persistence --> Adapters: Audit
+    Adapters --> WalletService: Audit
+  WalletService --> WalletController: Exception (4xx/5xx)
+  WalletController --> Client: Réponse d'erreur
+else dépôt accepté
+    WalletService -> Adapters: findByIdempotencyKey(idempotencyKey)
+    Adapters -> Persistence: findByIdempotencyKey(idempotencyKey)
+    Persistence --> Adapters: Optional<Transaction>
+    Adapters --> WalletService: Optional<Transaction>
+  opt idempotence (transaction qui existe déjà)
+    WalletService --> WalletController: transaction.id
+    WalletController --> Client: 200 OK DepositResponse(transaction.id)
+  end
+
+  WalletService -> Domain: créer Transaction (PENDING)
+    Domain --> WalletService: Transaction
+    WalletService -> Adapters: save(Transaction)
+  Adapters -> Persistence: save(Transaction)
+  Persistence --> Adapters: Transaction
+  Adapters --> WalletService: Transaction
+
+  WalletService -> Adapters: processPayment(idempotencyKey, userId)
+  Adapters --> WalletService: boolean
+
+  opt paiement rejeté
+    WalletService -> Domain: markAsFailed(transaction)
+    WalletService -> Adapters: save(transaction)
+    Adapters -> Persistence: save(transaction)
+    Persistence --> Adapters: transaction
+    Adapters --> WalletService: transaction
+    WalletService -> Domain: Créer audit d'échec
+    Domain --> WalletService: Audit
+    WalletService -> Adapters: save(Audit)
+    Adapters -> Persistence: save(Audit)
+    Persistence --> Adapters: Audit
+    Adapters --> WalletService: Audit
+    WalletService --> WalletController: DepositResult.failure("Paiement refusé")
+    WalletController --> Client: Réponse d'erreur
+   end
+
+  WalletService -> Domain: creditBalance(user, amount)
+  WalletService -> Adapters: save(user)
+  Adapters -> Persistence: save(user)
+  Persistence --> Adapters: user
+  Adapters --> WalletService: user
+
+    WalletService -> Domain: markAsSettled(transaction)
+    WalletService -> Adapters: save(transaction)
+    Adapters -> Persistence: save(transaction)
+
+  WalletService -> Domain: créer Audit de succès
+    Domain --> WalletService: Audit
+    WalletService -> Adapters: save(Audit)
+  Adapters -> Persistence: save(Audit)
+  Persistence --> Adapters: Audit
+  Adapters --> WalletService: Audit
+
+  WalletService --> WalletController: DepositResult.success(transaction.id)
+  WalletController --> Client: 200 OK DepositResponse(id, status=SETTLED)
+end
+
+@enduml

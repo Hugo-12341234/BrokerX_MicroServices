@@ -1,0 +1,86 @@
+@startuml
+' UC-01 — Inscription & Vérification d'identité (BrokerX)
+
+title Sequence Diagram\nUC-01 — Inscription & Vérification d'identité
+
+skinparam ParticipantPadding 8
+skinparam BoxPadding 6
+skinparam Shadowing false
+skinparam ArrowColor #2c3e50
+skinparam ActorStyle awesome
+autonumber
+
+actor Client
+participant UserController
+participant RegistrationService
+participant "Domain (User, VerificationToken, Audit)" as Domain
+participant "Adapters (User, Password, Email, Token)" as Adapters
+participant "Persistence (JPA Repos)" as Persistence
+participant UserVerificationController
+
+== Inscription ==
+Client -> UserController: POST /users/register\n(userForm: UserForm,\nmodel: Model)
+UserController -> RegistrationService: register(email: String,\nnom: String, mdp: String,\nadresse: String,\ndateDeNaissance: LocalDate)
+
+RegistrationService -> Adapters: findByEmail(email)
+Adapters -> Persistence: findByEmail(email)
+Persistence --> Adapters: Optional<User>
+Adapters --> RegistrationService: Optional<User>
+
+alt email déjà utilisé ou données invalides
+  RegistrationService --> UserController: Exception (4xx)
+  UserController --> Client: Erreur ("Email déjà utilisé")
+else succès
+  RegistrationService -> Adapters: hash mot de passe
+  RegistrationService -> Domain: créer User (statut PENDING)
+  Domain --> RegistrationService: User
+  RegistrationService -> Adapters: save(User)
+  Adapters -> Persistence: save(User)
+  Persistence --> Adapters: User
+  Adapters --> RegistrationService: User
+
+  RegistrationService -> Adapters: save(VerificationToken)
+  Adapters -> Persistence: save(VerificationToken)
+  Persistence --> Adapters: VerificationToken
+  Adapters --> RegistrationService: VerificationToken
+
+  RegistrationService -> Adapters: envoyer email de vérification
+
+  RegistrationService --> UserController: User
+  UserController --> Client: 200 OK (User)
+end
+
+== Vérification d'identité ==
+Client -> UserVerificationController: GET /verify?token=...\n(token: String, model: Model)
+UserVerificationController -> RegistrationService: verifyUser(token: String)
+
+RegistrationService -> Adapters: findByTokenHash(tokenHash: String)
+Adapters -> Persistence: findByTokenHash(tokenHash: String)
+Persistence --> Adapters: Optional<VerificationToken>
+Adapters --> RegistrationService: Optional<VerificationToken>
+
+alt token invalide ou expiré
+  RegistrationService --> UserVerificationController: False
+  UserVerificationController --> Client: Erreur (False)
+else succès
+  RegistrationService -> Domain: activate(User)
+  RegistrationService -> Adapters: save(User)
+  Adapters -> Persistence: save(User)
+  Persistence --> Adapters: User
+  Adapters --> RegistrationService: User
+
+  RegistrationService -> Adapters: delete(VerificationToken)
+  Adapters -> Persistence: delete(VerificationToken)
+
+  RegistrationService -> Domain: créer Audit
+    Domain --> RegistrationService: Audit
+  RegistrationService -> Adapters: save(Audit)
+  Adapters -> Persistence: save(Audit)
+  Persistence --> Adapters: Audit
+  Adapters --> RegistrationService: Audit
+
+  RegistrationService --> UserVerificationController: succès
+  UserVerificationController --> Client: 200 OK (True)
+end
+
+@enduml

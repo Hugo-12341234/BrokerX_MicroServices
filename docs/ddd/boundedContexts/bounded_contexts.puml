@@ -1,0 +1,54 @@
+@startuml
+skinparam packageStyle rectangle
+
+package "Utilisateur & Sécurité" {
+  rectangle "User"
+  rectangle "MfaChallenge"
+  rectangle "SessionToken"
+  rectangle "Registration"
+
+  User -down-> SessionToken
+  User -down-> MfaChallenge: "Valide"
+  User -down-> Registration: "Effectue"
+  MfaChallenge -down-> SessionToken: "Possède"
+}
+
+package "Portefeuille" {
+  rectangle "Wallet"
+  rectangle "Transaction"
+  rectangle "Positions"
+  rectangle "Stocks"
+  rectangle "SimulatedPayment"
+  rectangle "Solde"
+
+  Wallet -down-> Transaction: "Est alimenté par"
+  Transaction -down-> SimulatedPayment: "Est confirmée par"
+  Transaction -down-> Solde: "Modifie"
+  Wallet -down-> Positions: "Contient"
+  Positions -down-> Stocks: "Inclut"
+}
+
+package "Ordres" {
+  rectangle "Order"
+  rectangle "PreTradeValidation"
+
+  Order -down-> PreTradeValidation: "Est validé par"
+}
+
+package "Matching" {
+  rectangle "OrderBook"
+  rectangle "ExecutionReport"
+  rectangle "MatchEngine"
+
+  OrderBook -down-> MatchEngine: "Est traité par"
+  MatchEngine -down-> ExecutionReport: "Déclenche un rapport d'exécution"
+}
+
+' Liaisons inter-contextes principales
+User -right-> Wallet: "Possède"
+User -right-> Order: "Place"
+Wallet -down-> Order: "Est affecté par"
+Order -down-> OrderBook: "Est ajouté au carnet"
+Order -> Stocks: "Est placé sur"
+
+@enduml

@@ -1,0 +1,36 @@
+@startuml
+' UC-05 — Placement d’un ordre (pré-trade)
+
+title Diagramme d'activité\nUC-05 — Placement d’un ordre (pré-trade)
+
+|Client|
+start
+:Le client saisit les paramètres de l'ordre (symbole, sens, type, quantité, prix, durée);
+|Système|
+:Normaliser les données et horodater l'opération;
+:Vérifier la session et le portefeuille;
+if (Données invalides ou portefeuille inexistant?) then (Oui)
+  :Rejeter l'ordre;
+  :Informer le client du rejet;
+  stop
+else (Non)
+  :Vérifier l'idempotence;
+  if (Ordre déjà placé?) then (Oui)
+    :Renvoyer le résultat précédent au client;
+    stop
+  else (Non)
+    :Effectuer les contrôles pré-trade\n(pouvoir d'achat, bande de prix,\ntick size, short-sell, taille max, quantité > 0);
+    if (Contrôle pré-trade échoué?) then (Oui)
+      :Rejeter l'ordre avec motif;
+      :Informer le client du rejet;
+      stop
+    else (Non)
+      :Accepter l'ordre;
+      :Informer le client du succès;
+      stop
+    endif
+  endif
+endif
+
+@enduml
+

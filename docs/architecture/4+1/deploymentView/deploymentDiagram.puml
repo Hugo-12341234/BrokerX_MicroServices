@@ -1,0 +1,78 @@
+@startuml "BrokerX - Vue Déploiement"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam linetype ortho
+skinparam shadowing false
+skinparam artifactStyle rectangle
+
+'title et contexte
+' ----------------------------------------------------------------------
+title "BrokerX — Diagramme de Déploiement"
+
+actor "Utilisateur" as User
+
+node "Navigateur Web\n(Chrome, Firefox, Safari)" as Browser {
+  [Interface utilisateur\n(HTML/CSS/JS, Thymeleaf)]
+}
+
+node "Hôte (VM/Serveur)" as Host {
+  node "Docker Engine" as Docker {
+    node "Réseau bridge: brokerx-network" as Net {
+      node "Conteneur: app\n(Spring Boot, JRE 17)\nport 8090" as AppC {
+        artifact "brokerx.jar\n(JAR exécutable)" as AppJar
+        folder "UI Thymeleaf\n(/templates)" as ThymeleafUI
+        [Actuator /actuator/health]
+      }
+      database "PostgreSQL 13-alpine\nport 5432" as DB
+      frame "Volume: postgres_data\n(persistance Postgres)" as DBVol
+    }
+  }
+}
+
+cloud "SMTP Provider\n(Gmail, Outlook...)\nport 587" as SMTP
+
+' Connexions principales
+User --> Browser : Interaction utilisateur
+Browser --> AppC : HTTPS/HTTP 8090
+AppC --> DB : JDBC 5432
+DB .. DBVol : persiste
+AppC --> SMTP : SMTP 587
+
+note right of AppC
+- Image runtime: eclipse-temurin:17-jre-alpine
+- Spring Boot: 3.5.5
+- JRE: 17
+- HEALTHCHECK: /actuator/health
+- Variables env:
+  • SPRING_PROFILES_ACTIVE=prod
+  • SPRING_DATASOURCE_URL=jdbc:postgresql://database:5432/brokerx
+  • SPRING_DATASOURCE_USERNAME=brokerx_user
+  • SPRING_DATASOURCE_PASSWORD=brokerx_p*******
+  • SPRING_FLYWAY_ENABLED=true
+  • JWT_SECRET=BrokerX**************
+  • JWT_EXPIRATION=86400000
+end note
+
+note right of DB
+- Image: postgres:13-alpine
+- Healthcheck: pg_isready
+- DB: brokerx
+- User: brokerx_user
+- Password: brokerx_p*******
+- Volume: postgres_data
+end note
+
+legend right
+Déploiement BrokerX :
+- app : Application monolithique Spring Boot, gère la logique métier, l'API REST et l'interface utilisateur Thymeleaf
+- db : Base de données PostgreSQL 13, stockage persistant des données applicatives
+- SMTP : Service externe pour l'envoi d'e-mails transactionnels
+- Navigateur : Point d'accès utilisateur, interface web dynamique
+
+Ports exposés :
+- 8090 (app) — HTTP
+- 5432 (db) — JDBC
+- 587 (SMTP) — TLS
+end legend
+
+@enduml

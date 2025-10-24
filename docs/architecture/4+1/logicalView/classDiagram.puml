@@ -1,0 +1,80 @@
+@startuml
+' Diagramme UML des entités de persistance BrokerX (notation diagramme de classe)
+
+class User {
+  -id : Long
+  -email : String
+  -passwordHash : String
+  -name : String
+  -adresse : String
+  -dateDeNaissance : LocalDate
+  -status : Status { PENDING, ACTIVE, REJECTED, SUSPENDED }
+  -balance : BigDecimal
+  +activate() : void
+  +reject() : void
+  +creditBalance(amount : BigDecimal) : void
+}
+
+class UserAudit {
+  -id : Long
+  -action : String
+  -timestamp : LocalDateTime
+  -documentHash : String
+  -ipAddress : String
+  -userAgent : String
+  -sessionToken : String
+}
+
+class Transaction {
+  -id : Long
+  -idempotencyKey : String
+  -amount : BigDecimal
+  -type : TransactionType { DEPOSIT, WITHDRAWAL, TRADE_BUY, TRADE_SELL }
+  -status : TransactionStatus { PENDING, SETTLED, FAILED, COMPLETED }
+  -description : String
+  -createdAt : LocalDateTime
+  -updatedAt : LocalDateTime
+  +markAsSettled() : void
+  +markAsFailed() : void
+}
+
+class Order {
+  -id : Long
+  -clientOrderId : String
+  -symbol : String
+  -side : Side { ACHAT, VENTE }
+  -type : OrderType { MARCHE, LIMITE }
+  -quantity : int
+  -price : Double
+  -duration : DurationType { DAY, IOC, FOK }
+  -timestamp : Instant
+  -status : OrderStatus
+  -rejectReason : String { ACCEPTE, REJETE, EN_ATTENTE }
+}
+
+class MfaChallenge {
+  -id : Long
+  -code : String
+  -createdAt : LocalDateTime
+  -expiresAt : LocalDateTime
+  -used : boolean
+  -ipAddress : String
+  -failedAttempts : int = 0
+  -lockedUntil : LocalDateTime
+  +markAsUsed() : void
+  +isExpired() : boolean
+  +isValid() : boolean
+}
+
+class VerificationToken {
+  -id : Long
+  -tokenHash : String
+  -expiryDate : LocalDateTime
+}
+
+User "1" -- "*" Transaction : effectue
+User "1" -- "*" Order : place
+User "1" -- "*" UserAudit : est journalisé
+User "1" -- "*" MfaChallenge : accomplit
+User "1" -- "*" VerificationToken : possède
+@enduml

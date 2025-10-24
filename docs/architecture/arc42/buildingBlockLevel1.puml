@@ -1,0 +1,62 @@
+@startuml "BrokerX - Vue Briques Niveau 1"
+!theme spacelab
+skinparam backgroundColor #F8F9FA
+skinparam componentStyle rectangle
+skinparam linetype polyline
+skinparam defaultFontColor #000000
+skinparam ArrowColor #000000
+skinparam cloud {
+  BackgroundColor #D6C6F3
+  BorderColor #212F3C
+  FontColor #000000
+}
+skinparam actor {
+  BackgroundColor #BFD7ED
+  BorderColor #212F3C
+  FontColor #000000
+}
+skinparam note {
+  BackgroundColor #E5E8E8
+  BorderColor #212F3C
+  FontColor #000000
+}
+
+title "BrokerX - Vue des Blocs de Construction Niveau 1 (Boîte Blanche)"
+
+left to right direction
+
+' === Acteurs & Systèmes externes ===
+actor "Utilisateur" as User
+cloud "Système Email (SMTP)" as EmailCloud
+
+' === Système principal ===
+rectangle "BrokerX Monolithe" as BrokerX {
+  component "Application Serveur\n[Container: Spring Boot + Thymeleaf]" as WebApp #B3C6E7
+  database "Base de Données\n(PostgreSQL 13)" as DB #F7DFA3
+}
+
+' === Connexions ===
+User --> WebApp : "Accès à l'interface web, soumission\nde formulaires, requêtes REST (HTTP)"
+WebApp --> DB : "Lecture/écriture des données\nmétier via JDBC (utilisateurs, ordres, etc.)"
+WebApp --> EmailCloud : "Envoi de liens\net codes MFA par SMTP"
+EmailCloud --> User : "Réception d'e-mails de vérification\n et de codes"
+
+' === Notes ===
+note right of WebApp
+Principales fonctionnalités :
+- Inscription & KYC
+- Authentification MFA
+- Gestion du portefeuille
+- Passage d'ordres
+- Audit & traçabilité
+end note
+note right of DB
+Stocke :
+- Utilisateurs
+- Ordres
+- Transactions
+- Tokens & MFA
+- Logs d'audit
+end note
+
+@enduml

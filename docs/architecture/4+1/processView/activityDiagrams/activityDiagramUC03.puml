@@ -1,0 +1,46 @@
+@startuml
+' UC-03 — Approvisionnement du portefeuille (dépôt virtuel)
+
+title Diagramme d'activité\nUC-03 — Approvisionnement du portefeuille
+
+|Client|
+start
+:Le client saisit le montant à déposer;
+|Système|
+:Vérifier les limites (minimum/maximum);
+if (Montant hors limites?) then (Oui)
+  :Refuser le dépôt;
+  :Notifier le client du refus;
+  stop
+else (Non)
+  :Vérifier l'existence et le statut du compte;
+  if (Compte non trouvé ou non actif?) then (Oui)
+    :Refuser le dépôt;
+    :Notifier le client du refus;
+    stop
+  else (Non)
+    :Vérifier l'idempotence;
+    if (dépôt déjà effectué?) then (Oui)
+      :Renvoyer le résultat précédent au client;
+      stop
+    else (Non)
+      :Créer une transaction avec statut "PENDING";
+      :Simuler le paiement (Service Paiement Simulé);
+      if (Paiement rejeté?) then (Oui)
+        :Passer la transaction au statut "FAILED";
+        :Journaliser l'erreur;
+        :Notifier le client du rejet;
+        stop
+      else (Non)
+        :Passer la transaction au statut "SETTLED";
+        :Créditer le portefeuille;
+        :Journaliser la transaction;
+        :Notifier le client du succès;
+        stop
+      endif
+    endif
+  endif
+endif
+
+@enduml
+

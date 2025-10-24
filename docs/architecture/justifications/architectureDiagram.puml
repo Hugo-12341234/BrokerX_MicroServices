@@ -1,0 +1,15 @@
+@startuml
+skinparam backgroundcolor #FFFFFF
+skinparam defaultfontname xkcd Script
+
+actor "Acteurs externes" as Acteurs
+rectangle "Configuration\n(Sécurité, dépendances, démarrage)" as Config
+rectangle "Infrastructure\n(Implémentation des ports, Adapters, Persistance, Intégration services externes)" as Infra
+rectangle "Application\n(Orchestration des cas d'utilisation, coordination des services métier, logique applicative)" as App
+rectangle "Domaine\n(Entités métier, Services métier, Ports)" as Domaine
+
+Acteurs --> Config
+Config --> Infra
+Infra --> App
+App --> Domaine
+@enduml

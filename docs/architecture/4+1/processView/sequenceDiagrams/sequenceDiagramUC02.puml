@@ -1,0 +1,117 @@
+@startuml
+' UC-02 — Authentification & MFA (BrokerX)
+
+title Sequence Diagram\nUC-02 — Authentification & MFA
+
+skinparam ParticipantPadding 8
+skinparam BoxPadding 6
+skinparam Shadowing false
+skinparam ArrowColor #2c3e50
+skinparam ActorStyle awesome
+autonumber
+
+actor Client
+participant AuthController
+participant AuthenticationService
+participant "Domains (Audit, MfaChallenge, User)" as Domain
+participant "Adapters (User, Password, MFA, Email, JWT)" as Adapters
+participant "Persistence (JPA Repos)" as Persistence
+
+
+== Étape 1 : Login ==
+Client -> AuthController: POST /auth/login\nLoginRequest(email: String, password: String)
+AuthController -> AuthenticationService: authenticate(email: String, password: String)
+
+AuthenticationService -> Adapters: findByEmail(email)
+Adapters -> Persistence: findByEmail(email)
+Persistence --> Adapters: Optional<User>
+Adapters --> AuthenticationService: Optional<User>
+
+AuthenticationService -> Adapters: verifyPassword(user, password)
+Adapters --> AuthenticationService: boolean
+
+alt erreurs de login (user non trouvé, inactif,\nsuspendu, mauvais mot de passe)
+  AuthenticationService -> Domain: créer Audit d'échec
+  Domain --> AuthenticationService: audit
+  AuthenticationService -> Adapters: saveAudit(audit)
+  Adapters -> Persistence: save(audit)
+  Persistence --> Adapters: Audit
+  Adapters --> AuthenticationService: Audit
+  AuthenticationService --> AuthController: Exception(4XX/5XX)
+  AuthController --> Client: Erreur 401/403/500
+else informations valides
+  AuthenticationService -> Domain: créer MfaChallenge
+  Domain --> AuthenticationService: mfaChallenge
+  AuthenticationService -> Adapters: save(mfaChallenge)
+  Adapters -> Persistence: save(mfaChallenge)
+  Persistence --> Adapters: MfaChallenge
+  Adapters --> AuthenticationService: MfaChallenge
+
+  AuthenticationService -> Adapters: sendEmail(email: String, code: String)
+
+  alt erreur d'envoi d'email
+    AuthenticationService --> AuthController: LoginResult.failure("UNABLE_TO_SEND_MFA_CODE")
+    AuthController --> Client: 401 Error
+  else email envoyé
+    AuthenticationService --> AuthController: LoginResult.mfaRequired(code: String)
+    AuthController --> Client: 202 (code)
+  end
+end
+
+== Étape 2 : Vérification MFA ==
+Client -> AuthController: POST /auth/verify-mfa\nMfaVerifyRequest(userId: Long, code: String)
+AuthController -> AuthenticationService: verifyMfa(challengeId: String,\ncode: String, ipAddress: String,\nuserAgent: String)
+
+AuthenticationService -> Adapters: findActiveMfaChallenge(challengeId)
+Adapters -> Persistence: findActiveMfaChallenge(challengeId)
+Persistence --> Adapters: Optional<MfaChallenge>
+Adapters --> AuthenticationService: Optional<MfaChallenge>
+
+AuthenticationService -> Adapters: verifyMfa(MfaChallenge, otp)
+Adapters --> AuthenticationService: boolean
+
+alt erreurs (pas de challenge, expiré)
+  AuthenticationService -> Domain: créer Audit d'échec
+  Domain --> AuthenticationService: audit
+  AuthenticationService -> Adapters: saveAudit(audit)
+  Adapters -> Persistence: save(audit)
+  Persistence --> Adapters: Audit
+  Adapters --> AuthenticationService: Audit
+  AuthenticationService --> AuthController: VerifyResult.failure(errorCode)
+  AuthController --> Client: 401 Error
+ end
+alt code invalide et trop d'essais
+  AuthenticationService -> Adapters: findUserById(challengeId)
+    Adapters -> Persistence: findById(challengeId)
+    Persistence --> Adapters: Optional<User>
+    Adapters --> AuthenticationService: Optional<User>
+    AuthenticationService -> Domain: suspend(user)
+    AuthenticationService -> Adapters: save(user)
+    Adapters -> Persistence: save(user)
+    Persistence --> Adapters: User
+    Adapters --> AuthenticationService: User
+    AuthenticationService --> AuthController: VerifyResult.failure("TOO_MANY_ATTEMPTS_USER_SUSPENDED")
+    AuthController --> Client: 403 Error
+else code valide
+  AuthenticationService -> Domain: markAsUsed(MfaChallenge)
+  AuthenticationService -> Adapters: save(mfaChallenge)
+  Adapters -> Persistence: save(mfaChallenge)
+  Persistence --> Adapters: MfaChallenge
+  Adapters --> AuthenticationService: MfaChallenge
+
+  AuthenticationService -> Adapters: generateJwtToken(userId)
+  Adapters --> AuthenticationService: jwtToken
+
+  AuthenticationService -> Domain: créer Audit de succès
+    Domain --> AuthenticationService: audit
+    AuthenticationService -> Adapters: saveAudit(audit)
+    Adapters -> Persistence: save(audit)
+    Persistence --> Adapters: Audit
+    Adapters --> AuthenticationService: Audit
+
+  AuthenticationService --> AuthController: VerifyResult.success(jwtToken)
+  AuthController --> Client: 200 { token }
+end
+
+@enduml
+

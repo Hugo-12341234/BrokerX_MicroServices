@@ -1,0 +1,31 @@
+@startmindmap
+* Qualité BrokerX
+** Sécurité
+*** MFA obligatoire
+*** KYC obligatoire
+*** Chiffrement des données
+*** Journalisation des accès
+** Performance
+*** Traitement des ordres < 500 ms (P95)
+*** Scalabilité
+** Disponibilité
+*** Résilience aux pannes
+*** Acceptation des ordres même si un service externe est en panne
+** Maintenabilité
+*** Modularité
+*** Documentation
+*** Ajout facile de nouveaux types d’ordres/services
+** Testabilité
+*** Couverture de code > 95 % (JaCoCo)
+*** Indépendance des services externes (mockable)
+** Évolutivité
+*** Ajout de fonctionnalités sans impact majeur
+*** Préparation à la croissance du nombre d’utilisateurs
+** Traçabilité
+*** Audit complet des opérations critiques
+*** Logs d’audit en base
+** Conformité
+*** Respect des standards financiers
+*** RGPD
+@endmindmap
+

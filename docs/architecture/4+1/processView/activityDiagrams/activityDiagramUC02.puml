@@ -1,0 +1,35 @@
+@startuml
+' UC-02 — Authentification & MFA (BrokerX)
+
+title Diagramme d'activité\nUC-02 — Authentification & MFA
+
+|Client|
+start
+:Le client saisit son identifiant et son mot de passe;
+|Système|
+:Vérifier l'état du compte et les informations;
+if (Compte non actif ou informations invalides?) then (Oui)
+  :Rejeter l'authentification;
+  :Afficher un message d'erreur au client;
+  stop
+else (Non)
+  :Générer un challenge MFA (code temporaire);
+  :Envoyer le code MFA par email;
+|Client|
+  :Saisir le code MFA reçu;
+|Système|
+  if (Code MFA expiré, déjà utilisé, ou trop d'échecs?) then (Oui)
+    :Rejeter l'authentification;
+    :Afficher un message d'erreur au client;
+    stop
+  else (Non)
+    :Valider le code MFA;
+    :Générer le token de session;
+    :Journaliser l'audit (IP, machine, horodatage);
+    :Accorder l'accès à la plateforme;
+    stop
+  endif
+endif
+
+@enduml
+

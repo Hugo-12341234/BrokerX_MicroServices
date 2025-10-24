@@ -1,0 +1,19 @@
+# Justification et conception du schéma de persistance
+
+## Choix ORM ou DAO
+Le projet BrokerX utilise l’ORM JPA/Hibernate pour la gestion de la persistance, car il offre une abstraction puissante entre le modèle objet Java et la base de données relationnelle. L’ORM permet de définir les entités métier avec l’annotation `@Entity`, de gérer les relations (OneToMany, ManyToOne, etc.), et de bénéficier de la génération automatique des requêtes SQL. Les accès aux données sont réalisés via des interfaces annotées `@Repository`, qui héritent des interfaces Spring Data (JpaRepository, CrudRepository). Cette approche réduit le code boilerplate, facilite la maintenance et la testabilité, et permet de profiter de la gestion transactionnelle native de Spring. Contrairement à une approche DAO classique, qui nécessite d’écrire manuellement chaque requête et chaque mapping, l’ORM centralise la logique de persistance et garantit la cohérence entre le code et la base. Ce choix est particulièrement pertinent pour BrokerX, qui doit gérer des entités complexes, des relations multiples et des évolutions fréquentes du modèle.
+
+## Transactions
+La gestion des transactions est assurée par l’annotation `@Transactional` sur les services et les repositories critiques (ex : WalletDepositService, OrderRepository, TransactionRepository, MfaChallengeAdapter). Spring gère automatiquement le début, la validation et le rollback des transactions, ce qui garantit l’atomicité des opérations et la cohérence des données. Les transactions couvrent les opérations sensibles comme les dépôts, les placements d’ordres, la gestion des MFA et la création de tokens. En cas d’erreur ou d’exception, toutes les modifications sont annulées pour éviter les incohérences.
+
+## Contraintes d’intégrité
+Les contraintes d’intégrité sont définies dans les scripts de migration SQL (Flyway) et dans les entités JPA. On retrouve des clés primaires, des clés étrangères, des contraintes d’unicité (ex : client_order_id), des contraintes NOT NULL, et des index pour optimiser les accès. Par exemple, la table `orders` possède une contrainte d’unicité sur `client_order_id` pour éviter les doublons, et toutes les relations sont sécurisées par des clés étrangères avec gestion des cascades. Les entités JPA reflètent ces contraintes via les annotations (@Id, @Column(nullable = false), @UniqueConstraint, @ManyToOne, etc.), ce qui assure une double validation côté code et côté base de données.
+
+## Migrations reproductibles
+Les migrations de schéma sont gérées par Flyway, avec des scripts SQL versionnés dans le dossier `db/migration`. Chaque modification de la structure de la base (création de table, ajout de colonne, contrainte, index) est tracée et appliquée de façon déterministe sur tous les environnements. Flyway garantit que chaque migration est idempotente, traçable et réversible. Cela permet de synchroniser la base entre les développeurs, les environnements de test et de production, et de revenir à un état antérieur en cas de problème. Les scripts sont testés et validés à chaque livraison, et la stratégie de versionnement évite les conflits et les pertes de données.
+
+## Données seed
+Des données de seed sont insérées via le script `V12__Insert_seed_data.sql`. Ce script permet de peupler la base avec des utilisateurs, des ordres, des transactions et des MFA pour les démonstrations et les tests. Les données seed facilitent la validation fonctionnelle, la démo du produit et la reproductibilité des scénarios métier. Elles sont conçues pour couvrir les principaux cas d’utilisation et garantir que le système démarre toujours dans un état cohérent et exploitable.
+
+---
+Cette gestion de la persistance assure la robustesse, la cohérence et la maintenabilité du projet BrokerX, tout en respectant les bonnes pratiques d’intégrité, de migration et de gestion transactionnelle.

@@ -1,0 +1,65 @@
+@startuml "BrokerX - Vue Briques Niveau 2"
+!theme spacelab
+skinparam backgroundColor #F8F9FA
+skinparam componentStyle rectangle
+skinparam linetype polyline
+skinparam defaultFontColor #000000
+skinparam ArrowColor #000000
+skinparam ranksep 120
+skinparam nodesep 80
+
+title "BrokerX - Vue des Blocs de Construction Niveau 2 (Contrôleurs & Services)"
+
+top to bottom direction
+
+actor "Client (Utilisateur)\nAccède à l'application web pour toutes les opérations de courtage." as User
+
+rectangle "Contrôleurs Web (Spring MVC)" as Controllers {
+  component "AuthController\nGère l'authentification et la vérification MFA." as AuthC #B3C6E7
+  component "HomeController\nAffiche la page d'accueil et la navigation principale." as HomeC #B3C6E7
+  component "OrderController\nPermet de passer et consulter des ordres de trading." as OrderC #B3C6E7
+  component "UserController\nGère le profil et les informations utilisateur." as UserC #B3C6E7
+  component "UserVerificationController\nGère la vérification d'identité (KYC)." as UserVerifC #B3C6E7
+  component "WalletController\nGère le portefeuille et les dépôts." as WalletC #B3C6E7
+}
+
+rectangle "Services Métier (Spring Bean)" as Services {
+  component "AuthenticationService\nLogique d'authentification et MFA." as AuthS #F7DFA3
+  component "OrderService\nLogique métier pour la gestion des ordres." as OrderS #F7DFA3
+  component "PreTradeValidationService\nValide les ordres avant exécution." as PreTradeS #F7DFA3
+  component "RegistrationService\nGère l'inscription et la vérification utilisateur." as RegS #F7DFA3
+  component "StockService\nGestion des actifs financiers et cotations." as StockS #F7DFA3
+  component "WalletDepositService\nGère les dépôts dans le portefeuille." as WalletS #F7DFA3
+}
+
+database "Base de Données\n(PostgreSQL 13)" as DB #D6C6F3
+cloud "Système Email (SMTP)\nEnvoie les notifications et codes MFA aux utilisateurs." as EmailCloud #D6C6F3
+
+' === Connexions ===
+User --> AuthC : "Authentification, MFA"
+User --> HomeC : "Accueil, navigation"
+User --> OrderC : "Passage d'ordres"
+User --> UserC : "Gestion du profil"
+User --> UserVerifC : "Vérification d'identité"
+User --> WalletC : "Gestion du portefeuille"
+
+AuthC --> AuthS : "Authentification, MFA"
+OrderC --> OrderS : "Gestion des ordres"
+OrderC --> PreTradeS : "Validation pré-trade"
+UserC --> RegS : "Inscription, gestion utilisateur"
+UserVerifC --> RegS : "Vérification d'identité"
+WalletC --> WalletS : "Dépôt portefeuille"
+OrderC --> StockS : "Consultation actifs"
+
+AuthS --> DB : "Lecture/écriture utilisateur, tokens"
+OrderS --> DB : "Lecture/écriture ordres"
+PreTradeS --> DB : "Lecture ordres, validation"
+RegS --> DB : "Lecture/écriture utilisateur"
+StockS --> DB : "Lecture actifs"
+WalletS --> DB : "Lecture/écriture utilisateur"
+
+RegS --> EmailCloud : "Envoi de liens de vérification et notifications par SMTP"
+AuthS --> EmailCloud : "Envoi de codes MFA par SMTP"
+EmailCloud --> User : "Réception d'e-mails de vérification et de codes"
+
+@enduml

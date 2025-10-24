@@ -1,0 +1,32 @@
+@startuml
+' UC-01 — Inscription & Vérification d'identité (BrokerX)
+
+title Diagramme d'activité\nUC-01 — Inscription & Vérification d'identité
+
+|Client|
+start
+:Le client fournit email, mot de passe, nom, adresse, date de naissance;
+|Système|
+:Vérifier la validité des informations;
+if (Email déjà utilisé ou informations invalides?) then (Oui)
+  :Rejeter l'inscription;
+  :Afficher un message d'erreur au client;
+  stop
+else (Non)
+  :Créer le compte avec statut "PENDING";
+  :Envoyer le lien de vérification d'identité par email;
+|Client|
+  :Cliquer sur le lien de vérification reçu par email;
+|Système|
+  if (Lien de vérification expiré ou non utilisé?) then (Oui)
+    :Le compte reste "PENDING";
+    stop
+  else (Non)
+    :Vérifier l'identité via le token;
+    :Activer le compte (statut "ACTIVE");
+    :Journaliser l'opération (horodatage, identifiant);
+    stop
+  endif
+endif
+
+@enduml

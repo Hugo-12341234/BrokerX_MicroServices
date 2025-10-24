@@ -1,0 +1,28 @@
+@startuml
+' Diagramme de cas d'utilisation BrokerX — Vue Scénarios (4+1)
+
+title Diagramme de cas d'utilisation — BrokerX
+
+actor Client
+actor "Service Paiement Simulé" as PaymentService
+
+rectangle "Application BrokerX" as BrokerXApp {
+  usecase "S'inscrire et vérifier son identité" as UC01
+  usecase "S'authentifier avec MFA" as UC02
+  usecase "Déposer de l'argent dans le portefeuille" as UC03
+  usecase "Placer un ordre d'achat ou de vente" as UC05
+  note right of UC05
+    Contrôles pré-trade réalisés en interne
+    (pouvoir d'achat, bande de prix, tick size, etc.)
+  end note
+}
+
+Client --> UC01
+Client --> UC02
+Client --> UC03
+Client --> UC05
+
+UC03 --> PaymentService : <<utilise>>
+UC05 --> UC03 : <<utilise solde portefeuille>>
+
+@enduml

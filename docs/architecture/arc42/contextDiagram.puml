@@ -1,0 +1,19 @@
+@startuml
+!theme plain
+
+actor Client
+actor "Opérations Back-Office" as BackOffice
+actor "Conformité / Risque" as Compliance
+
+rectangle "BrokerX" {
+}
+
+Client --> BrokerX : Demandes d’inscription,\nordres, dépôts
+BrokerX --> Client : Confirmations, états de\nportefeuille, notifications
+BackOffice --> BrokerX : Instructions de gestion,\ndemandes d’audit
+BrokerX --> BackOffice : Rapports, états de\nrèglements, alertes
+Compliance --> BrokerX : Requêtes de surveillance,\ndemandes d’audit
+BrokerX --> Compliance : Journaux d’audit,\nalertes, rapports
+
+@enduml
+
