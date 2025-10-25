@@ -1,0 +1,42 @@
+@startuml
+actor "OrderService" as OrderService
+participant "OrderBookController" as Controller
+participant "MatchingService" as Service
+participant "Domain(OrderBook, MatchingResult)" as Domain
+participant "Adapters (OrderBook, Matching)" as Adapters
+participant "Persistence (JPA Repos)" as Persistence
+
+OrderService -> Controller: POST /api/v1/orderbook\nOrderDTO(orderDto)
+Controller -> Service: matchOrder(orderBook)
+Service -> Domain: Nettoyer ordres expirés
+Service -> Adapters: save(orderBook)
+Adapters -> Persistence: save(orderBook)
+Persistence --> Adapters: OrderBook
+Adapters --> Service: OrderBook
+Service -> Adapters: findAllBySymbolAndOppositeSide(symbol, side)
+Adapters -> Persistence: findAllBySymbolAndOppositeSide(symbol, side)
+Persistence --> Adapters: List<Order>
+Adapters --> Service: List<Order>
+Service -> Service: findMatch(orderBook, candidateOrders)
+
+alt Matching possible
+    Service -> Domain: new ExecutionReport(...)
+    Service -> Adapters: save(executionReport)
+    Adapters -> Persistence: save(executionReport)
+    Persistence --> Adapters: ExecutionReport
+    Adapters --> Service: ExecutionReport
+    Service -> Adapters: updateOrderBook(orderBook)
+    Adapters -> Persistence: save(orderBook)
+    Persistence --> Adapters: OrderBook
+    Adapters --> Service: OrderBook
+    Controller <- Service: MatchingResult (succès)
+    OrderService <- Controller: 200 OK\nRésultat d'appariement
+else Matching impossible ou protection
+    Service -> Adapters: updateOrderBook(orderBook) (échec)
+    Adapters -> Persistence: save(orderBook)
+    Persistence --> Adapters: OrderBook
+    Adapters --> Service: OrderBook
+    Controller <- Service: MatchingResult (échec)
+    OrderService <- Controller: 4XX or 5XX\nRésultat d'échec
+end
+@enduml

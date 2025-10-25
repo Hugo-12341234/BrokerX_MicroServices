@@ -569,12 +569,13 @@ Cette vue permet de comprendre la logique métier profonde du système, d’assu
 ![UC07 - Activité](docs/architecture/4+1/processView/activityDiagrams/activityDiagramUC07.png)
 
 ### Contexte
-La vue processus détaille le comportement dynamique du système lors de l’exécution des cas d’utilisation. Elle montre comment les composants collaborent pour réaliser les opérations métier, gérer les erreurs et orchestrer les interactions.
+La vue processus détaille le comportement dynamique du système lors de l’exécution des cas d’utilisation. Elle montre comment les composants collaborent pour réaliser les opérations métier, gérer les erreurs et orchestrer les interactions. L’ajout du UC07 (Appariement interne & Exécution) met en lumière la logique centrale du matching, la gestion des différents types d’ordres (DAY, IOC, FOK) et les alternatives métier, illustrant la complexité et la robustesse du moteur d’appariement.
 
 ### Éléments
-- Services applicatifs (RegistrationService, AuthService, WalletService, OrderService)
-- Contrôleurs web (UserController, AuthController, WalletController, OrderController)
-- Adapters (UserAdapter, TransactionAdapter, etc.)
+- Services applicatifs (RegistrationService, AuthService, WalletService, OrderService, MatchingService)
+- Contrôleurs web (UserController, AuthController, WalletController, OrderController, OrderBookController)
+- Moteur d’appariement interne (MatchingService)
+- Adapters (UserAdapter, TransactionAdapter, OrderBookAdapter, etc.)
 - Persistance (JPA Repos)
 - Acteurs externes (Client)
 

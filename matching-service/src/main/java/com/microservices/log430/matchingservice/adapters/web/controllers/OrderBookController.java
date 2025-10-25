@@ -1,7 +1,7 @@
 package com.microservices.log430.matchingservice.adapters.web.controllers;
 
 import com.microservices.log430.matchingservice.domain.model.entities.OrderBook;
-import com.microservices.log430.matchingservice.domain.service.MatchingService;
+import com.microservices.log430.matchingservice.domain.port.in.MatchingPort;
 import com.microservices.log430.matchingservice.adapters.web.dto.MatchingResult;
 import com.microservices.log430.matchingservice.adapters.web.dto.OrderDTO;
 import com.microservices.log430.matchingservice.adapters.web.dto.ErrorResponse;
@@ -19,11 +19,9 @@ import java.time.Instant;
 @RequestMapping("/api/v1/orderbook")
 public class OrderBookController {
     private static final Logger logger = LoggerFactory.getLogger(OrderBookController.class);
-    private final MatchingService matchingService;
+    private final MatchingPort matchingPort;
 
-    public OrderBookController(MatchingService matchingService) {
-        this.matchingService = matchingService;
-    }
+    public OrderBookController(MatchingPort matchingPort) {this.matchingPort = matchingPort;}
 
     @PostMapping
     public ResponseEntity<?> matchOrder(@RequestBody OrderDTO orderDto, HttpServletRequest httpRequest) {
@@ -33,7 +31,7 @@ public class OrderBookController {
             logger.info("Réception d'un nouvel ordre à apparier : clientOrderId={}, symbol={}, side={}, quantity={}, price={}",
                     orderDto.clientOrderId, orderDto.symbol, orderDto.side, orderDto.quantity, orderDto.price);
             OrderBook orderBook = OrderToOrderBookMapper.toOrderBook(orderDto);
-            MatchingResult result = matchingService.matchOrder(orderBook);
+            MatchingResult result = matchingPort.matchOrder(orderBook);
             logger.info("Matching terminé pour clientOrderId={}, statut={}, executions={}",
                     result.updatedOrder.getClientOrderId(), result.updatedOrder.getStatus(), result.executions.size());
             return ResponseEntity.ok(result);

@@ -1,0 +1,42 @@
+@startuml
+start
+:Réception nouvel ordre;
+:Insérer ordre dans le carnet;
+:Rechercher meilleure contrepartie (priorité prix/temps);
+if (Contrepartie trouvée?) then (oui)
+  :Vérifier type d'ordre;
+  if (Ordre DAY?) then (oui)
+    :Exécuter le matching selon quantité disponible;
+    :Créer exécution(s) (fills/partial fills);
+    :Mettre à jour quantités des ordres;
+    :Émettre ExecutionReport (Fill/Partial Fill);
+    :Mettre à jour top-of-book;
+  else (non)
+    if (Ordre IOC?) then (oui)
+      :Exécuter le possible;
+      :Annuler le reste;
+      :Créer exécution(s) (fills/partial fills);
+      :Mettre à jour quantités des ordres;
+      :Émettre ExecutionReport (Fill/Partial Fill);
+      :Mettre à jour top-of-book;
+    else (non)
+      if (Ordre FOK?) then (oui)
+        if (Tout peut être exécuté?) then (oui)
+          :Exécuter tout;
+          :Créer exécution(s) (fills);
+          :Mettre à jour quantités des ordres;
+          :Émettre ExecutionReport (Fill);
+          :Mettre à jour top-of-book;
+        else (non)
+          :Annuler ordre FOK;
+          :Émettre ExecutionReport (Rejected);
+        endif
+      endif
+    endif
+  endif
+else (non)
+  :Aucune contrepartie trouvée;
+  :Ordre reste Working;
+endif
+stop
+@enduml
