@@ -19,7 +19,7 @@ participant "Persistence (JPA Repos)" as Persistence
 participant UserVerificationController
 
 == Inscription ==
-Client -> UserController: POST /users/register\n(userForm: UserForm,\nmodel: Model)
+Client -> UserController: POST /api/v1/users/register\n(userForm: UserForm,\nmodel: Model)
 UserController -> RegistrationService: register(email: String,\nnom: String, mdp: String,\nadresse: String,\ndateDeNaissance: LocalDate)
 
 RegistrationService -> Adapters: findByEmail(email)
@@ -51,7 +51,7 @@ else succès
 end
 
 == Vérification d'identité ==
-Client -> UserVerificationController: GET /verify?token=...\n(token: String, model: Model)
+Client -> UserVerificationController: GET /api/v1/verify?token=...\n(token: String, model: Model)
 UserVerificationController -> RegistrationService: verifyUser(token: String)
 
 RegistrationService -> Adapters: findByTokenHash(tokenHash: String)

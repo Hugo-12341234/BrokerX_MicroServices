@@ -19,7 +19,7 @@ participant "Persistence (JPA Repos)" as Persistence
 
 
 == Étape 1 : Login ==
-Client -> AuthController: POST /auth/login\nLoginRequest(email: String, password: String)
+Client -> AuthController: POST /api/v1/auth/login\nLoginRequest(email: String, password: String)
 AuthController -> AuthenticationService: authenticate(email: String, password: String)
 
 AuthenticationService -> Adapters: findByEmail(email)
@@ -59,7 +59,7 @@ else informations valides
 end
 
 == Étape 2 : Vérification MFA ==
-Client -> AuthController: POST /auth/verify-mfa\nMfaVerifyRequest(userId: Long, code: String)
+Client -> AuthController: POST /api/v1/auth/verify-mfa\nMfaVerifyRequest(userId: Long, code: String)
 AuthController -> AuthenticationService: verifyMfa(challengeId: String,\ncode: String, ipAddress: String,\nuserAgent: String)
 
 AuthenticationService -> Adapters: findActiveMfaChallenge(challengeId)

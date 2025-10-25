@@ -12,14 +12,28 @@ autonumber
 
 actor Client
 participant WalletController
-participant WalletService
-participant "Domain(Audit, Transaction)" as Domain
-participant "Adapters (Transaction, User)" as Adapters
+participant WalletDepositService as WalletService
+participant "Domain(Audit, Transaction, Wallet)" as Domain
+participant "Adapters (Transaction, User, Wallet)" as Adapters
 participant "Persistence (JPA Repos)" as Persistence
 
 == Soumission du dépôt ==
-Client -> WalletController: POST /wallet/deposit\nDepositRequest(amount: BigDecimal, idempotencyKey: String)
+Client -> WalletController: POST /api/v1/wallet/deposit\nDepositRequest(amount, idempotencyKey)
 WalletController -> WalletService: deposit(userId, amount, idempotencyKey)
+
+' Récupération du portefeuille
+WalletService -> Adapters: findByUserId(userId)
+Adapters -> Persistence: findByUserId(userId)
+Persistence --> Adapters: Optional<Wallet>
+Adapters --> WalletService: Optional<Wallet>
+opt portefeuille inexistant
+    WalletService -> Domain: créer Wallet
+    Domain --> WalletService: Wallet
+    WalletService -> Adapters: save(Wallet)
+    Adapters -> Persistence: save(Wallet)
+    Persistence --> Adapters: Wallet
+    Adapters --> WalletService: Wallet
+end
 
 alt erreur de validation (montant invalide, clé manquante, compte introuvable ou inactif)
   WalletService -> Domain: Créer audit d'échec
@@ -66,7 +80,7 @@ else dépôt accepté
     WalletController --> Client: Réponse d'erreur
    end
 
-  WalletService -> Domain: creditBalance(user, amount)
+  WalletService -> Domain: setBalance(amount)
   WalletService -> Adapters: save(user)
   Adapters -> Persistence: save(user)
   Persistence --> Adapters: user
