@@ -25,9 +25,16 @@ else (Non)
       :Informer le client du rejet;
       stop
     else (Non)
-      :Accepter l'ordre;
-      :Informer le client du succès;
-      stop
+      :Envoyer l'ordre au moteur d'appariement;
+      if (Ordre "matché" par le moteur?) then (Oui)
+        :Confirmer le placement de l'ordre au client;
+        :Mettre à jour le portefeuille des utilisateurs impliqués;
+        :Journaliser l'opération (horodatage, identifiant);
+        stop
+      else (Non)
+        :Rejeter l'ordre avec motif du moteur;
+        :Informer le client du rejet;
+        stop
     endif
   endif
 endif
