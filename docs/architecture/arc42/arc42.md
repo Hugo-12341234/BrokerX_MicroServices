@@ -722,67 +722,76 @@ Ce modèle permet de visualiser rapidement les objets métier, leurs interaction
 
 ### 11.2 Persistance
 
-BrokerX utilise une base de données PostgreSQL pour stocker toutes les données métier : utilisateurs, ordres, transactions, défis MFA, tokens de vérification et journaux d’audit. La base est persistée sur disque, et la localisation du fichier de données est gérée par la configuration Docker : le volume nommé `postgres_data` assure la persistance des données, même lors du redémarrage ou de la mise à jour des conteneurs.
+BrokerX adopte une architecture microservices : chaque microservice possède sa propre base PostgreSQL, avec un schéma métier dédié. Les données critiques (utilisateurs, ordres, transactions, MFA, audit) sont isolées par domaine, ce qui garantit la robustesse, la conformité et la scalabilité.
 
-Toutes les opérations sur la base de données passent par JPA, avec Hibernate comme fournisseur. Les entités persistées sont décrites dans la section Domain Models. L’accès aux entités se fait exclusivement via les repositories Spring Data JPA, garantissant une abstraction et une sécurité des accès.
+La persistance de chaque microservice s’appuie sur :
+- PostgreSQL : chaque microservice dispose d’une base indépendante, gérée via Docker volumes pour la durabilité.
+- Spring Data JPA/Hibernate : les entités métier sont annotées @Entity, les accès se font via des repositories Spring, assurant l’abstraction et la sécurité.
+- Scripts de migration Flyway : chaque service maintient ses migrations SQL dans son propre dossier, garantissant la reproductibilité et la traçabilité des évolutions de schéma.
+- Données seed : chaque microservice peut insérer ses propres données de démonstration ou de test via des scripts dédiés.
 
-Aucune donnée métier n’est stockée en mémoire ou dans des fichiers plats : toutes les informations critiques (identité, ordres, transactions, MFA, audit) sont centralisées dans PostgreSQL pour garantir la fiabilité, la traçabilité et la conformité réglementaire.
+Aucune donnée métier n’est stockée en mémoire ou dans des fichiers plats : tout est centralisé dans PostgreSQL. Les fichiers statiques (images, documents) sont référencés par leur hash ou URL, mais non stockés dans la base.
 
-Les fichiers statiques (templates Thymeleaf, ressources front-end) sont embarqués dans le JAR de l’application et servis par Spring Boot. Aucun fichier utilisateur (image, document, etc.) n’est stocké en dehors de la base : toutes les pièces justificatives ou documents d’audit sont référencés par leur hash dans la base, assurant l’intégrité et la non-répudiation.
-
-La configuration de la connexion à la base de données (URL, utilisateur, mot de passe) est externalisée dans les fichiers de propriétés et les variables d’environnement Docker, permettant une gestion flexible des environnements de développement, test et production.
-
-En résumé, la persistance des données dans BrokerX repose sur :
-- PostgreSQL pour toutes les données métier et d’audit
-- Docker volumes pour la durabilité des données
-- Spring Data JPA pour l’accès aux entités
-- Aucun stockage de fichiers binaires ou documents en dehors de la base
-
-Cette approche garantit la robustesse, la conformité et la portabilité du système, tout en facilitant la maintenance et la migration des données.
+La configuration des connexions (URL, credentials) est externalisée dans les variables d’environnement Docker et les fichiers de configuration de chaque microservice.
 
 #### 11.2.1 Choix ORM ou DAO
-Le projet BrokerX utilise l’ORM JPA/Hibernate pour la gestion de la persistance, car il offre une abstraction puissante entre le modèle objet Java et la base de données relationnelle. L’ORM permet de définir les entités métier avec l’annotation `@Entity`, de gérer les relations (OneToMany, ManyToOne, etc.), et de bénéficier de la génération automatique des requêtes SQL. Les accès aux données sont réalisés via des interfaces annotées `@Repository`, qui héritent des interfaces Spring Data (JpaRepository, CrudRepository). Cette approche réduit le code boilerplate, facilite la maintenance et la testabilité, et permet de profiter de la gestion transactionnelle native de Spring. Contrairement à une approche DAO classique, qui nécessite d’écrire manuellement chaque requête et chaque mapping, l’ORM centralise la logique de persistance et garantit la cohérence entre le code et la base. Ce choix est particulièrement pertinent pour BrokerX, qui doit gérer des entités complexes, des relations multiples et des évolutions fréquentes du modèle.
+Chaque microservice utilise Spring Data JPA/Hibernate pour la gestion de la persistance. Les entités sont mappées via annotations, les relations sont explicites (OneToMany, ManyToOne, etc.), et les repositories héritent des interfaces Spring Data. Cette approche réduit le code technique, facilite la maintenance et la testabilité, et assure la cohérence entre le modèle objet et la base.
 
 #### 11.2.2 Transactions
-La gestion des transactions est assurée par l’annotation `@Transactional` sur les services et les repositories critiques (ex : WalletDepositService, OrderRepository, TransactionRepository, MfaChallengeAdapter). Spring gère automatiquement le début, la validation et le rollback des transactions, ce qui garantit l’atomicité des opérations et la cohérence des données. Les transactions couvrent les opérations sensibles comme les dépôts, les placements d’ordres, la gestion des MFA et la création de tokens. En cas d’erreur ou d’exception, toutes les modifications sont annulées pour éviter les incohérences.
+La gestion des transactions est assurée par l’annotation `@Transactional` sur les services et les repositories critiques. Spring orchestre automatiquement le commit et le rollback, garantissant l’atomicité et la cohérence des opérations sensibles (dépôts, ordres, MFA, audit). Les transactions sont isolées par microservice : il n’y a pas de transaction distribuée entre bases.
 
 #### 11.2.3 Contraintes d’intégrité
-Les contraintes d’intégrité sont définies dans les scripts de migration SQL (Flyway) et dans les entités JPA. On retrouve des clés primaires, des clés étrangères, des contraintes d’unicité (ex : client_order_id), des contraintes NOT NULL, et des index pour optimiser les accès. Par exemple, la table `orders` possède une contrainte d’unicité sur `client_order_id` pour éviter les doublons, et toutes les relations sont sécurisées par des clés étrangères avec gestion des cascades. Les entités JPA reflètent ces contraintes via les annotations (@Id, @Column(nullable = false), @UniqueConstraint, @ManyToOne, etc.), ce qui assure une double validation côté code et côté base de données.
+Les contraintes d’intégrité (clés primaires, étrangères, unicité, NOT NULL, index) sont définies dans les scripts Flyway et les entités JPA de chaque microservice. Les validations métier sont doublées côté code et côté base, assurant la fiabilité et la conformité des données.
 
 #### 11.2.4 Migrations reproductibles
-Les migrations de schéma sont gérées par Flyway, avec des scripts SQL versionnés dans le dossier `db/migration`. Chaque modification de la structure de la base (création de table, ajout de colonne, contrainte, index) est tracée et appliquée de façon déterministe sur tous les environnements. Flyway garantit que chaque migration est idempotente, traçable et réversible. Cela permet de synchroniser la base entre les développeurs, les environnements de test et de production, et de revenir à un état antérieur en cas de problème. Les scripts sont testés et validés à chaque livraison, et la stratégie de versionnement évite les conflits et les pertes de données.
+Chaque microservice gère ses propres migrations Flyway, versionnées et appliquées indépendamment. Les scripts sont idempotents et traçables, garantissant la synchronisation des schémas entre les environnements. Les migrations sont testées et validées à chaque livraison.
 
 #### 11.2.5 Données seed
-Des données de seed sont insérées via le script `V12__Insert_seed_data.sql`. Ce script permet de peupler la base avec des utilisateurs, des ordres, des transactions et des MFA pour les démonstrations et les tests. Les données seed facilitent la validation fonctionnelle, la démo du produit et la reproductibilité des scénarios métier. Elles sont conçues pour couvrir les principaux cas d’utilisation et garantir que le système démarre toujours dans un état cohérent et exploitable.
+Les données de seed sont insérées par chaque microservice via des scripts dédiés, permettant de peupler les bases avec des utilisateurs, portefeuilles, ordres, transactions et MFA pour les tests et les démonstrations. Les seeds couvrent les principaux cas d’utilisation métier et assurent un démarrage cohérent du système.
 
+Cette organisation garantit la robustesse, la conformité et la portabilité du système BrokerX, tout en facilitant la maintenance, l’évolution et la scalabilité de chaque domaine métier.
 
 ### 11.3 Interface Utilisateur
 
-L’interface utilisateur de BrokerX est une application web classique, rendue côté serveur avec Thymeleaf et servie par Spring Boot. Elle propose une navigation fluide et sécurisée pour toutes les opérations de courtage : inscription, authentification MFA, gestion du portefeuille, passage d’ordres et consultation des historiques.
+L’interface utilisateur de BrokerX est une application web moderne développée avec React. Elle offre une expérience fluide, responsive et sécurisée pour toutes les opérations de courtage : inscription, vérification d’identité (KYC), authentification MFA, gestion du portefeuille, passage d’ordres et consultation des historiques.
+Les principales caractéristiques :
+- Frontend React : SPA (Single Page Application) avec gestion des états, navigation dynamique et appels API REST sécurisés (HTTPS/JWT).
+- Séparation frontend/backend : le frontend communique exclusivement avec l’API Gateway, qui centralise la sécurité et le routage vers les microservices.
+- Gestion des formulaires : toutes les interactions (inscription, dépôt, ordre, MFA) passent par des formulaires React, avec validation côté client et serveur.
+- Sécurité : authentification forte via MFA, gestion des rôles, tokens JWT, et chiffrement TLS pour toutes les communications.
+- Design : interface responsive, adaptée aux usages financiers, avec composants réutilisables et gestion des erreurs utilisateur.
+- Dépendances JS/CSS : utilisation de npm pour la gestion des librairies installées comme react-router-dom.
 
-L’UI utilise HTML, CSS et JavaScript, avec un thème sobre et responsive adapté aux besoins financiers. Toutes les interactions passent par des formulaires web et des appels REST sécurisés.
+Toutes les opérations critiques (inscription, authentification, ordres, dépôts) sont journalisées côté backend : l’UI affiche les statuts, les notifications et les historiques en temps réel.
 
-Aucune interface mobile native ou SPA n’est fournie par défaut : l’accès se fait exclusivement via le navigateur web.
+Cette organisation garantit une expérience utilisateur moderne, sécurisée et conforme aux exigences du secteur financier, tout en facilitant l’évolution et la maintenance du frontend.
 
 ### 11.4 Optimisation JavaScript et CSS
 
-L’optimisation des ressources JavaScript et CSS dans BrokerX est volontairement simple : aucun framework externe, gestionnaire de dépendances ou outil de minification n’est utilisé. Tout le code JavaScript et CSS est écrit en inline directement dans les templates Thymeleaf, ce qui évite toute dépendance supplémentaire et simplifie le déploiement.
+Le frontend BrokerX est développé avec React et utilise des fichiers .css classiques ou du CSS inline, sans framework CSS externe (type Bootstrap, Material UI) ni librairie de gestion avancée des styles. L’organisation des styles repose sur des fichiers CSS modulaires importés dans les composants React, ou sur du style inline directement dans le JSX.
 
-Aucune bibliothèque tierce (npm, bower, webjars, wro4j, etc.) n’est requise : l’ensemble des scripts et styles nécessaires à l’interface sont embarqués dans le JAR et servis par Spring Boot. Cette approche garantit la portabilité et la maintenance, tout en limitant la surface d’attaque et les risques liés aux mises à jour de dépendances externes.
+La gestion des dépendances JavaScript se fait via npm, principalement pour React et quelques librairies utilitaires (ex : react-router-dom pour la navigation). Aucune librairie de gestion ou d’optimisation CSS n’est utilisée : pas de SASS, LESS, Tailwind, Styled Components, etc.
 
-En résumé : tout le CSS et le JavaScript de BrokerX est inline, intégré dans les templates, sans optimisation ou minification avancée.
+L’optimisation des ressources JS/CSS est assurée par le build React (Webpack/Babel), qui minifie et bundle automatiquement le code lors de la compilation. Aucun outil externe de minification ou de post-traitement n’est requis.
+
+Cette approche garantit :
+- Une structure simple et maintenable des styles
+- Une portabilité maximale du frontend
+- Un déploiement sans dépendance à des frameworks CSS ou outils de build additionnels
+
+Le code CSS et JS est donc soit inline dans les composants, soit dans des fichiers .css importés, et le build React assure l’optimisation standard pour la production.
 
 ### 11.5 Traitement des transactions
 
-BrokerX s’appuie sur Spring Boot pour la gestion des transactions locales au sein du JPA EntityManager. Toutes les opérations critiques (ordres, dépôts, retraits, MFA) sont traitées de façon transactionnelle pour garantir la cohérence des données. BrokerX ne supporte pas les transactions distribuées.
+BrokerX s’appuie sur Spring Boot pour la gestion des transactions locales au sein du JPA EntityManager. Toutes les opérations critiques (ordres, dépôts, MFA) sont traitées de façon transactionnelle pour garantir la cohérence des données. BrokerX ne supporte pas les transactions distribuées.
 
 ### 11.6 Gestion de session
 
-BrokerX expose uniquement une API publique stateless : aucune gestion de session côté serveur. L’authentification et l’autorisation sont gérées par des tokens JWT et MFA, sans stockage de session.
+BrokerX expose uniquement une API publique stateless (à travers le gateway)  : aucune gestion de session côté serveur. L’authentification et l’autorisation sont gérées par des tokens JWT et MFA, sans stockage de session. Ces tokens JWT sont transmis lors de chaque appel d'API.
 
 ### 11.7 Sécurité
 
-La sécurité des endpoints API BrokerX repose sur l’authentification forte (MFA, JWT) et le chiffrement TLS. Les accès sont contrôlés par des rôles et toutes les opérations sensibles sont journalisées. Pour renforcer la sécurité, l’application peut être déployée derrière un proxy SSL ou avec la configuration TLS du conteneur Tomcat embarqué.
+La sécurité des endpoints API BrokerX repose sur l’authentification forte (MFA, JWT) et le chiffrement TLS. Les accès sont contrôlés par des rôles et toutes les opérations sensibles sont journalisées. Toutes les étapes critiques nécessitent un token valide pour pouvoir être effectuées. Pour renforcer la sécurité, l’application peut être déployée derrière un proxy SSL ou avec la configuration TLS du conteneur Tomcat embarqué.
 
 Ce niveau de sécurité est adapté au type de données gérées et aux exigences réglementaires du secteur financier.
 
