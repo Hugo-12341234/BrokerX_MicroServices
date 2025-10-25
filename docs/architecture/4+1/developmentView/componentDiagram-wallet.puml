@@ -1,0 +1,65 @@
+@startuml "Wallet Service - Component Diagram"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle uml2
+skinparam linetype ortho
+skinparam shadowing false
+skinparam ArrowColor #606060
+skinparam FontColor #404040
+skinparam nodesep 120
+skinparam ranksep 180
+left to right direction
+
+title "Wallet Service - Component Diagram"
+
+actor "Utilisateur" as Utilisateur
+
+package "Controllers" #FFECB3 {
+  [WalletController] as WalletCtrl
+}
+
+package "Services du domaine" #FFF3E0 {
+    [StockService] as StockSvc
+  [WalletDepositService] as WalletDepositSvc
+}
+
+package "Adapteurs" #E6F7FF {
+  [TransactionPersistenceAdapter] as TransactionAdapter
+  [SimulatedPaymentServiceAdapter] as PaymentAdapter
+  [StockRuleAdapter] as StockRuleAdapter
+  [WalletAdapter] as WalletAdapter
+  [WalletAuditAdapter] as AuditAdapter
+}
+
+package "Ports" #FFF9C4 {
+  interface "TransactionPort" as ITransPort
+  interface "StockRulePort" as IStockRulePort
+  interface "StockPort" as IStockPort
+  interface "WalletDepositPort" as IWalletDepositPort
+  interface "AuditPort" as IAuditPort
+  interface "PaymentServicePort" as IPaymentPort
+    interface "WalletPort" as IWalletPort
+}
+
+package "Infrastructure" #E2FFCC {
+  database "PostgreSQL Wallet" as DBWallet
+}
+
+' --- Flèches principales ---
+Utilisateur ..> WalletCtrl : HTTP
+WalletCtrl ..> WalletDepositSvc
+WalletDepositSvc --> IWalletDepositPort
+WalletDepositSvc ..> IStockPort
+WalletDepositSvc ..> IStockRulePort
+WalletDepositSvc ..> ITransPort
+WalletDepositSvc ..> IPaymentPort
+WalletDepositSvc ..> IAuditPort
+WalletDepositSvc ..> IWalletPort
+TransactionAdapter --> ITransPort
+AuditAdapter --> IAuditPort
+StockRuleAdapter --> IStockRulePort
+PaymentAdapter --> IPaymentPort
+WalletAdapter --> IWalletPort
+StockSvc --> IStockPort
+"Adapteurs" ..> DBWallet : JDBC
+@enduml

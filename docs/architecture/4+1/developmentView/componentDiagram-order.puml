@@ -1,0 +1,49 @@
+@startuml "Order Service - Component Diagram"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle uml2
+skinparam linetype ortho
+skinparam shadowing false
+skinparam ArrowColor #606060
+skinparam FontColor #404040
+skinparam nodesep 120
+skinparam ranksep 180
+left to right direction
+
+title "Order Service - Component Diagram"
+
+actor "Utilisateur" as Utilisateur
+
+package "Controllers" #FFECB3 {
+  [OrderController] as OrderCtrl
+}
+
+package "Services du domaine" #FFF3E0 {
+  [OrderService] as OrderSvc
+  [PreTradeValidationService] as PreTradeValidationSvc
+}
+
+package "Adapteurs" #E6F7FF {
+  [OrderAdapter] as OrderAdapter
+}
+
+package "Ports" #FFF9C4 {
+  interface "OrderPort" as IOrderPort
+  interface "OrderPlacementPort" as IOrderPlacementPort
+  interface "PreTradeValidationPort" as IPreTradeValidationPort
+}
+
+package "Infrastructure" #E2FFCC {
+  database "PostgreSQL Order" as DBOrder
+}
+
+' --- Flèches principales ---
+Utilisateur ..> OrderCtrl : HTTP
+OrderCtrl ..> OrderSvc
+OrderSvc --> IOrderPlacementPort
+OrderSvc ..> IPreTradeValidationPort
+OrderSvc ..> IOrderPort
+PreTradeValidationSvc --> IPreTradeValidationPort
+OrderAdapter --> IOrderPort
+"Adapteurs" ..> DBOrder : JDBC
+@enduml

@@ -1,0 +1,79 @@
+@startuml "Auth Service - Component Diagram"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle uml2
+skinparam linetype ortho
+skinparam shadowing false
+skinparam ArrowColor #606060
+skinparam FontColor #404040
+skinparam nodesep 120
+skinparam ranksep 180
+left to right direction
+
+title "Auth Service - Component Diagram"
+
+actor "Utilisateur" as Utilisateur
+
+package "Controllers" #FFECB3 {
+  [AuthController] as AuthCtrl
+  [UserController] as UserCtrl
+  [UserVerificationController] as UserVerifCtrl
+}
+
+package "Services du domaine" #FFF3E0 {
+  [AuthenticationService] as AuthSvc
+  [RegistrationService] as RegistrationSvc
+}
+
+package "Adapteurs" #E6F7FF {
+  [UserAdapter] as UserAdapter
+  [VerificationTokenAdapter] as VerificationTokenAdapter
+  [MfaChallengeAdapter] as MfaChallengeAdapter
+  [AuditAdapter] as AuditAdapter
+  [JwtTokenAdapter] as JwtTokenAdapter
+  [EmailAdapter] as EmailAdapter
+}
+
+package "Ports" #FFF9C4 {
+  interface "UserPort" as IUserPort
+  interface "VerificationTokenPort" as IVerifPort
+  interface "MfaChallengePort" as IMfaPort
+  interface "AuditPort" as IAuditPort
+  interface "EmailSenderPort" as IEmailPort
+  interface "JwtTokenPort" as IJwtPort
+  interface "AuthenticationPort" as IAuthPort
+  interface "RegistrationPort" as IRegPort
+}
+
+package "Infrastructure" #E2FFCC {
+  database "PostgreSQL Auth" as DBAuth
+  cloud "SMTP (Gmail)" as SMTP
+}
+
+' --- Flèches principales ---
+Utilisateur ..> AuthCtrl : HTTP
+Utilisateur ..> UserCtrl : HTTP
+Utilisateur ..> UserVerifCtrl : HTTP
+AuthCtrl ..> AuthSvc
+UserCtrl ..> RegistrationSvc
+UserVerifCtrl ..> RegistrationSvc
+AuthSvc ..> IUserPort
+AuthSvc ..> IMfaPort
+AuthSvc ..> IEmailPort
+AuthSvc ..> IAuditPort
+AuthSvc ..> IJwtPort
+RegistrationSvc ..> IUserPort
+RegistrationSvc ..> IVerifPort
+RegistrationSvc ..> IEmailPort
+RegistrationSvc ..> IAuditPort
+UserAdapter --> IUserPort
+VerificationTokenAdapter --> IVerifPort
+MfaChallengeAdapter --> IMfaPort
+AuditAdapter --> IAuditPort
+EmailAdapter --> IEmailPort
+JwtTokenAdapter --> IJwtPort
+"Adapteurs" ..> DBAuth : JDBC
+EmailAdapter ..> SMTP : SMTP 587
+RegistrationSvc --> IRegPort
+AuthSvc --> IAuthPort
+@enduml

@@ -1,0 +1,61 @@
+@startuml "BrokerX - Global Component Diagram"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle uml2
+skinparam linetype ortho
+skinparam shadowing false
+skinparam ArrowColor #606060
+skinparam FontColor #404040
+skinparam nodesep 120
+skinparam ranksep 180
+left to right direction
+
+title "BrokerX - Global Component Diagram"
+
+actor "Utilisateur" as Utilisateur
+
+package "Frontend" #EDE7F6 {
+  component "React UI" as ReactUI
+}
+
+component "API Gateway" as Gateway #B3E5FC
+component "NGINX Load Balancer" as Nginx #B2DFDB
+component "Swagger UI" as Swagger #F8BBD0
+component "Prometheus" as Prometheus #C8E6C9
+component "Grafana" as Grafana #FFF9C4
+
+package "Microservices" #F5F5F5 {
+  component "Auth Service" as AuthSvc
+  component "Order Service" as OrderSvc
+  component "Wallet Service" as WalletSvc
+  component "Matching Service" as MatchingSvc
+}
+
+package "Databases" #E2FFCC {
+  database "PostgreSQL Auth" as DBAuth
+  database "PostgreSQL Order" as DBOrder
+  database "PostgreSQL Wallet" as DBWallet
+  database "PostgreSQL Matching" as DBMatching
+}
+
+' --- Flèches principales ---
+Utilisateur --> ReactUI : HTTP
+ReactUI --> Gateway : HTTP/REST
+Gateway --> Nginx : HTTP
+Nginx --> AuthSvc : REST
+Nginx --> OrderSvc : REST
+Nginx --> WalletSvc : REST
+Nginx --> MatchingSvc : REST
+Gateway --> Swagger : REST Docs
+AuthSvc --> DBAuth : JDBC
+OrderSvc --> DBOrder : JDBC
+WalletSvc --> DBWallet : JDBC
+MatchingSvc --> DBMatching : JDBC
+Prometheus --> AuthSvc : Metrics
+Prometheus --> OrderSvc : Metrics
+Prometheus --> WalletSvc : Metrics
+Prometheus --> MatchingSvc : Metrics
+Grafana --> Prometheus : Monitoring
+
+@enduml
+

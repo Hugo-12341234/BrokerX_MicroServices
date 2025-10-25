@@ -591,24 +591,30 @@ Cette vue permet de visualiser le flow des opérations, la gestion des exception
 ## 10. Vue Développement
 
 ### Diagrammes
-- ![Diagramme de composants](docs/architecture/4+1/developmentView/BrokerX___Component_Diagram-BrokerX___Component_Diagram.png)
+- Diagramme de composants global : ![Diagramme de composants global](docs/architecture/4+1/developmentView/componentDiagram-global.png)
+- Diagramme de composants auth-service : ![Diagramme de composants Auth Service](docs/architecture/4+1/developmentView/componentDiagram-auth.png)
+- Diagramme de composants order-service : ![Diagramme de composants Order Service](docs/architecture/4+1/developmentView/componentDiagram-order.png)
+- Diagramme de composants wallet-service : ![Diagramme de composants Wallet Service](docs/architecture/4+1/developmentView/componentDiagram-wallet.png)
+- Diagramme de composants matching-service : ![Diagramme de composants Matching Service](docs/architecture/4+1/developmentView/componentDiagram-matching.png)
 - ![Diagramme de packages](docs/architecture/4+1/developmentView/BrokerX___Package_Diagram-BrokerX_Monolith___Package_Diagram.png)
 
 ### Contexte
-La vue développement présente l’organisation du code source, la structure des dossiers, la modularité et les dépendances internes. Elle met en avant la façon dont le projet est découpé pour faciliter le travail des développeurs.
+La vue développement présente l’organisation du code source, la structure des dossiers, la modularité et les dépendances internes. Elle met en avant la façon dont le projet est découpé pour faciliter le travail des développeurs. Elle propose une double vision : une vue globale de l’architecture (tous les microservices et l’infrastructure) et une vue détaillée de la structure interne de chaque microservice métier.
 
 ### Éléments
 - Packages principaux : adapters, domain, infrastructure
 - Composants techniques : contrôleurs, services, adapters, ports
+- Diagrammes de composants pour chaque microservice (auth, order, wallet, matching)
 - Structure des dossiers et conventions de nommage
 
 ### Relations
 - Les packages sont organisés selon l’architecture hexagonale
 - Les dépendances entre modules sont explicites et maîtrisées
+- La séparation entre microservices et infrastructure est clairement illustrée
 - Les conventions facilitent la maintenance et l’évolution
 
 ### Rationnel
-Cette vue facilite la compréhension du projet pour les développeurs, la maintenance et l’évolution du code. Elle favorise la modularité, la réutilisabilité et la robustesse de l’application. Elle permet d’anticiper les impacts des changements, d’améliorer la qualité du code et de réduire les risques de dette technique. Elle est aussi utile pour l’onboarding, la gestion des versions et la collaboration entre équipes.
+Cette vue facilite la compréhension du projet pour les développeurs, la maintenance et l’évolution du code. La double vision (globale + microservices) favorise la modularité, la réutilisabilité et la robustesse de l’application. Elle permet d’anticiper les impacts des changements, d’améliorer la qualité du code et de réduire les risques de dette technique. Elle est aussi utile pour l’onboarding, la gestion des versions et la collaboration entre équipes.
 
 ## 11. Concepts transversaux
 

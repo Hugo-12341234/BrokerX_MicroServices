@@ -1,0 +1,49 @@
+@startuml "Matching Service - Component Diagram"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle uml2
+skinparam linetype ortho
+skinparam shadowing false
+skinparam ArrowColor #606060
+skinparam FontColor #404040
+skinparam nodesep 120
+skinparam ranksep 180
+left to right direction
+
+title "Matching Service - Component Diagram"
+
+actor "Utilisateur" as Utilisateur
+
+package "Controllers" #FFECB3 {
+  [OrderBookController] as OrderBookCtrl
+}
+
+package "Services du domaine" #FFF3E0 {
+  [MatchingService] as MatchingSvc
+}
+
+package "Adapteurs" #E6F7FF {
+  [OrderBookAdapter] as OrderBookAdapter
+  [ExecutionReportAdapter] as ExecutionReportAdapter
+}
+
+package "Ports" #FFF9C4 {
+  interface "OrderBookPort" as IOrderBookPort
+  interface "ExecutionReportPort" as IExecReportPort
+  interface "MatchingPort" as IMatchingPort
+}
+
+package "Infrastructure" #E2FFCC {
+  database "PostgreSQL Matching" as DBMatching
+}
+
+' --- Flèches principales ---
+Utilisateur ..> OrderBookCtrl : HTTP
+OrderBookCtrl ..> MatchingSvc
+MatchingSvc ..> IOrderBookPort
+MatchingSvc ..> IExecReportPort
+MatchingSvc --> IMatchingPort
+OrderBookAdapter --> IOrderBookPort
+ExecutionReportAdapter --> IExecReportPort
+"Adapteurs" ..> DBMatching : JDBC
+@enduml
