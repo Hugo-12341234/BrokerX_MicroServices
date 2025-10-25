@@ -628,53 +628,89 @@ Cette vue facilite la compréhension du projet pour les développeurs, la mainte
 
 ## 11. Concepts transversaux
 
-### 11.1 Modèle de persistance et de domaine
+### 11.1 Modèle de persistance par microservice
 
-Avant d’aborder la structure des données, voici le diagramme ERD qui présente les principales entités persistées et leurs relations dans BrokerX. Ce schéma permet de visualiser la base du modèle de données et les liens entre les tables.
+Chaque microservice possède sa propre base de données, avec un schéma ERD dédié :
 
-#### Diagramme ERD
-![Diagramme ERD BrokerX](/docs/persistance/schemas/schema_er.png)
+#### Auth-Service
+![ERD Auth-Service](docs/persistance/schemas/schema_er_auth-service.png)
 
-Le tableau suivant détaille chaque table du modèle de persistance, avec une brève description de son rôle dans le système.
+| Table                | Description                                                                                                      |
+|----------------------|------------------------------------------------------------------------------------------------------------------|
+| Users                | Stocke les utilisateurs : email, mot de passe, nom, adresse, date de naissance, statut, solde, etc.              |
+| user_audit           | Journalise les actions utilisateur : action, timestamp, document hash, IP, user agent, session token.            |
+| mfa_challenges       | Stocke les défis MFA : code, date de création/expiration, état d’utilisation, IP, tentatives, verrouillage.      |
+| verification_token   | Stocke les tokens de vérification : hash du token, date d’expiration.                                            |
 
-#### Tableau 1. Tables de persistance
+#### Wallet-Service
+![ERD Wallet-Service](docs/persistance/schemas/schema_er_wallet-service.png)
 
-| Nom                | Description                                                                                                      |
-|--------------------|------------------------------------------------------------------------------------------------------------------|
-| User               | Stocke les utilisateurs : email, mot de passe, nom, adresse, date de naissance, statut, solde, etc.              |
-| UserAudit          | Journalise les actions utilisateur : action, timestamp, document hash, IP, user agent, session token.            |
-| Transaction        | Stocke les transactions : montant, type (dépôt, retrait, achat, vente), statut, description, dates.              |
-| Order              | Stocke les ordres de trading : symbole, côté (achat/vente), type, quantité, prix, durée, statut, raison rejet.   |
-| MfaChallenge       | Stocke les défis MFA : code, date de création/expiration, état d’utilisation, IP, tentatives, verrouillage.      |
-| VerificationToken  | Stocke les tokens de vérification : hash du token, date d’expiration.                                            |
+| Table           | Description                                                                                                 |
+|-----------------|-------------------------------------------------------------------------------------------------------------|
+| Wallet          | Portefeuille virtuel associé à un utilisateur, solde, statut.                                               |
+| StockPosition   | Position sur un actif financier détenue dans le portefeuille.                                               |
+| StockRule       | Règle métier associée à une position (ex : limites, alertes, restrictions).                                 |
+| Transaction     | Mouvement de fonds : dépôt, retrait, achat, vente, avec idempotence et statut.                              |
+| WalletAudit     | Journalisation des actions sur le portefeuille : dépôt, retrait, modification, etc.                         |
 
-Pour mieux comprendre la logique métier et les interactions entre les objets, le diagramme de classes ci-dessous illustre les entités principales et leurs relations dans le code.
+#### Order-Service
+![ERD Order-Service](docs/persistance/schemas/schema_er_order-service.png)
 
-#### Diagramme de classes
-![Diagramme de classes BrokerX](/docs/persistance/schemas/schema_uml.png)
+| Table   | Description                                                                                                         |
+|---------|---------------------------------------------------------------------------------------------------------------------|
+| Order   | Ordre de trading : symbole, côté (achat/vente), type, quantité, prix, durée, statut, raison de rejet, timestamp.    |
 
-Le tableau suivant présente chaque entité du modèle de domaine, avec une explication de son rôle métier.
+#### Matching-Service
+![ERD Matching-Service](docs/persistance/schemas/schema_er_matching-service.png)
 
-#### Tableau 2. Modèle de domaine
+| Table            | Description                                                                                                 |
+|------------------|-------------------------------------------------------------------------------------------------------------|
+| OrderBook        | Carnet d’ordres pour un symbole, date de création.                                                          |
+| ExecutionReport  | Rapport d’exécution : type, quantité, prix, timestamp, lié à un carnet d’ordres et à un ordre.              |
 
-| Nom d’entité         | Description métier                                                                                           |
-|----------------------|-------------------------------------------------------------------------------------------------------------|
-| User                 | Représente un utilisateur, gère l’activation, le rejet, le crédit du solde, et les statuts de compte.        |
-| UserAudit            | Permet de tracer toutes les actions importantes réalisées par un utilisateur.                                |
-| Transaction          | Représente une opération financière : dépôt, retrait, achat ou vente, avec gestion d’idempotence et statut.  |
-| Order                | Représente un ordre de trading, avec gestion du type, quantité, prix, durée, statut et raison de rejet.      |
-| MfaChallenge         | Gère les défis MFA, leur validité, expiration, utilisation et verrouillage en cas d’échecs.                  |
-| VerificationToken    | Gère les tokens de vérification pour l’activation de compte ou la récupération d’accès.                      |
+Chaque schéma ERD est adapté à la logique métier et à la séparation stricte des responsabilités de chaque microservice.
 
-Puis, voici les principales méthodes métier de l’entité User, qui illustrent les opérations clés sur les comptes utilisateurs.
+### 11.2 Diagrammes de classes par microservice
 
-#### Tableau 3. Méthodes métier importantes sur User
+Chaque microservice possède son propre diagramme de classes, illustrant les entités métier et leurs relations :
 
-| Méthode              | Description                                                                                                 |
-|----------------------|------------------------------------------------------------------------------------------------------------|
-| activate()           | Active le compte utilisateur.                                                                              |
-| reject()             | Rejette le compte utilisateur.                                                                             |
-| creditBalance(amount)| Ajoute un montant au solde de l’utilisateur.                                                               |
+#### Auth-Service
+![Diagramme de classes Auth-Service](docs/architecture/4+1/logicalView/classDiagramAuth.png)
+
+| Classe              | Rôle métier                                                                                              |
+|---------------------|---------------------------------------------------------------------------------------------------------|
+| User                | Représente un utilisateur, gère l’activation, le rejet, le crédit du solde, et les statuts de compte.    |
+| MfaChallenge        | Gère les défis MFA, leur validité, expiration, utilisation et verrouillage en cas d’échecs.              |
+| VerificationToken   | Gère les tokens de vérification pour l’activation de compte ou la récupération d’accès.                  |
+| UserAudit           | Permet de tracer toutes les actions importantes réalisées par un utilisateur.                            |
+
+#### Wallet-Service
+![Diagramme de classes Wallet-Service](docs/architecture/4+1/logicalView/classDiagramWallet.png)
+
+| Classe         | Rôle métier                                                                                                   |
+|---------------|---------------------------------------------------------------------------------------------------------------|
+| Wallet        | Portefeuille virtuel, gère le solde, les positions, les transactions et l’audit.                              |
+| StockPosition | Position sur un actif financier détenue dans le portefeuille.                                                 |
+| StockRule     | Règle métier associée à une position (ex : limites, alertes, restrictions).                                   |
+| Transaction   | Mouvement de fonds : dépôt, retrait, achat, vente, avec gestion d’idempotence et de statut.                   |
+| WalletAudit   | Journalisation des actions sur le portefeuille : dépôt, retrait, modification, etc.                           |
+
+#### Order-Service
+![Diagramme de classes Order-Service](docs/architecture/4+1/logicalView/classDiagramOrder.png)
+
+| Classe   | Rôle métier                                                                                                         |
+|---------|---------------------------------------------------------------------------------------------------------------------|
+| Order   | Représente un ordre de trading, avec gestion du type, quantité, prix, durée, statut et raison de rejet.             |
+
+#### Matching-Service
+![Diagramme de classes Matching-Service](docs/architecture/4+1/logicalView/classDiagramMatching.png)
+
+| Classe           | Rôle métier                                                                                                 |
+|------------------|-------------------------------------------------------------------------------------------------------------|
+| OrderBook        | Carnet d’ordres, gère la priorité prix/temps et la gestion des ordres.                                      |
+| ExecutionReport  | Rapport d’exécution : type, quantité, prix, timestamp, lié à un carnet d’ordres et à un ordre.              |
+
+Chaque diagramme de classes permet de visualiser la structure métier propre à chaque microservice, facilitant la compréhension, la maintenance et l’évolution du code.
 
 #### Modèle de domaine
 

@@ -1,0 +1,16 @@
+@startuml
+' ERD Order-Service
+entity "Order" as ord {
+  id : BIGSERIAL [PK] NOT NULL
+  client_order_id : VARCHAR(64)
+  symbol : VARCHAR(16) NOT NULL
+  side : VARCHAR(16) NOT NULL
+  type : VARCHAR(16) NOT NULL
+  quantity : INT NOT NULL
+  price : DOUBLE PRECISION
+  duration : VARCHAR(16) NOT NULL
+  timestamp : TIMESTAMP(3) NOT NULL
+  status : VARCHAR(16) NOT NULL
+  reject_reason : VARCHAR(255)
+}
+@enduml

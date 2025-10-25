@@ -1,0 +1,49 @@
+@startuml
+' ERD Wallet-Service
+entity "Wallet" as wallet {
+  id : BIGSERIAL [PK] NOT NULL
+  user_id : BIGINT NOT NULL
+  balance : DECIMAL(15,2) NOT NULL
+  status : VARCHAR(20) NOT NULL
+  --
+}
+entity "StockPosition" as sp {
+  id : UUID [PK] NOT NULL
+  wallet_id : BIGINT [FK] NOT NULL
+  symbol : VARCHAR(16) NOT NULL
+  quantity : INT NOT NULL
+  avgeragePrice : DOUBLE PRECISION
+  --
+}
+entity "StockRule" as sr {
+  symbol : VARCHAR(16) [PK] NOT NULL
+  tickSize: DECIMAL(10,4) NOT NULL
+  minBand : DECIMAL(10,4) NOT NULL
+  maxBand : DECIMAL(10,4) NOT NULL
+  price : DECIMAL(15,4) NOT NULL
+  --
+}
+entity "Transaction" as tx {
+  id : BIGSERIAL [PK] NOT NULL
+  userId : BIGINT NOT NULL
+  wallet_id : BIGINT [FK] NOT NULL
+  idempotency_key : VARCHAR(255)
+  amount : DECIMAL(15,2) NOT NULL
+  type : VARCHAR(50) NOT NULL
+  status : VARCHAR(50) NOT NULL
+  description : TEXT
+  --
+}
+entity "WalletAudit" as waudit {
+  id : BIGSERIAL [PK] NOT NULL
+  wallet_id : BIGINT [FK] NOT NULL
+  action : VARCHAR(50) NOT NULL
+  timestamp : TIMESTAMP NOT NULL
+  details : TEXT
+}
+wallet ||--o{ sp : "possède"
+sp ||--|| sr : "concerne"
+wallet ||--o{ tx : "effectue"
+wallet ||--o{ waudit : "est journalisé"
+@enduml
+
