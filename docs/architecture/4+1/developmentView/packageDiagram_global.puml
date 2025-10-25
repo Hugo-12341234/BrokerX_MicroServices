@@ -1,0 +1,37 @@
+@startuml "Global Package Diagram"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam linetype ortho
+skinparam shadowing false
+skinparam ArrowColor #606060
+skinparam FontColor #404040
+left to right direction
+skinparam nodesep 80
+skinparam ranksep 120
+title "Global Package Diagram"
+package "LOG430_BrokerX_MicroServices" as rootPkg #F5F5F5 {
+  package "api-gateway" as apiPkg #E8F0FF {}
+  package "auth-service" as authPkg #FFD6A1 {}
+  package "matching-service" as matchPkg #B6EEB6 {}
+  package "order-service" as orderPkg #EBD4B1 {}
+  package "wallet-service" as walletPkg #D9EBFF {}
+  package "frontend" as frontPkg #B9E0F3 {}
+  package "monitoring" as monPkg #F3E8FF {
+    package "grafana" as grafanaPkg #F3E8FF {}
+    package "prometheus" as prometheusPkg #F3E8FF {}
+  }
+  package "nginx" as nginxPkg #FFF0D9 {}
+}
+apiPkg ..> authPkg : <<REST>>
+apiPkg ..> matchPkg : <<REST>>
+apiPkg ..> orderPkg : <<REST>>
+apiPkg ..> walletPkg : <<REST>>
+frontPkg ..> apiPkg : <<HTTP>>
+monPkg ..> apiPkg : <<monitoring>>
+monPkg ..> authPkg : <<monitoring>>
+monPkg ..> matchPkg : <<monitoring>>
+monPkg ..> orderPkg : <<monitoring>>
+monPkg ..> walletPkg : <<monitoring>>
+nginxPkg <.. apiPkg : <<use>
+@enduml
+

@@ -590,21 +590,31 @@ Cette vue permet de visualiser le flow des opérations, la gestion des exception
 
 ## 10. Vue Développement
 
-### Diagrammes
+### Diagrammes de composants
 - Diagramme de composants global : ![Diagramme de composants global](docs/architecture/4+1/developmentView/componentDiagram-global.png)
 - Diagramme de composants auth-service : ![Diagramme de composants Auth Service](docs/architecture/4+1/developmentView/componentDiagram-auth.png)
 - Diagramme de composants order-service : ![Diagramme de composants Order Service](docs/architecture/4+1/developmentView/componentDiagram-order.png)
 - Diagramme de composants wallet-service : ![Diagramme de composants Wallet Service](docs/architecture/4+1/developmentView/componentDiagram-wallet.png)
 - Diagramme de composants matching-service : ![Diagramme de composants Matching Service](docs/architecture/4+1/developmentView/componentDiagram-matching.png)
-- ![Diagramme de packages](docs/architecture/4+1/developmentView/BrokerX___Package_Diagram-BrokerX_Monolith___Package_Diagram.png)
+
+### Diagrammes de packages
+- Diagramme de packages global : ![Diagramme de packages global](docs/architecture/4+1/developmentView/packageDiagram_global.png)
+- Diagramme de packages auth-service : ![Diagramme de packages Auth Service](docs/architecture/4+1/developmentView/packageDiagram_auth-service.png)
+- Diagramme de packages order-service : ![Diagramme de packages Order Service](docs/architecture/4+1/developmentView/packageDiagram_order-service.png)
+- Diagramme de packages wallet-service : ![Diagramme de packages Wallet Service](docs/architecture/4+1/developmentView/packageDiagram_wallet-service.png)
+- Diagramme de packages matching-service : ![Diagramme de packages Matching Service](docs/architecture/4+1/developmentView/packageDiagram_matching-service.png)
 
 ### Contexte
 La vue développement présente l’organisation du code source, la structure des dossiers, la modularité et les dépendances internes. Elle met en avant la façon dont le projet est découpé pour faciliter le travail des développeurs. Elle propose une double vision : une vue globale de l’architecture (tous les microservices et l’infrastructure) et une vue détaillée de la structure interne de chaque microservice métier.
 
+Le packageDiagram global permet de visualiser la séparation entre les microservices, le frontend, le monitoring et la configuration nginx. Les diagrammes détaillés montrent la structure interne de chaque microservice, avec les dépendances typiques entre contrôleurs, services, ports, entités et repositories.
+
+Les microservices comme l’api-gateway n’ont pas de diagramme de package ou de composant détaillé, car ils n’embarquent pas de logique métier propre : ils se contentent de router les requêtes via Spring Cloud Gateway.
+
 ### Éléments
 - Packages principaux : adapters, domain, infrastructure
 - Composants techniques : contrôleurs, services, adapters, ports
-- Diagrammes de composants pour chaque microservice (auth, order, wallet, matching)
+- Diagrammes de composants et de packages pour chaque microservice (auth, order, wallet, matching)
 - Structure des dossiers et conventions de nommage
 
 ### Relations

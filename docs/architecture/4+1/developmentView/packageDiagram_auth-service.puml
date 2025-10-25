@@ -1,18 +1,15 @@
-@startuml "BrokerX - Package Diagram"
+@startuml "Auth Service - Package Diagram"
 !theme plain
 skinparam backgroundColor #FFFFFF
 skinparam linetype ortho
 skinparam shadowing false
 skinparam ArrowColor #606060
 skinparam FontColor #404040
-
 left to right direction
 skinparam nodesep 80
 skinparam ranksep 120
-
-title "BrokerX Monolith - Package Diagram"
-
-package "com.monolithique.log430.log430_brokerx" as appPkg #F5F5F5 {
+title "Auth Service - Package Diagram"
+package "com.microservices.log430.authservice" as appPkg #F5F5F5 {
   package "adapters" as adaptersPkg #EBD4B1 {
     package "web" as webPkg #FFD6A1 {
       package "controllers" as webCtrlPkg #FFF0D9 {}
@@ -37,8 +34,6 @@ package "com.monolithique.log430.log430_brokerx" as appPkg #F5F5F5 {
     package "config" as configPkg #E8F0FF {}
   }
 }
-
-' ----------------- Dependencies typiques -----------------
 webCtrlPkg ..> webDtoPkg : <<import>>
 webCtrlPkg ..> domSvcPkg : <<use>>
 domSvcPkg ..> domModelPkg : <<access>>
@@ -50,15 +45,11 @@ persistPortImplPkg ..> persistMapPkg : <<use>>
 persistRepoPkg ..> persistEntityPkg : <<import>>
 persistMapPkg ..> persistEntityPkg : <<import>>
 persistPortImplPkg ..> configPkg : <<import>>
-
-' Layout hints pour garder l'ordre horizontal
 webCtrlPkg -[hidden]-> webDtoPkg
 persistEntityPkg -[hidden]-> persistMapPkg
 persistMapPkg -[hidden]-> persistPortImplPkg
 persistPortImplPkg -[hidden]-> persistRepoPkg
-
 domModelPkg -[hidden]-> domPortPkg
-
 domPortInPkg -[hidden]-> domPortOutPkg
-
 @enduml
+

@@ -1,0 +1,51 @@
+@startuml "Matching Service - Package Diagram"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam linetype ortho
+skinparam shadowing false
+skinparam ArrowColor #606060
+skinparam FontColor #404040
+left to right direction
+skinparam nodesep 80
+skinparam ranksep 120
+title "Matching Service - Package Diagram"
+package "com.microservices.log430.matchingservice" as appPkg #F5F5F5 {
+  package "adapters" as adaptersPkg #EBD4B1 {
+    package "web" as webPkg #FFD6A1 {
+      package "controllers" as webCtrlPkg #FFF0D9 {}
+      package "dto" as webDtoPkg #FFF0D9 {}
+    }
+    package "persistence" as persistPkg #B9E0F3 {
+      package "entities" as persistEntityPkg #D9EBFF {}
+      package "map" as persistMapPkg #D9EBFF {}
+      package "portImpl" as persistPortImplPkg #D9EBFF {}
+      package "repository" as persistRepoPkg #D9EBFF {}
+    }
+  }
+  package "domain" as domainPkg #B6EEB6 {
+    package "model.entities" as domModelPkg #D9F2D9 {}
+    package "port" as domPortPkg #D9F2D9 {
+      package "in" as domPortInPkg #D9F2D9 {}
+      package "out" as domPortOutPkg #D9F2D9 {}
+    }
+    package "service" as domSvcPkg #D9F2D9 {}
+  }
+}
+webCtrlPkg ..> webDtoPkg : <<import>>
+webCtrlPkg ..> domSvcPkg : <<use>>
+domSvcPkg ..> domModelPkg : <<access>>
+domSvcPkg ..> domPortInPkg : <<implements>>
+domSvcPkg ..> domPortOutPkg : <<use>>
+persistPortImplPkg ..> domPortOutPkg : <<implements>>
+persistPortImplPkg ..> persistRepoPkg : <<use>>
+persistPortImplPkg ..> persistMapPkg : <<use>>
+persistRepoPkg ..> persistEntityPkg : <<import>>
+persistMapPkg ..> persistEntityPkg : <<import>>
+webCtrlPkg -[hidden]-> webDtoPkg
+persistEntityPkg -[hidden]-> persistMapPkg
+persistMapPkg -[hidden]-> persistPortImplPkg
+persistPortImplPkg -[hidden]-> persistRepoPkg
+domModelPkg -[hidden]-> domPortPkg
+domPortInPkg -[hidden]-> domPortOutPkg
+@enduml
+
