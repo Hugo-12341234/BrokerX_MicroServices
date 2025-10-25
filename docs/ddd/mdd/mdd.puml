@@ -14,7 +14,12 @@ class User {
   address: String
   birthDate: Date
   status: String
+}
+
+class Wallet {
+  id: Long
   balance: Double
+  status: String
 }
 
 class Transaction {
@@ -23,7 +28,6 @@ class Transaction {
   type: String
   status: String
   description: String
-  createdAt: DateTime
 }
 
 class Order {
@@ -49,7 +53,9 @@ class Stock {
 }
 
 ' Relations
+User "1" -- "1" Wallet : possède >
 User "1" -- "*" Transaction : effectue >
 User "1" -- "*" Order : place >
 Order "*" -- "1" Stock : concerne >
+Wallet "1" -- "*" Stock : contient >
 @enduml
