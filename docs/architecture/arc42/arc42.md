@@ -902,101 +902,144 @@ Cette organisation garantit la reproductibilité, la fiabilité et la rapidité 
 
 ## 12. Décisions d'architecture
 
-### 12.1 Architecture hexagonale vs MVC
+### 12.1 Architecture microservices et découpage
 
-# ADR 001 : Architecture hexagonale vs MVC
+# ADR 001 : Style architectural & découpage microservices
 
 **Statut** : Acceptée\
-**Date** : 2025-09-23
+**Date** : 2025-10-24
 
 ## Contexte
-Le projet BrokerX doit adopter une structure claire, évolutive et adaptée à la complexité métier (gestion d’ordres, portefeuille, sécurité, intégration de services externes). Deux styles sont envisagés : MVC (Model-View-Controller) et Hexagonal (Ports & Adapters).
+Le projet BrokerX, initialement monolithique, doit évoluer vers une architecture microservices pour répondre aux exigences de scalabilité, modularité, résilience et déploiement indépendant. Le découpage logique s’appuie sur les domaines métier : Authentification, Ordres, Matching, Wallet. L’API Gateway devient le point d’entrée unique, assurant le routage, la sécurité et la cohérence des appels.
+
 ## Décision
-Nous choisissons l’architecture hexagonale pour BrokerX. Ce style permet une séparation stricte du domaine métier des dépendances techniques, facilite l’intégration de nouveaux services, la testabilité, et prépare le projet à une éventuelle modularisation ou migration vers des microservices.
+Nous adoptons une architecture microservices REST, chaque service étant conteneurisé et indépendant, avec une API Gateway (Spring Cloud Gateway) pour le routage et la gestion des accès. Ce choix permet de centraliser la sécurité, le monitoring, la documentation (Swagger) et le versionnage des APIs, tout en évitant la duplication de logique dans chaque microservice. Le découpage par domaine métier assure une meilleure évolutivité : chaque équipe peut travailler sur un service sans impacter les autres, et chaque service peut être déployé ou mis à l’échelle indépendamment. Les communications inter-services se font via HTTP REST, avec des routes versionnées et des codes d’erreur normalisés.
+
 ## Conséquences
-- Le domaine métier est indépendant des frameworks et de l’infrastructure.
-- Les ports et adapters facilitent l’intégration de services externes.
-- La structure est plus modulaire et évolutive qu’un MVC classique.
-- La courbe d’apprentissage peut être plus élevée pour les nouveaux développeurs.
-- La documentation et la communication sont facilitées.
+- Scalabilité horizontale : chaque service peut être répliqué indépendamment.
+- Déploiement et maintenance facilités : isolation des pannes, évolutivité.
+- Complexité accrue : gestion des dépendances, monitoring, orchestration.
+- API Gateway centralise la sécurité, le routage et la documentation (Swagger).
+- Migration facilitée : chaque domaine peut évoluer ou être remplacé sans impacter les autres.
 
 ### 12.2 Persistance des données
 
-# ADR 002 : Persistance des données
+# ADR 002 : Stratégie de persistance & transactions
 
 **Statut** : Acceptée\
-**Date** : 2025-09-23
+**Date** : 2025-10-24
 
 ## Contexte
-BrokerX doit stocker de façon fiable les utilisateurs, ordres, transactions, stocks, et assurer la traçabilité (audit). Plusieurs options sont possibles : base de données relationnelle, NoSQL, fichiers, etc.
+Dans BrokerX, chaque microservice gère sa propre base de données PostgreSQL pour garantir l’isolation, la scalabilité et la conformité. Les migrations sont gérées par Flyway, l’accès aux données par JPA/Hibernate, et l’intégrité par des transactions ACID. L’audit, l’idempotence et la traçabilité sont des exigences fortes du métier (ordres, comptes, positions).
 
 ## Décision
-Nous retenons une base de données relationnelle (ex : PostgreSQL) pour la persistance principale. Les ports du domaine définissent les interfaces, et les adapters d’infrastructure implémentent l’accès aux données via JPA/Hibernate.
+Chaque microservice dispose d’une base PostgreSQL dédiée, avec schéma et migrations indépendants. Ce choix permet d’éviter les effets de bord et les blocages entre domaines : une erreur ou une surcharge sur un service n’impacte pas les autres. PostgreSQL a été choisi pour sa robustesse, sa gestion avancée des transactions et sa compatibilité avec les outils de migration (Flyway) et d’ORM (JPA/Hibernate). Les migrations indépendantes facilitent l’évolution du schéma sans coordination complexe entre équipes. Les transactions sont gérées au niveau du service, avec rollback sur erreur. Les clés **d’idempotence** sont utilisées pour les opérations critiques (dépôts, ordres). Un journal d’audit append-only est mis en place dans chaque base de données pour la traçabilité et la conformité. Cette approche évite la complexité des transactions distribuées, tout en assurant la cohérence locale et la traçabilité.
 
 ## Conséquences
-- Les modèles métier sont mappés sur des tables relationnelles.
-- La cohérence transactionnelle est assurée.
-- La migration vers d’autres solutions (NoSQL, cloud) reste possible via de nouveaux adapters.
-- Les requêtes complexes et la traçabilité sont facilitées.
-- La gestion des migrations de schéma doit être planifiée.
+- Isolation des données : chaque service est responsable de son modèle et de son intégrité.
+- Scalabilité et résilience accrues : pas de dépendance croisée sur la persistance.
+- Migrations reproductibles et auditables (Flyway).
+- Gestion robuste des erreurs et des transactions.
+- Complexité accrue pour la cohérence globale (pas de transactions distribuées).
 
-### 12.3 Journalisation des opérations utilisateur
+### 12.3 Stratégie d’erreurs, versionnage & conformité
 
-# Journalisation des opérations utilisateur
+# ADR 003 : Stratégie d’erreurs, versionnage & conformité
 
 **Statut** : Acceptée\
-**Date** : 2025-09-23
+**Date** : 2025-10-24
 
 ## Contexte
-La traçabilité des actions des utilisateurs est essentielle pour la conformité réglementaire (KYC/AML), la sécurité et l’analyse métier. Plusieurs approches sont possibles : logs applicatifs, solutions externes (ELK, SIEM), ou persistance dédiée en base de données. Il faut garantir la robustesse, la facilité d’accès et la pérennité des données d’audit.
+En architecture microservices, la gestion des erreurs, du versionnage d’API et de la conformité (audit, sécurité, traçabilité) est essentielle pour garantir la robustesse, l’évolutivité et la conformité réglementaire. Les erreurs doivent être normalisées (JSON, codes HTTP), le versionnage doit permettre l’évolution sans rupture, et la traçabilité doit répondre aux exigences KYC/AML et audit métier.
 
 ## Décision
-Nous avons choisi de créer une table dédiée `UserAudit` dans la base de données. Toutes les opérations importantes (inscription, authentification, ordres, transactions, vérifications) sont journalisées avec les informations pertinentes (horodatage, identifiant utilisateur, type d’action, détails). Cette solution permet une requêtabilité directe, une intégration simple avec le domaine, et une conformité aux exigences internes et externes.
+Les erreurs sont normalisées en JSON avec des codes HTTP explicites et des messages détaillés. Le versionnage des routes est systématique (/api/v1/...), permettant l’évolution des contrats sans impacter les clients existants. Un audit append-only est mis en place pour toutes les opérations sensibles, et la conformité est assurée par la journalisation et la validation des entrées (authentification, sécurité JWT, validation des payloads). La conformité réglementaire et l’audit sont garantis par la journalisation append-only de toutes les opérations sensibles, permettant une traçabilité complète et un accès aux historiques pour contrôle externe.
+Ce mécanisme assure que chaque action critique est enregistrée de façon immuable, répondant aux exigences d’audit métier et réglementaire (KYC/AML, contrôle interne, audit externe).
 
 ## Conséquences
-- La traçabilité est centralisée et facilement accessible pour les audits et analyses.
-- La solution est évolutive : de nouveaux types d’événements peuvent être ajoutés facilement.
-- Les performances sont maîtrisées, car la journalisation est intégrée au modèle de données.
-- L’intégration avec des outils externes reste possible via export ou synchronisation.
-- La gestion de la volumétrie et de la rétention des données doit être planifiée pour éviter l’engorgement.
+- Robustesse accrue : erreurs claires, versionnage maîtrisé, audit complet.
+- Facilité d’évolution des APIs et des clients.
+- Conformité réglementaire et traçabilité assurées.
+- Complexité technique : gestion des versions, des audits et de la sécurité sur chaque service.
 
-## 12.4 Justification de l'architecture
+## 12.4 Justification du choix de cache
 
-# Architecture de BrokerX
+# ADR 004 : Choix du cache
 
-BrokerX adopte une **architecture hexagonale (Ports & Adapters)**.
+**Statut** : Acceptée\
+**Date** : 2025-10-24
 
-### Justification du choix
-- **Séparation stricte du domaine métier** : Le cœur métier (modèles, services, logique métier) est isolé des dépendances techniques (frameworks, bases de données, API externes). Les règles métier restent stables et compréhensibles, même si la technologie évolue.
-- **Évolutivité et adaptabilité** : L’architecture hexagonale facilite l’ajout ou le remplacement de services externes (paiement, données de marché, audit) sans impacter le domaine. Par exemple, un changement de fournisseur de paiement n’affecte que l’adapter correspondant.
-- **Facilité de test et de validation métier** : Le découplage permet de tester le domaine indépendamment des frameworks, ce qui accélère la validation métier et la détection des régressions. Les ports facilitent la création de mocks pour les tests unitaires et d’intégration.
-- **Dépendances dirigées et absence de cycles** : Les dépendances sont orientées du domaine vers les ports, puis vers les adapters, ce qui évite les cycles et rend l’architecture plus robuste et maintenable.
-- **Réduction du couplage** : Le domaine ne dépend jamais de l’infrastructure ou des frameworks, ce qui permet de migrer vers une autre technologie (ex : changement de framework, passage à une architecture microservices) sans refonte du métier.
-- **Conformité réglementaire et sécurité** : En isolant le métier, on facilite la traçabilité et la conformité (audit, KYC, MFA), car les règles métier sont centralisées et documentées.
-- **Clarté et communication** : Ce style favorise une documentation claire et une compréhension partagée entre les équipes métier et technique, car chaque couche a une responsabilité bien définie.
+## Contexte
+Pour améliorer la performance et la scalabilité, BrokerX doit mettre en place un mécanisme de cache pour les endpoints coûteux. Plusieurs solutions sont envisageables : cache mémoire local, Redis, ou cache distribué. Le cache doit permettre de réduire la charge sur la base de données et d’accélérer les réponses, tout en garantissant la cohérence et la gestion des expirations/invalidation.
 
-Ce style répond aux besoins de BrokerX : évolutivité, conformité réglementaire, sécurité, intégration de nouveaux services externes, et robustesse face aux changements technologiques.
+## Décision
+Nous avons choisi d’utiliser un cache mémoire in-memory (Caffeine) pour les endpoints critiques, plutôt que Redis. Ce choix est motivé par la simplicité d’intégration, la rapidité d’accès, et le fait que les données à cacher sont temporaires et propres à chaque instance. Redis aurait été pertinent pour un cache partagé entre plusieurs instances, mais la complexité d’administration et la latence réseau ne sont pas justifiées pour ces usages. Le cache in-memory offre une latence ultra-faible et une intégration native avec Spring Boot. Les endpoints ciblés sont très sollicités mais ne nécessitent pas de cohérence globale entre instances : chaque instance peut gérer son propre cache. Cette approche simplifie le déploiement et la maintenance, tout en maximisant la performance. Les endpoints critiques qui ont été sélectionnés sont : GET api/v1/wallet et GET api/v1/wallet/stock/{stockId}. Ces endpoints ont été sélecionnés parce qu'ils sont énormément utilisés dans toutes les opérations critiques de l'application. Il semblait donc logique de mettre la cache à cette endroit, car le gain semble être le plus important. Des règles d’expiration et de taille maximale du cache sont définies pour éviter la surconsommation de mémoire et garantir la fraîcheur des données.
+
+## Conséquences
+- Amélioration significative de la latence et du throughput sur les endpoints critiques.
+- Réduction de la charge sur la base de données.
+- Complexité minimale : pas d’administration Redis, pas de gestion réseau.
+- Risque de données obsolètes (stale) limité à l’instance : nécessite des règles d’expiration adaptées.
+
+## 12.5 Justification du choix de load balancer
+
+# ADR 005 : Choix du Load Balancer
+
+**Statut** : Acceptée\
+**Date** : 2025-10-24
+
+## Contexte
+La montée en charge et la tolérance aux pannes nécessitent un mécanisme de répartition du trafic entre plusieurs instances de microservices. Plusieurs solutions sont envisageables : NGINX, HAProxy, Traefik, ou des services cloud. Le load balancer doit permettre le routage dynamique, la gestion des sessions, le monitoring et la facilité de configuration.
+
+## Décision
+Nous avons choisi NGINX comme load balancer principal pour BrokerX. Ce choix est motivé par sa robustesse, sa performance, et son intégration simple avec Docker et les microservices. NGINX permet le routage HTTP, la gestion des headers, le monitoring basique, et la configuration de règles avancées (sticky sessions, healthchecks). Il offre une répartition efficace du trafic, une tolérance aux pannes et une scalabilité horizontale. Les alternatives comme HAProxy ou Traefik ont été écartées pour privilégier la simplicité et la maturité de NGINX dans l’écosystème Docker. Les tests de charge sont réalisés avec NGINX pour comparer la performance selon le nombre d’instances.
+
+## Conséquences
+- Répartition efficace du trafic et tolérance aux pannes.
+- Scalabilité horizontale facilitée.
+- Configuration flexible et intégration simple avec Docker Compose.
+- Complexité supplémentaire pour le monitoring avancé et la gestion des sessions.
+
+## 12.6 Justification de l'api gateway
+
+# ADR 006 : Choix de l’API Gateway
+
+**Statut** : Acceptée\
+**Date** : 2025-10-24
+
+## Contexte
+L’API Gateway est un composant clé pour centraliser le routage, la sécurité, la documentation et la gestion des accès aux microservices. Plusieurs solutions sont envisageables : Kong, KrakenD, Spring Cloud Gateway, etc. Le choix doit permettre une intégration native avec l’écosystème Spring, la gestion des routes versionnées, des headers, du CORS, et la documentation Swagger.
+
+## Décision
+Nous avons choisi Spring Cloud Gateway comme API Gateway pour BrokerX. Ce choix s’explique par l’intégration native avec Spring Boot, la facilité de configuration des routes, la gestion des filtres, du CORS, des headers, et la compatibilité avec Docker. Spring Cloud Gateway permet d’unifier la sécurité, le monitoring, la documentation Swagger et le versionnage des APIs, tout en évitant la duplication de logique dans chaque microservice. La gestion des routes, des filtres et du CORS est flexible et adaptée à l’écosystème Spring déjà utilisé dans tous les microservices. La documentation Swagger peut être centralisée et exposée via la Gateway, facilitant l’accès pour les développeurs et les clients. La compatibilité avec Docker et la facilité de déploiement sont des atouts majeurs pour la CI/CD et la maintenance.
+
+## Conséquences
+- Centralisation du routage, de la sécurité et de la documentation.
+- Intégration native avec l’écosystème Spring et Docker.
+- Facilité d’évolution et de maintenance des routes et des règles d’accès.
+- Complexité supplémentaire pour la gestion des filtres avancés et du monitoring.
 
 ---
 
-### Architecture monolithique et évolutivité
+### Architecture microservices et évolutivité
 
-BrokerX est une application monolithique : toutes les fonctionnalités métier, la logique applicative et l’intégration technique sont regroupées dans un même déploiement.
-- **Un seul artefact déployé** : toutes les couches (domaine, application, infrastructure, configuration) sont assemblées et exécutées ensemble, ce qui simplifie la gestion et la supervision.
-- **Centralisation des règles métier** : la logique métier et les processus sont gérés dans un même espace, ce qui facilite la cohérence et la traçabilité.
-- **Gestion transactionnelle fiable** : les opérations complexes (dépôt, placement d’ordre, audit) bénéficient d’une gestion transactionnelle robuste, sans complexité distribuée.
-- **Modularité interne** : chaque couche et chaque port/adaptateur est clairement séparé, ce qui permet d’ajouter, modifier ou remplacer des modules sans impacter le reste du système.
-- **Préparation à la modularisation** : les ports et adapters peuvent être extraits vers des microservices ou modules indépendants si le besoin de scalabilité ou d’évolution se présente.
-- **Facilité d’intégration de nouveaux services** : l’ajout de services externes (paiement, données de marché, audit) se fait via de nouveaux adapters, sans toucher au domaine métier.
-- **Clarté et robustesse** : la séparation stricte des responsabilités rend le code plus lisible, plus maintenable et facilite l’intégration de nouveaux développeurs.
+BrokerX repose désormais sur une architecture microservices : chaque domaine métier (authentification, ordres, matching, portefeuille) est isolé dans un service indépendant, déployé dans son propre conteneur Docker.
 
-Ainsi, BrokerX combine la simplicité et la robustesse du monolithe avec la modularité et l’évolutivité de l’architecture hexagonale.
+- **Déploiement indépendant** : chaque microservice (auth-service, order-service, wallet-service, matching-service) est packagé et déployé séparément, ce qui facilite la scalabilité et la maintenance.
+- **Isolation des responsabilités** : la logique métier, la persistance et la sécurité sont propres à chaque service, garantissant la robustesse et la conformité.
+- **Gestion transactionnelle locale** : chaque microservice gère ses transactions de façon autonome, sans complexité distribuée.
+- **Modularité et évolutivité** : l’ajout ou la modification d’un service n’impacte pas les autres ; chaque équipe peut travailler sur son domaine sans dépendance forte.
+- **Intégration facilitée** : les communications inter-services se font via API REST sécurisées, et l’API Gateway centralise le routage, la sécurité et la documentation.
+- **Scalabilité horizontale** : chaque service peut être répliqué selon la charge, et le load balancer (NGINX) répartit le trafic pour garantir la haute disponibilité.
+- **Supervision et observabilité** : chaque microservice expose ses métriques et logs, facilitant le monitoring, la détection d’anomalies et la conformité réglementaire.
+
+Cette architecture microservices offre à BrokerX une grande flexibilité, une robustesse accrue et une capacité d’évolution rapide pour répondre aux besoins futurs du projet.
 
 ---
 
 ### Description des couches et dépendances
 
-L’architecture se compose des couches suivantes :
+L’architecture de chaque microservice se compose des couches suivantes :
 - **Domaine** : Entités métier (User, Order, Transaction, Stock…), services métier, ports (interfaces du domaine). Cette couche porte la logique métier, les règles de validation, et les invariants du système.
 - **Application** : Orchestration des cas d’utilisation, coordination des services métier, gestion de la logique applicative. Elle fait le lien entre les besoins métier et les interactions techniques, sans dépendre des frameworks.
 - **Infrastructure** : Implémentation des ports (adapters), persistance, sécurité, intégration avec les services externes. Cette couche traduit les besoins métier en opérations techniques (accès base de données, appels API, gestion de la sécurité).
@@ -1019,7 +1062,7 @@ L’architecture se compose des couches suivantes :
 
 ---
 
-### Illustration de l’architecture
+### Illustration de l’architecture hexagonale de chaque microservice
 
 ![Diagramme d'architecture hexagonale](docs/architecture/justifications/architectureDiagram.png)
 
@@ -1027,14 +1070,12 @@ L’architecture se compose des couches suivantes :
 
 ### Justification globale
 
-L’architecture hexagonale appliquée au monolithe BrokerX :
+L’architecture hexagonale appliquée à chacun des microservices de BrokerX :
 - Permet de faire évoluer la plateforme sans refonte majeure, en isolant le métier des choix techniques.
 - Sécurise le domaine contre les changements techniques et réglementaires, en centralisant les règles métier.
 - Facilite l’intégration de nouveaux services externes (paiement, données de marché, audit) grâce aux ports et adapters.
 - Répond aux exigences de clarté, évolutivité et conformité de l’analyse métier, tout en favorisant la communication entre les équipes.
 - Garantit la robustesse et la maintenabilité du système, en évitant les cycles et en maîtrisant les dépendances.
-- Prépare la plateforme à une éventuelle migration vers une architecture distribuée ou microservices, sans perte de logique métier.
-
 
 
 ## 13. Scénarios de Qualité
