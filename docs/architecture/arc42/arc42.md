@@ -801,7 +801,7 @@ Aucune partie du système BrokerX ne présente de risque vital ou d’impact sur
 
 ### 11.9 Communications et intégration
 
-BrokerX communique principalement via des API REST sécurisées (HTTPS) et SMTP pour l’envoi d’e-mails. Aucune file de messages ou broker interne n’est utilisé : toutes les intégrations externes (KYC, notifications, audit) passent par des appels HTTP ou SMTP. Les messages ne sont pas persistés en dehors de la base de données métier.
+BrokerX communique principalement via des API REST sécurisées (HTTPS) et SMTP pour l’envoi d’e-mails. Aucune file de messages ou broker interne n’est utilisé : toutes les intégrations externes (KYC, notifications, audit) passent par des appels HTTP (APIs). Les messages ne sont pas persistés en dehors de la base de données métier.
 
 ### 11.10 Vérifications de plausibilité et de validité
 
@@ -816,38 +816,50 @@ Les contrôles sont réalisés à la fois au niveau des entités (annotations) e
 
 ### 11.11 Gestion des exceptions/erreurs
 
-Les erreurs de validation (données invalides, contraintes métier) sont mappées sur des codes HTTP appropriés (400, 403, 422) et retournées par les contrôleurs Spring. Les erreurs techniques (base de données, réseau, SMTP) sont loguées et peuvent entraîner l’échec de la requête ou une réponse 500.
+La gestion des erreurs dans BrokerX repose sur un format JSON normalisé pour toutes les réponses d’erreur, mis en place au niveau de l’API Gateway. Chaque microservice retourne ses erreurs métier ou techniques avec le code HTTP approprié (400, 401, 403, 404, 409, 422, 500, etc.), et le gateway centralise la transformation : toutes les erreurs sont renvoyées au client dans un format uniforme, facilitant l’intégration et le traitement côté frontend
 
-Les contrôleurs REST gèrent la conversion des exceptions en réponses HTTP standardisées. Les erreurs critiques sont journalisées pour analyse et audit.
+Le format d’erreur JSON inclut systématiquement : le code HTTP, un identifiant d’erreur, un message explicite, et éventuellement des détails ou des champs invalides. Cela garantit une expérience cohérente pour les consommateurs d’API et simplifie le monitoring et le debug.
+
+Les contrôleurs REST de chaque microservice gèrent la conversion des exceptions en réponses HTTP standardisées, et le gateway applique la normalisation du format. Les erreurs critiques sont journalisées pour analyse et audit, assurant la traçabilité et la conformité réglementaire.
 
 ### 11.12 Journalisation et traçabilité
 
-BrokerX journalise toutes les actions critiques des utilisateurs (connexion, ordres, dépôts, MFA, vérification) dans la table UserAudit de la base PostgreSQL. Chaque entrée contient l’action, le timestamp, l’IP, le user agent et le token de session. Les transactions et les placements d'ordre sont également journalisés dans les tables Transaction et Order.
+BrokerX journalise toutes les actions critiques des utilisateurs (connexion, ordres, dépôts, MFA, vérification) dans la table UserAudit de la base PostgreSQL. Les opérations sur les portefeuilles sont spécifiquement tracées dans la table WalletAudit, et tous les événements d’exécution d’ordres sont persistés dans la table ExecutionReport. Chaque entrée d’audit contient l’action, le timestamp, l’IP, le user agent et le token de session.
 
-La journalisation technique (logs applicatifs) est assurée via SLF4J et la configuration par défaut de Spring Boot : les logs sont envoyés en stdout et peuvent être collectés par l’infrastructure d’hébergement.
+La journalisation technique est assurée via SLF4J : tout le code métier contient des logs structurés, facilitant la traçabilité et l’analyse des opérations. Les logs applicatifs sont envoyés en stdout et collectés par l’infrastructure.
 
-La traçabilité métier est garantie par la persistance des logs d’audit en base, permettant l’analyse, la conformité et la détection d’anomalies. Les noms des loggers correspondent aux packages des classes pour faciliter l’identification des modules dans les logs.
+Pour l’observabilité, BrokerX expose des métriques via Prometheus, permettant le monitoring en temps réel. Grafana est utilisé pour la visualisation des logs, métriques et alertes, ce qui renforce la supervision, la détection d’anomalies et la conformité réglementaire.
+
+Les noms des loggers correspondent aux packages des classes pour faciliter l’identification des modules dans les logs. La traçabilité métier est garantie par la persistance des logs d’audit en base et la collecte centralisée des métriques et logs techniques.
 
 ### 11.13 Configurabilité
 
-BrokerX utilise Spring Boot pour la gestion de la configuration. Les propriétés principales sont définies dans `src/main/resources/application.properties` pour le développement, et surchargées par `application-prod.properties` en production. Il est possible d’ajouter ou de modifier des propriétés via des variables d’environnement ou des fichiers spécifiques à l’environnement (ex : application-test.properties).
+Chaque microservice BrokerX dispose de sa propre configuration, isolée dans le dossier src/main/resources (ex : application.properties, application-docker.properties). Les propriétés sensibles (mots de passe, clés JWT, endpoints SMTP) sont injectées via variables d’environnement Docker ou fichiers secrets, jamais en dur dans le code.
 
-Tableau 13. Principales propriétés de configuration BrokerX
+Les principales catégories de configuration sont :
+- **Base de données** : URL, utilisateur, mot de passe, pool de connexions
+- **Sécurité** : clés JWT, durée de validité des tokens, MFA, rôles
+- **Serveur** : port HTTP, contexte, CORS
+- **Monitoring** : endpoints Prometheus, niveau de log, nom du logger
+- **Email** : hôte SMTP, port, credentials
+- **Observabilité** : activation des métriques, traces, logs structurés
 
-| Propriété                        | Valeur par défaut (dev)                                             | Description                                      |
-|----------------------------------|---------------------------------------------------------------------|--------------------------------------------------|
-| spring.application.name          | LOG430_BrokerX                                                      | Nom de l’application                             |
-| spring.datasource.url            | jdbc:postgresql://localhost:5432/brokerxdb                          | URL de la base de données PostgreSQL             |
-| spring.mail.host                 | smtp.gmail.com                                                      | Hôte SMTP pour l’envoi d’e-mails                 |
-| server.port                      | 8081 (dev) 8090 (prod)                                             | Port HTTP de l’application (dev)                 |
-| jwt.secret                       | your-256-bit-secret-key-for-development-change-in-production-please | Clé secrète JWT (dev)                            |
-| jwt.expiration                   | 86400000                                                            | Durée de validité des tokens JWT (ms)            |
-| spring.thymeleaf.cache           | false                                                               | Cache des templates Thymeleaf                    |
-| management.endpoints.web.exposure.include | health,info,metrics                                                 | Endpoints exposés pour le monitoring             |
-| app.base-url                     | http://localhost:8090 (prod)                                        | URL de base de l’application (prod)              |
-| logging.level.com.monolitique.log430 | INFO (prod)                                                         | Niveau de log pour le code métier                |
+Chaque microservice suit la convention :
+- `spring.datasource.*` pour la base de données
+- `server.port` pour le port HTTP
+- `jwt.*` pour la sécurité
+- `management.endpoints.*` pour le monitoring
+- `spring.mail.*` pour l’email
 
-La configuration est centralisée et facilement modifiable selon l’environnement (développement, production). Les propriétés sensibles (mots de passe, clés) doivent être gérées via des variables d’environnement en production.
+La configuration est surchargée par environnement (dev, test, prod) et centralisée via Docker Compose ou orchestrateur. Les propriétés communes (ex : monitoring, sécurité) sont harmonisées pour faciliter la supervision et la maintenance.
+
+Exemple :
+- `auth-service` : configuration MFA, JWT, SMTP
+- `order-service` : configuration base de données, logs, endpoints REST
+- `wallet-service` : configuration persistance, monitoring
+- `matching-service` : configuration performance, logs, métriques
+
+Cette approche garantit la flexibilité, la sécurité et la portabilité de chaque microservice, tout en facilitant la gestion des environnements et la conformité aux standards du projet.
 
 ### 11.14 Internationalisation
 
@@ -855,15 +867,38 @@ L’unique langue supportée par BrokerX est le français. Il n’existe aucun m
 
 ### 11.15 Migration
 
-BrokerX est une application développée from scratch en Java/Spring Boot. Aucune migration de données ou d’application antérieure n’a été réalisée : toutes les données ont été créées directement dans la base PostgreSQL du projet.
+Le projet BrokerX a initialement été développé sous forme d’application monolithique Java/Spring Boot. Une migration vers une architecture microservices a été réalisée : le code, les modèles métier et les données ont été découpés et répartis dans des microservices indépendants (auth-service, order-service, wallet-service, matching-service), chacun avec sa propre base PostgreSQL.
+
+La migration a impliqué :
+- La séparation du code source en plusieurs projets Maven distincts, un par microservice
+- La refonte des schémas de base de données : chaque microservice possède désormais son propre schéma et ses scripts de migration Flyway
+- La migration des données existantes du monolithe vers les bases dédiées des microservices, avec adaptation des formats et des relations
+- La mise en place d’une API Gateway et d’un load balancer pour centraliser l’accès et le routage
+- L’adaptation des scripts de déploiement Docker et Docker Compose pour orchestrer les nouveaux services
+
+Aucune donnée n’a été perdue : toutes les opérations critiques (utilisateurs, ordres, portefeuilles, MFA, audit) ont été migrées et vérifiées. Le système fonctionne désormais en mode microservices, avec une isolation stricte des domaines métier et une scalabilité accrue.
 
 ### 11.16 Testabilité
 
-Le projet contient des tests automatisés (JUnit) dans le dossier standard `src/test/java` d’un projet Maven. Les tests couvrent les services métier, les contrôleurs web et les entités principales. Les tests sont exécutés à chaque build Maven et ne doivent pas être ignorés.
+Chaque microservice BrokerX est couvert par des tests automatisés : les services métier, les contrôleurs REST et les entités principales sont testés via JUnit dans le dossier standard `src/test/java` de chaque projet Maven. Les tests d’intégration vérifient les interactions avec la base PostgreSQL dédiée, et des mocks sont utilisés pour les dépendances externes (SMTP, API Gateway).
+
+Le pipeline CI/CD exécute systématiquement tous les tests à chaque build Maven : aucune livraison n’est acceptée si les tests échouent. Les cas d’utilisation critiques (inscription, authentification MFA, dépôt, passage d’ordre, matching) sont systématiquement couverts par des scénarios de test, garantissant la robustesse et la non-régression du système.
+
+La couverture de test est mesurée et documentée : chaque microservice doit atteindre un seuil minimal de couverture sur les classes métier et les contrôleurs. Les tests facilitent la maintenance, l’évolution et la fiabilité de l’architecture microservices.
 
 ### 11.17 Gestion du build
 
-L’application se construit avec Maven sans dépendances externes hors Maven. Toutes les étapes (compilation, tests, packaging) sont automatisées via le pipeline CI/CD. Le build produit un JAR exécutable prêt à être déployé dans Docker.
+Le build de BrokerX est entièrement automatisé via Maven et le pipeline CI/CD défini dans les fichiers `ci.yml` et `cd.yml`. À chaque push ou pull request, le pipeline exécute les étapes suivantes :
+- Compilation des microservices Java/Spring Boot avec Maven (`mvn clean install`)
+- Exécution des tests unitaires et d’intégration : le build échoue si un test ne passe pas
+- Packaging des artefacts JAR pour chaque microservice
+- Construction des images Docker via `docker build`
+- Publication des images sur le registre Docker si les tests sont validés
+- Déploiement automatisé sur l’environnement cible (dev, staging, prod) via Docker Compose
+
+Les logs de build et de test sont archivés pour audit et traçabilité. Les dépendances sont gérées exclusivement via Maven et npm (pour le frontend React). Aucun artefact n’est livré si la qualité ou la couverture de test minimale n’est atteinte. Si tout passe, un artefact pour le build du projet ainsi qu'un artefact pour le rapport de tests sont générés et stockés.
+
+Cette organisation garantit la reproductibilité, la fiabilité et la rapidité des livraisons, tout en assurant la conformité aux exigences de qualité et de sécurité du projet BrokerX.
 
 ## 12. Décisions d'architecture
 
