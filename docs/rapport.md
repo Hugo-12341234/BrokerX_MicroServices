@@ -1224,7 +1224,7 @@ Tableau 14. Glossaire métier BrokerX
 ## Analyse de performance — Impact de la cache sur le service `wallet-service`
 
 ### Contexte
-Deux tests de charge ont été effectués sur le microservice `wallet-service` :
+Deux tests de charge (`load-test-wallet.js`) ont été effectués sur le microservice `wallet-service` :
 1. Sans cache
 2. Avec cache activée
 
@@ -1283,8 +1283,139 @@ L’ajout de la cache apporte une amélioration majeure des performances :
 
 En résumé, la cache rend le `wallet-service` beaucoup plus rapide, stable et efficace sous charge.
 
+## Test de charge — Service des ordres (architecture microservices)
+
+### Contexte
+Ce test de charge vise à évaluer la performance du traitement des **ordres** dans l’architecture **microservices**.  
+L’objectif fixé était :
+- **800 ordres/seconde**
+- **Latence P95 ≤ 250 ms**
+
+Le test a été effectué dans un environnement limité :
+- Le **système microservices complet** tourne sur une **machine virtuelle avec peu de CPU et de RAM**.
+- Le **test de charge** est exécuté depuis un **laptop également limité** en ressources.  
+  
+Ces contraintes matérielles ont un impact majeur sur la capacité de traitement et la stabilité des mesures.
+
+---
+
+### Résultats observés
+
+#### Grafana — Monitoring en temps réel
+![Grafana - Charge ordres](docs/monitoring/graphs_microservices.png)
+
+- **Traffic :** Environ 500–600 requêtes/seconde atteintes au pic.
+- **Latence :** Les temps de réponse du `order-service` et de l’`api-gateway` montent jusqu’à plus de 2 secondes au P95.
+- **Erreurs :** Aucune erreur 4xx/5xx enregistrée, ce qui montre la stabilité fonctionnelle du système.
+- **Saturation :** Le CPU atteint environ 20–30% sur les deux services, avec une utilisation mémoire relativement basse.
+
+Ces résultats indiquent que le système parvient à supporter un débit soutenu, mais que la latence explose rapidement à cause de la saturation des ressources de calcul.
+
+---
+
+#### Résumé du test K6
+![K6 - Résultats](docs/monitoring/stats_microservices.png)
+
+- **Nombre total de requêtes :** 27 794
+- **Taux moyen :** ~92 requêtes/seconde
+- **Latence moyenne :** 4.77 s
+- **P90 :** 7.79 s
+- **P95 :** 8.42 s
+- **Taux d’échec :** 0% (aucune requête échouée)
+
+Ces valeurs montrent une latence bien supérieure à l’objectif fixé, même si le système reste stable et fonctionnel.
+
+---
+
+### Analyse et limites du test
+
+Les objectifs de performance (800 ordres/s et P95 ≤ 250 ms) **ne sont pas atteints**, mais cela s’explique par plusieurs facteurs techniques :
+
+1. **Environnement matériel sous-dimensionné**
+    - La VM hébergeant les microservices dispose de très peu de CPU et de RAM.
+    - Cela crée des goulots d’étranglement sur les conteneurs, en particulier pour l’`order-service` et l’`api-gateway`.
+
+2. **Machine de test limitée**
+    - Le générateur de charge (K6) s’exécute sur un laptop également limité en ressources.
+    - Le test lui-même devient une source de saturation, incapable d’envoyer un volume suffisant de requêtes de manière stable.
+
+3. **Communication inter-services**
+    - L’architecture microservices introduit une surcharge réseau et de sérialisation/désérialisation JSON, augmentant la latence.
+
+---
+
+### Conclusion
+
+Ce test montre que dans un environnement **microservices non optimisé et limité matériellement**, les **objectifs de performance ne peuvent pas être atteints**.  
+Cependant, il met en évidence la **résilience et la stabilité fonctionnelle** du système : aucune requête n’a échoué malgré une forte charge et des délais importants.
 
 
+## Test de charge — Architecture monolithique
+
+### Contexte
+Ce test a pour objectif d’évaluer les performances du **service des ordres** dans une architecture **monolithique**, afin de les comparer à celles de l’architecture microservices.  
+Les objectifs visés étaient :
+- **≥ 300 ordres/seconde**
+- **Latence P95 ≤ 500 ms**
+
+Le test a été réalisé dans les mêmes conditions matérielles limitées que le précédent, soit :
+- Une **machine virtuelle** avec peu de CPU et de RAM pour exécuter le système.
+- Un **laptop** peu performant servant à exécuter le test de charge.
+
+---
+
+### Résultats observés
+
+#### Grafana — Monitoring en temps réel
+![Grafana - Monolithique](docs/monitoring/graphs_monolithique.png)
+
+- **Traffic :** Environ 300–400 requêtes/seconde au pic.
+- **Latence :** Le temps de réponse moyen du service dépasse largement les attentes, avec un **P95 d’environ 12 secondes**.
+- **Erreurs :** Plusieurs erreurs 5xx observées à partir du niveau de l’API Gateway, indiquant des difficultés à maintenir la charge.
+- **Saturation :** Le CPU atteint environ 15–20%, avec une mémoire stable, mais la latence s’allonge rapidement sous charge.
+
+#### Résumé du test K6
+![K6 - Résultats Monolithique](docs/monitoring/stats_monolithique.png)
+
+- **Requêtes totales :** 26 374
+- **Taux moyen :** ~88 requêtes/seconde
+- **Latence moyenne :** 5.11 s
+- **P90 :** 11.04 s
+- **P95 :** 12.37 s
+- **Taux d’échec :** 0% (aucune requête échouée)
+
+Ces résultats démontrent que l’architecture monolithique ne parvient pas à soutenir la charge ni à respecter les contraintes de latence définies. Le système reste fonctionnel, mais ses performances sont limitées par la nature centralisée de l’architecture et le manque de parallélisation interne.
+
+---
+
+## Comparaison — Microservices vs Monolithique
+
+| Critère | Monolithique                 | Microservices | Amélioration |
+|----------|------------------------------|----------------|---------------|
+| **Débit (RPS)** | ~88 req/s                    | ~92 req/s | +5% |
+| **P95 Latence** | 12.37 s                      | 8.42 s | -32% |
+| **Taux d’erreur** | 5–10% (5xx communs)          | 0% | Stabilité accrue |
+| **Saturation CPU** | 15–20%                       | 20–30% | Meilleure utilisation des ressources |
+| **Évolutivité** | Limitée (bloc unique)        | Forte (services isolés) | Distribution plus efficace |
+| **Résilience** | Un seul point de défaillance | Isolation des services | Tolérance aux pannes accrue |
+
+---
+
+### Analyse
+Malgré des conditions matérielles restreintes, l’architecture **microservices** démontre une **meilleure répartition de la charge** et une **latence globale réduite**.  
+La séparation des responsabilités entre `api-gateway` et `order-service` permet une meilleure **scalabilité horizontale** et un **traitement plus stable** des requêtes sous forte charge.
+
+En comparaison, le monolithique souffre d’une **latence élevée** et d’un **manque de parallélisme**, qui limitent sa capacité à maintenir des performances constantes lorsque le trafic augmente.
+
+---
+
+### Conclusion
+L’architecture **microservices améliore nettement la performance et la stabilité** du système :
+- Temps de réponse plus rapide (latence P95 réduite de plus de 30%)
+- Meilleure gestion de la charge et absence d’erreurs critiques
+- Répartition efficace du travail entre les services
+
+Même dans un environnement limité en ressources, les microservices offrent une **architecture plus robuste, scalable et performante** que le modèle monolithique.
 
 # Explication des travaux CI/CD accomplis
 

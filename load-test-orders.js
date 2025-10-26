@@ -57,11 +57,11 @@ function generateOrderData() {
 
   return {
     symbol: symbol,
-    side: isBuy ? 'ACHAT' : 'ACHAT', // CORRIGÉ: utiliser les enums français
+    side: isBuy ? 'ACHAT' : 'VENTE',
     quantity: quantity,
     price: 200.00, // Prix fixe à 150$ comme demandé
-    type: 'LIMITE', // CORRIGÉ: utiliser l'enum français
-    duration: 'FOK' // CORRIGÉ: utiliser l'enum français
+    type: 'LIMITE',
+    duration: 'FOK'
   };
 }
 

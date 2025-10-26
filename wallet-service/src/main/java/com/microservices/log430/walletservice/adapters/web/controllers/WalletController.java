@@ -38,9 +38,9 @@ public class WalletController {
      * Raison: Calculs complexes portefeuille + positions, appelé très fréquemment
      */
     @GetMapping("")
-//    @Cacheable(value = "walletCache",
-//               key = "#p0 != null ? T(java.lang.Long).valueOf(#p0) : 'no-user'",
-//               condition = "#p0 != null && !#p0.trim().isEmpty()")
+    @Cacheable(value = "walletCache",
+               key = "#p0 != null ? T(java.lang.Long).valueOf(#p0) : 'no-user'",
+               condition = "#p0 != null && !#p0.trim().isEmpty()")
     public ResponseEntity<?> getWallet(@RequestHeader("X-User-Id") String userIdHeader, HttpServletRequest httpRequest) {
         String path = httpRequest.getRequestURI();
         String requestId = httpRequest.getHeader("X-Request-Id");
