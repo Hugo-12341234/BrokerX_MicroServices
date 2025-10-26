@@ -1286,7 +1286,7 @@ En résumé, la cache rend le `wallet-service` beaucoup plus rapide, stable et e
 ## Test de charge — Service des ordres (architecture microservices)
 
 ### Contexte
-Ce test de charge vise à évaluer la performance du traitement des **ordres** dans l’architecture **microservices**.  
+Ce test de charge (`load-test-orders.js`) vise à évaluer la performance du traitement des **ordres** dans l’architecture **microservices**.  
 L’objectif fixé était :
 - **800 ordres/seconde**
 - **Latence P95 ≤ 250 ms**
@@ -1416,6 +1416,103 @@ L’architecture **microservices améliore nettement la performance et la stabil
 - Répartition efficace du travail entre les services
 
 Même dans un environnement limité en ressources, les microservices offrent une **architecture plus robuste, scalable et performante** que le modèle monolithique.
+
+## Test de charge — Évaluation du load balancer (NGINX)
+
+### Contexte
+Ces tests visent à évaluer la **scalabilité horizontale** du système via un **load balancer NGINX** distribuant les requêtes vers plusieurs instances du `order-service`.  
+Chaque test a été effectué avec le même scénario de charge, mais en variant le nombre d’instances : **1, 2, 3 et 4**.
+
+L’environnement de test reste fortement limité :
+- Le **load balancer et toutes les instances** tournent sur une **même machine virtuelle avec peu de CPU et de RAM**.
+- Le **goulot d’étranglement principal** demeure la base de données, avec plusieurs erreurs liées à la **concurrence d’accès**.
+
+Ces contraintes faussent partiellement les résultats — en conditions normales, sur plusieurs serveurs physiques, la montée en charge serait beaucoup plus efficace.
+
+---
+
+### Résultats — 1 instance
+![1 instance](docs/monitoring/graphs_1_instances.png)
+
+- **Débit :** Environ 100–150 requêtes/s au maximum.
+- **Latence :** Moyenne autour de 6–8 secondes.
+- **Erreurs :** Plusieurs erreurs 5xx apparaissent lorsque la charge augmente, liées à la saturation de la base.
+- **Saturation :** CPU entre 10% et 20%, mémoire stable autour de 10%.
+
+Avec une seule instance, le service répond de manière stable, mais la latence reste élevée, ce qui indique déjà une limite de traitement sur la machine.
+
+---
+
+### Résultats — 2 instances
+![2 instances](docs/monitoring/graphs_2_instances.png)
+
+- **Débit :** Environ 200 requêtes/s au pic.
+- **Latence :** Toujours autour de 6–8 secondes, sans amélioration notable.
+- **Erreurs :** Toujours présentes, mais plus dispersées dans le temps.
+- **Saturation :** CPU partagé entre les deux instances, entre 10% et 20%.
+
+L’ajout d’une deuxième instance ne réduit pas la latence, car les deux conteneurs partagent les mêmes ressources matérielles. Le gain théorique de parallélisme est annulé par la limite CPU globale de la VM.
+
+---
+
+### Résultats — 3 instances
+![3 instances](docs/monitoring/graphs_3_instances.png)
+
+- **Débit :** Autour de 250–300 requêtes/s au pic.
+- **Latence :** Explosion jusqu’à 20 secondes au P95.
+- **Erreurs :** Quelques pics d’erreurs 5xx liés à la concurrence, mais globalement plus stables.
+- **Saturation :** CPU autour de 10%, mais fortement contraint par la surcharge des processus.
+
+À trois instances, la latence augmente fortement. Le CPU semble ne pas suivre la montée en charge — il y a trop de processus concurrents pour les ressources disponibles.  
+En théorie, sur des machines distinctes, ce niveau d’instances devrait au contraire réduire la latence et améliorer le temps de réponse moyen.
+
+---
+
+### Résultats — 4 instances
+![4 instances](docs/monitoring/graphs_4_instances.png)
+
+- **Débit :** Environ 350–400 requêtes/s au pic.
+- **Latence :** Monte entre 25 et 30 secondes.
+- **Erreurs :** Légère hausse d’erreurs dues à la concurrence, mais aucune panne du service.
+- **Saturation :** CPU saturé, atteignant jusqu’à 60%, mémoire toujours stable.
+
+Avec quatre instances, la charge CPU devient critique. Les conteneurs se partagent les mêmes ressources, ce qui provoque une congestion et une explosion des temps de réponse.  
+Le load balancer répartit bien les requêtes, mais l’infrastructure monomachine empêche tout véritable gain de performance.
+
+---
+
+## Comparaison et analyse
+
+| Nombre d’instances | Débit max (RPS) | Latence P95 approx. | Erreurs | Utilisation CPU | Observations |
+|--------------------|-----------------|---------------------|----------|-----------------|---------------|
+| **1** | ~150 | ~6–8 s | Élevée | 10–20% | Bonne stabilité, latence constante mais haute |
+| **2** | ~200 | ~6–8 s | Moyenne | 10–20% | Aucune amélioration, ressources CPU partagées |
+| **3** | ~300 | ~20 s | Moyenne | ~10% | Latence explose, CPU insuffisant pour 3 conteneurs |
+| **4** | ~400 | ~25–30 s | Moyenne/élevée | ~60% | CPU saturé, contention extrême entre conteneurs |
+
+---
+
+### Interprétation
+
+En théorie, **l’ajout d’instances** devrait permettre une **meilleure parallélisation** et donc **une baisse de la latence**.  
+Cependant, dans ces tests :
+- Toutes les instances sont hébergées sur **la même machine**, ce qui **annule les bénéfices du scaling horizontal**.
+- La **latence augmente** avec le nombre d’instances, car les conteneurs se battent pour les mêmes ressources CPU.
+- La **base de données** devient rapidement un goulot d’étranglement, amplifiant les erreurs et les délais.
+
+Ainsi, les résultats ne reflètent pas la performance réelle d’un load balancing distribué, mais plutôt les **limites physiques de l’environnement local**.
+
+---
+
+### Conclusion
+
+Même si la latence augmente artificiellement dans ces tests, on observe :
+- Une **hausse linéaire du débit** avec le nombre d’instances.
+- Une **stabilité fonctionnelle** du système malgré la charge.
+- Une **bonne répartition** des requêtes par le load balancer.
+
+Dans un environnement réaliste, avec plusieurs serveurs physiques ou des conteneurs répartis sur plusieurs nœuds, cette architecture **offrirait une scalabilité horizontale efficace** :  
+les temps de réponse chuteraient significativement, et le système pourrait **gérer bien plus de requêtes sans dégradation majeure**.
 
 # Explication des travaux CI/CD accomplis
 
