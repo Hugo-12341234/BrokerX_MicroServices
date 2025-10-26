@@ -1221,6 +1221,71 @@ Tableau 14. Glossaire métier BrokerX
 
 # Fin de la documentation arc42
 
+## Analyse de performance — Impact de la cache sur le service `wallet-service`
+
+### Contexte
+Deux tests de charge ont été effectués sur le microservice `wallet-service` :
+1. Sans cache
+2. Avec cache activée
+
+Objectif : mesurer l’effet de la mise en cache sur les quatre signaux clés :
+- Traffic (RPS)
+- Latence
+- Erreurs (4xx/5xx)
+- Saturation (CPU/Mémoire)
+
+---
+
+### Résultats
+
+#### 1. Sans cache
+![Sans cache](docs/monitoring/graphs_without_cache.png)
+
+- **Traffic :** ≈ 400–500 req/s au pic
+- **Latence :** Moyenne autour de 200–300 ms, plus variable
+- **Erreurs :** Aucune erreur détectée
+- **Saturation :** CPU entre 30–50%, mémoire légèrement plus utilisée
+
+Le service montre une latence plus élevée et plus fluctuante, liée aux nombreux accès directs à la base de données.
+
+---
+
+#### 2. Avec cache
+![Avec cache](docs/monitoring/graphs_with_cache.png)
+
+- **Traffic :** ≈ 400–500 req/s, bien soutenu
+- **Latence :** 4–6 ms, très stable
+- **Erreurs :** Aucune erreur détectée
+- **Saturation :** CPU autour de 10%, mémoire faible (<5%)
+
+Avec cache, les temps de réponse chutent drastiquement et restent stables, la charge CPU et mémoire reste faible.
+
+---
+
+### Comparaison
+
+| Critère | Sans cache | Avec cache | Évolution |
+|----------|-------------|-------------|------------|
+| **Latence moyenne** | ~250 ms (variable) | 4–6 ms (stable) | Forte amélioration |
+| **Erreurs 4xx/5xx** | 0 req/s | 0 req/s | Aucun risque |
+| **CPU** | 30–50% | 5–10% | Réduction nette |
+| **Mémoire** | ~10% | <5% | Réduction |
+| **RPS** | 400–500 | 400–500 | Stable |
+
+---
+
+### Conclusion
+L’ajout de la cache apporte une amélioration majeure des performances :
+- Latence divisée par environ 50, avec une stabilité remarquable
+- Réduction de la charge CPU et mémoire
+- Aucune erreur détectée
+- Débit inchangé mais mieux soutenu
+
+En résumé, la cache rend le `wallet-service` beaucoup plus rapide, stable et efficace sous charge.
+
+
+
+
 # Explication des travaux CI/CD accomplis
 
 Le projet BrokerX intègre un pipeline CI/CD automatisé pour garantir la qualité et la fiabilité des livraisons. À chaque push ou pull request, le pipeline effectue les étapes suivantes :
