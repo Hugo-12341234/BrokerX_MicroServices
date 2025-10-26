@@ -21,6 +21,7 @@ export const options = {
         { duration: '30s', target: 400 },  // 400 VUs - plateau intermédiaire
         { duration: '30s', target: 600 },  // 600 VUs
         { duration: '30s', target: 800 }, // 800 VUs - cible principale
+        { duration: '30s', target: 1000 }, // Poussée finale à 1000 VUs
         { duration: '30s', target: 800 }, // Maintien à 800 VUs (stress test)
         { duration: '30s', target: 400 },  // Descente progressive
         { duration: '30s', target: 0 },    // Arrêt
@@ -56,11 +57,11 @@ function generateOrderData() {
 
   return {
     symbol: symbol,
-    side: isBuy ? 'ACHAT' : 'VENTE', // CORRIGÉ: utiliser les enums français
+    side: isBuy ? 'ACHAT' : 'ACHAT', // CORRIGÉ: utiliser les enums français
     quantity: quantity,
     price: 200.00, // Prix fixe à 150$ comme demandé
     type: 'LIMITE', // CORRIGÉ: utiliser l'enum français
-    duration: 'DAY' // CORRIGÉ: utiliser l'enum français
+    duration: 'FOK' // CORRIGÉ: utiliser l'enum français
   };
 }
 
@@ -99,7 +100,7 @@ export default function () {
   }
 
   // Petit délai pour simuler un comportement réaliste
-  sleep(Math.random() * 0.1); // 0-100ms de délai aléatoire
+  //sleep(Math.random() * 0.1); // 0-100ms de délai aléatoire
 }
 
 // Fonction de setup
