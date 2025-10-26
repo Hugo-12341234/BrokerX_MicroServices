@@ -5,12 +5,18 @@
 *** KYC obligatoire
 *** Chiffrement des données
 *** Journalisation des accès
+*** Gestion des secrets inter-services
+*** Sécurité des communications inter-services
 ** Performance
-*** Traitement des ordres < 500 ms (P95)
+*** Traitement des ordres < 250 ms (P95)
+*** Débit de 800 ordres/s
 *** Scalabilité
 ** Disponibilité
 *** Résilience aux pannes
 *** Acceptation des ordres même si un service externe est en panne
+*** Tolérance aux pannes inter-services
+*** Supervision centralisée (logs, métriques)
+*** Disponibilité de 95.5 %
 ** Maintenabilité
 *** Modularité
 *** Documentation
@@ -28,4 +34,3 @@
 *** Respect des standards financiers
 *** RGPD
 @endmindmap
-

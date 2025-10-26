@@ -1088,23 +1088,20 @@ L’arbre de qualité ci-dessous synthétise les principaux attributs de qualit�
 
 ### 13.2 Scénarios d’évaluation
 
-**Testabilité / Couverture**
-- L’utilisation de JaCoCo pendant le développement et dans le pipeline CI/CD doit garantir un taux de couverture de code d’au moins 95 % sur les classes métier critiques (services, contrôleurs, entités).
+**Performance / Traitement des ordres**
+- Le système doit traiter un ordre d’achat ou de vente en moins de 250 ms (P95) et supporter un débit de 800 ordres/seconde. Des tests de performance automatisés doivent valider ces critères (tests de charge avec k6).
 
-**Testabilité / Indépendance des services externes**
-- L’architecture doit permettre de tester toute logique métier dépendant de services externes (ex : envoi d’e-mails, accès base de données, fournisseurs de données de marché) sans avoir besoin de ces services réels. Toutes les dépendances externes doivent être mockables via des interfaces ou des adapters.
-
-*Exemple :*
-- Le service d’envoi de codes MFA utilise une interface EmailProvider. Lors des tests, un mock de cette interface permet de valider la logique métier sans connexion SMTP réelle.
+**Disponibilité / Résilience**
+- Le système doit garantir une disponibilité de 95.5 %. En cas de panne d’un composant non critique (ex : service d’e-mail), le système doit continuer à accepter les ordres et journaliser l’incident. Des scénarios de test doivent simuler la défaillance de chaque dépendance externe.
 
 **Sécurité / MFA et KYC**
 - Toute tentative d’accès à une ressource protégée sans authentification MFA ou sans vérification KYC doit être bloquée et journalisée. Les tests automatisés doivent couvrir ces scénarios d’accès non autorisé.
 
-**Performance / Traitement des ordres**
-- Le système doit traiter un ordre d’achat ou de vente en moins de 500 ms (P95) même sous charge. Des tests de performance automatisés doivent valider ce critère.
+**Testabilité / Couverture**
+- L’utilisation de JaCoCo dans le pipeline CI/CD doit garantir un taux de couverture de code d’au moins 95 % sur les classes métier critiques (services, contrôleurs, entités).
 
-**Disponibilité / Résilience**
-- En cas de panne d’un composant non critique (ex : service d’e-mail), le système doit continuer à accepter les ordres et journaliser l’incident. Des scénarios de test doivent simuler la défaillance de chaque dépendance externe.
+**Testabilité / Indépendance des services externes**
+- Toute logique métier dépendant de services externes (ex : envoi d’e-mails, accès base de données, fournisseurs de données de marché) doit être testable sans ces services réels, via des mocks ou des adapters.
 
 **Maintenabilité / Évolutivité**
 - L’ajout d’un nouveau type d’ordre ou d’un nouveau service externe doit pouvoir se faire sans modification majeure du domaine métier. Des tests d’intégration valident la non-régression lors de l’ajout de nouvelles fonctionnalités.
@@ -1114,16 +1111,39 @@ L’arbre de qualité ci-dessous synthétise les principaux attributs de qualit�
 
 ## 14. Risques Techniques
 
-BrokerX a été conçu selon des standards éprouvés et bénéficie d’une architecture robuste, éprouvée en environnement de développement et de test. À ce jour, aucune faille technique majeure n’a été identifiée pour les scénarios d’utilisation prévus.
+La migration vers une architecture microservices apporte de nouveaux risques techniques, en plus des risques classiques :
 
-Cependant, certains risques techniques subsistent :
+**1. Complexité de l’orchestration et du monitoring**
+- La gestion de plusieurs microservices indépendants nécessite une orchestration fine (Docker Compose, CI/CD), un monitoring centralisé (Prometheus, Grafana) et une supervision des logs. Un défaut de configuration peut entraîner des pannes difficiles à diagnostiquer.
 
-- **Risque de corruption de la base PostgreSQL** en cas d’arrêt brutal du serveur (panne matérielle, crash OS, coupure électrique). Ce risque est atténué par l’utilisation de volumes Docker persistants et la mise en place de sauvegardes régulières de la base de données.
-- **Dépendance à des services externes (SMTP, fournisseurs de données de marché)** : une indisponibilité temporaire de ces services peut impacter certaines fonctionnalités (ex : envoi de codes MFA, notifications). L’architecture prévoit une gestion de la résilience : les ordres et opérations critiques restent acceptés et journalisés même en cas de panne d’un service externe.
-- **Montée en charge** : si le nombre d’utilisateurs ou le volume d’ordres croît très rapidement, des ajustements d’infrastructure (scaling, tuning PostgreSQL, optimisation du code) pourraient être nécessaires. Des tests de charge réguliers et une surveillance proactive permettent d’anticiper ce risque.
-- **Sécurité** : bien que l’authentification MFA, le KYC et le chiffrement soient en place, le risque d’attaque (phishing, brute force, faille 0-day) ne peut jamais être totalement éliminé.
+**2. Cohérence des données et absence de transactions distribuées**
+- Chaque microservice possède sa propre base PostgreSQL : il n’existe pas de transaction globale entre services. Un échec partiel lors d’une opération multi-service (ex : dépôt + ordre) peut générer des incohérences métier.
 
-En résumé, les principaux risques techniques sont identifiés, documentés et font l’objet de mesures de mitigation adaptées à la criticité de BrokerX.
+**3. Risque de latence et de surcharge réseau**
+- Les appels inter-services via API REST augmentent la latence et la charge réseau, surtout en cas de forte sollicitation (800 ordres/s). Un monitoring précis du throughput et des temps de réponse est nécessaire.
+
+**4. Disponibilité et tolérance aux pannes**
+- La disponibilité globale dépend de la résilience de chaque microservice et du load balancer (NGINX). Une panne du gateway ou du load balancer peut rendre l’ensemble du système indisponible.
+
+**5. Sécurité et gestion des tokens**
+- La gestion des tokens JWT et MFA doit être synchronisée entre les services. Une faille dans la validation ou la propagation des tokens peut exposer des endpoints sensibles.
+
+**6. Testabilité et mocks**
+- Les dépendances externes (SMTP, fournisseurs de données de marché) doivent être systématiquement mockées pour garantir la testabilité. Un défaut de mock peut fausser les résultats des tests automatisés.
+
+**7. Migration et gestion des versions**
+- La migration du monolithe vers les microservices, ainsi que le versionnage des APIs, peut générer des incompatibilités ou des pertes de données si les scripts Flyway ou les contrats d’API ne sont pas synchronisés.
+
+**8. Scalabilité et gestion du cache**
+- L’utilisation d’un cache in-memory (Caffeine) par instance peut entraîner des problèmes de données obsolètes (stale) ou de surconsommation mémoire si la configuration n’est pas maîtrisée.
+
+**9. Conformité et audit**
+- La journalisation des actions critiques doit être fiable et centralisée. Un défaut d’audit ou une perte de logs peut compromettre la conformité réglementaire (KYC, AML).
+
+**10. Risque d’erreurs de configuration**
+- Les propriétés sensibles (JWT, SMTP, DB) sont injectées via variables d’environnement Docker. Une erreur de configuration peut exposer le système ou empêcher le démarrage des services.
+
+Ces risques doivent être anticipés par des tests d’intégration, une supervision active, une documentation rigoureuse et des procédures de rollback en cas d’incident.
 
 ## 15. Glossaire
 
@@ -1161,4 +1181,20 @@ Tableau 14. Glossaire métier BrokerX
 | Description        | Texte explicatif associé à une transaction ou un ordre.                                           |
 | Timestamp          | Date et heure d’enregistrement d’une opération ou d’un ordre.                                     |
 | PreTradeValidation | Contrôle métier effectué avant l’acceptation d’un ordre (pouvoir d’achat, règles de prix, tick size, bande de prix, quantité, etc.). |
+| Microservice       | Service indépendant dédié à un domaine métier, déployé dans son propre conteneur et base de données. |
+| API Gateway        | Point d’entrée unique du système, centralise le routage, la sécurité et la documentation des APIs.    |
+| Load Balancer      | Composant (ex : NGINX) qui répartit la charge entre les instances des microservices.                  |
+| Matching           | Processus d’appariement des ordres d’achat et de vente selon les règles métier.                       |
+| Matching-Service   | Microservice dédié à la gestion du carnet d’ordres et à l’exécution des appariements.                 |
+| OrderBook          | Carnet d’ordres, structure regroupant les ordres en attente d’exécution pour un actif donné.          |
+| ExecutionReport    | Rapport d’exécution généré lors de l’appariement d’ordres, contenant les détails de la transaction.   |
+| Caffeine           | Solution de cache in-memory utilisée pour optimiser la performance des endpoints critiques.           |
+| Flyway             | Outil de migration de schéma de base de données, utilisé indépendamment par chaque microservice.      |
+| Prometheus         | Outil de monitoring des métriques techniques et métier.                                               |
+| Grafana            | Outil de visualisation des métriques et logs du système.                                              |
+| Audit append-only  | Journalisation immuable des actions critiques pour la conformité et la traçabilité.                   |
+| Docker Compose     | Outil d’orchestration des conteneurs pour le déploiement des microservices.                           |
+| Idempotence        | Propriété garantissant qu’une opération répétée n’a pas d’effet supplémentaire.                       |
+| Stateless          | Qualifie une API ou un service qui ne conserve pas d’état de session côté serveur.                    |
+
 
