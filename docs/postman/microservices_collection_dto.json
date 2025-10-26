@@ -1,0 +1,263 @@
+{
+  "info": {
+    "name": "Microservices API Collection (with DTO bodies)",
+    "_postman_id": "9cb35c8c-8f6a-4e42-b6dd-f8ebfcf520c1",
+    "description": "Collection Postman avec corps de requ\u00eates bas\u00e9s sur les DTOs fournis.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth Service",
+      "item": [
+        {
+          "name": "Auth Controller",
+          "item": [
+            {
+              "name": "Login",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "http://localhost:8079/api/v1/auth/login",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Verify MFA",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "http://localhost:8079/api/v1/auth/verify-mfa",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"challengeId\": \"123456\",\n  \"code\": \"987654\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Logout",
+              "request": {
+                "method": "POST",
+                "url": "http://localhost:8079/api/v1/auth/logout"
+              }
+            }
+          ]
+        },
+        {
+          "name": "User Controller",
+          "item": [
+            {
+              "name": "Register User",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "http://localhost:8079/api/v1/users/register",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"newuser@example.com\",\n  \"password\": \"password123\",\n  \"name\": \"Jean Dupont\",\n  \"adresse\": \"123 Rue Principale, Montr\\u00e9al\",\n  \"dateDeNaissance\": \"1990-05-10\"\n}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "User Verification Controller",
+          "item": [
+            {
+              "name": "Verify User",
+              "request": {
+                "method": "GET",
+                "url": "http://localhost:8079/api/v1/verify?token=EXAMPLE_TOKEN"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Matching Service",
+      "item": [
+        {
+          "name": "OrderBook Controller",
+          "item": [
+            {
+              "name": "Match Order",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "http://localhost:8079/api/v1/orderbook",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"id\": 1,\n  \"clientOrderId\": \"ORD-2024-001\",\n  \"userId\": 1,\n  \"symbol\": \"AAPL\",\n  \"side\": \"ACHAT\",\n  \"type\": \"LIMITE\\u00c9\",\n  \"quantity\": 10,\n  \"price\": 150.0,\n  \"duration\": \"DAY\",\n  \"timestamp\": \"2024-10-25T10:00:00Z\",\n  \"status\": \"WORKING\",\n  \"rejectReason\": null\n}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Debug Controller",
+          "item": [
+            {
+              "name": "Create Seed Orders",
+              "request": {
+                "method": "POST",
+                "url": "http://localhost:8079/api/v1/debug/bookorder/seed-orders"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Order Service",
+      "item": [
+        {
+          "name": "Order Controller",
+          "item": [
+            {
+              "name": "Place Order",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-User-Id",
+                    "value": "1"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "abc-12345"
+                  }
+                ],
+                "url": "http://localhost:8079/api/v1/orders/place",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"symbol\": \"AAPL\",\n  \"side\": \"ACHAT\",\n  \"type\": \"LIMITE\\u00c9\",\n  \"quantity\": 10,\n  \"price\": 150.0,\n  \"duration\": \"DAY\"\n}"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Wallet Service",
+      "item": [
+        {
+          "name": "Wallet Controller",
+          "item": [
+            {
+              "name": "Get Wallet",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-User-Id",
+                    "value": "1"
+                  }
+                ],
+                "url": "http://localhost:8079/api/v1/wallet"
+              }
+            },
+            {
+              "name": "Deposit",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-User-Id",
+                    "value": "1"
+                  }
+                ],
+                "url": "http://localhost:8079/api/v1/wallet/deposit",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"amount\": 1000.0\n}"
+                }
+              }
+            },
+            {
+              "name": "Get Stock By Symbol",
+              "request": {
+                "method": "GET",
+                "url": "http://localhost:8079/api/v1/wallet/stock?symbol=AAPL"
+              }
+            },
+            {
+              "name": "Update Wallet",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "http://localhost:8079/api/v1/wallet/update",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": 1,\n  \"symbol\": \"AAPL\",\n  \"quantityChange\": 5,\n  \"amountChange\": -750.0\n}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cache Debug Controller",
+          "item": [
+            {
+              "name": "Get Cache Contents",
+              "request": {
+                "method": "GET",
+                "url": "http://localhost:8079/api/v1/debug/cache?cacheName=walletCache"
+              }
+            },
+            {
+              "name": "Clear Cache",
+              "request": {
+                "method": "DELETE",
+                "url": "http://localhost:8079/api/v1/debug/cache?cacheName=walletCache"
+              }
+            },
+            {
+              "name": "Get Cache Info",
+              "request": {
+                "method": "GET",
+                "url": "http://localhost:8079/api/v1/debug/cache/info"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
