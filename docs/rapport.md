@@ -1641,29 +1641,42 @@ Le load balancer NGINX répartira le trafic entre les instances.
   - Puis, cliquez sur `Dashboards`, puis sur `BrokerX - 4 Golden Signals Dashboard`. Ce dashboard est le principal qui contient toues les informations voulues.
 ![Grafana](docs/grafana.png)
 
-## 6. Arrêt de l’application
+## 7. Arrêt de l’application
 Pour arrêter tous les services :
 ```
 docker-compose down
 ```
 
-## 7. Nettoyage (optionnel)
+## 8. Nettoyage (optionnel)
 Pour supprimer les volumes de données (attention, cela efface toutes les données persistées) :
 ```
 docker-compose down -v
 ```
 
-## 8. Problèmes fréquents
+## 9. Problèmes fréquents
 - **Port déjà utilisé** : Modifiez le port dans `docker-compose.yml` ou arrêtez l’application qui utilise déjà le port 8090 ou 5432.
 - **Erreur de build** : Vérifiez que Docker fonctionne, que vous avez bien extrait tous les fichiers, et relancez la commande.
 - **Problème d’accès à la base** : Attendez quelques secondes après le démarrage, la base peut mettre un peu de temps à être prête.
 
-## 9. Pour rouler les tests en local
+## 10. Pour rouler les tests en local
 - **Depuis l'IDE** :
     1. Ouvrez un terminal.
     2. Placez-vous dans le dossier du microservice à tester (ex : `cd order-service`).
     3. Lancez les tests avec `mvn test` ou `.\mvnw.cmd test`.
     4. Répétez l'opération pour chaque microservice.
+
+## 11. Pour exécuter les tests de charge sur les ordres avec K6
+- Assurez-vous que Docker est en cours d’exécution et que tous les services sont lancés (voir section 4).
+- Ouvrez un terminal dans le dossier racine du projet.
+- Exécutez la commande suivante pour bien setup le tests de charge K6 : `.\setup-load-test-data.bat`
+- Ensuite, lancez le test de charge avec : `.\run-load-test.bat`
+- Les résultats s’affichent dans le terminal et sont également envoyés à Prometheus/Grafana pour analyse.
+- Pour nettoyer les données de test après exécution : `.\cleanup-load-test-data.bat`
+
+## 12. Pour exécuter les tests de charge sur le portefeuille avec K6
+- Assurez-vous que Docker est en cours d’exécution et que tous les services sont lancés (voir section 4).
+- Ouvrez un terminal dans le dossier racine du projet.
+- Exécutez la commande suivante pour lancer le tests de charge K6 : `k6 run load-test-wallet.js`
 
 # Guide de démonstration BrokerX
 
