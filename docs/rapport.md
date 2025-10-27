@@ -1514,25 +1514,49 @@ Même si la latence augmente artificiellement dans ces tests, on observe :
 Dans un environnement réaliste, avec plusieurs serveurs physiques ou des conteneurs répartis sur plusieurs nœuds, cette architecture **offrirait une scalabilité horizontale efficace** :  
 les temps de réponse chuteraient significativement, et le système pourrait **gérer bien plus de requêtes sans dégradation majeure**.
 
-# Explication des travaux CI/CD accomplis
+## Explication des travaux CI/CD accomplis
 
-Le projet BrokerX intègre un pipeline CI/CD automatisé pour garantir la qualité et la fiabilité des livraisons. À chaque push ou pull request, le pipeline effectue les étapes suivantes :
+Le projet BrokerX utilise une chaîne CI/CD automatisée basée sur GitHub Actions, avec deux pipelines principaux :
 
-- **Compilation du code** avec Maven
-- **Exécution de la pyramide de tests**
-- **Vérification du style et de la qualité du code**
-- **Construction de l’image Docker** de l’application
-- **Déploiement automatique** sur la machine virtuelle
+- **CI (Intégration Continue)** : vérifie le style du code (Checkstyle), compile les microservices Java/Spring Boot avec Maven, exécute tous les tests (unitaires, intégration, E2E) avec PostgreSQL en service Docker, et archive les artefacts JAR et les rapports de tests à chaque push ou pull request sur `master` ou `main`.
+- **CD (Déploiement Continu)** : déploie automatiquement l’application sur la machine virtuelle dès qu’un push est effectué sur `master`. Le pipeline nettoie l’espace de travail, récupère le code, arrête les conteneurs existants, reconstruit et relance les services Docker Compose, vérifie l’état des conteneurs, affiche les logs en cas d’échec, effectue un rollback si besoin, et résume le déploiement.
 
-Chaque étape est validée avant de passer à la suivante, ce qui permet de détecter rapidement les erreurs et d’assurer la stabilité du projet. Les résultats des pipelines sont consultables dans GitHub, mais comme vous n’y avez pas accès directement, voici quelques captures d’écran illustrant les exécutions :
+### Détail du pipeline CI (`.github/workflows/ci.yml`)
+
+- **Linting** : vérification du style Java avec Checkstyle.
+- **Build** : compilation Maven, génération des JAR, archivage des artefacts.
+- **Tests** : exécution des tests unitaires, d’intégration et E2E, avec PostgreSQL en service Docker. Les rapports de tests sont archivés.
+
+### Détail du pipeline CD (`.github/workflows/cd.yml`)
+
+- **Nettoyage de l’espace de travail** sur la VM.
+- **Récupération du code** (checkout).
+- **Arrêt des conteneurs existants**.
+- **Déploiement** : build Docker Compose sans cache, lancement des services en arrière-plan.
+- **Vérification du déploiement** : contrôle de l’état des conteneurs, affichage des logs en cas d’échec.
+- **Rollback automatique** si le déploiement échoue.
+- **Résumé du déploiement** en cas de succès.
+
+### Visualisation des pipelines
+
+Les résultats et l’état des pipelines sont illustrés par les captures suivantes :
 
 - ![Pipeline CI réussi](./CI.png)
+- ![Pipeline CI tests réussis](./CI_tests.png)
 - ![Pipeline CD réussi](./CD.png)
 - ![Verifiy Deploy réussi](./CD_Deploy.png)
 
-Ces automatisations assurent que chaque modification du code est testée, validée et déployée, ce qui renforce la fiabilité et la rapidité des livraisons sur BrokerX.
+Cette automatisation garantit que chaque modification du code est testée, validée et déployée de façon fiable et reproductible sur BrokerX.
 
-*note : Le déploiement automatique est fait par la pipeline CD sur GitHub Actions grâce à un runner "self-hosted" que j'ai créé sur la VM. C'est à dire que dès qu'un push est effectué sur cette branche, l'application est redéployée automatiquement sur la VM. Si vous n'avez pas accès à la pipeline GitHub, veuillez regardez les captures d'écran comme preuves de ce processus.*
+### Stratégie de tests automatisés
+
+La stratégie de tests de BrokerX repose sur une **pyramide de tests** pour garantir la robustesse et la fiabilité du système :
+
+- **Tests unitaires** : chaque fonction critique du domaine métier est couverte par des tests unitaires (JUnit). Ces tests valident la logique métier isolée, sans dépendance externe, et assurent la non-régression sur les règles fondamentales.
+- **Tests d’intégration** : tous les contrôleurs REST de chaque microservice sont testés avec **Testcontainers** et une base PostgreSQL dédiée. Ces tests vérifient la communication intra-microservices, la persistance, et la conformité des APIs, en simulant un environnement réel.
+- **Tests E2E (End-to-End)** : chaque microservice dispose d’un scénario E2E qui valide le fonctionnement complet du flow métier. Les réponses des autres services sont mockées pour isoler le service testé et garantir la stabilité des scénarios.
+
+Cette pyramide de tests permet de détecter rapidement les régressions, d’assurer la qualité du code et de valider l’intégration entre les composants. Tous les tests sont exécutés automatiquement dans le pipeline CI/CD à chaque livraison.
 
 # Guide d'exploitation (Runbook)
 
