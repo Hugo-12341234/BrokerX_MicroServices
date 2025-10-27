@@ -1619,16 +1619,27 @@ Ceci marche pour chacun des 4 microservices (auth-service, matching-service, ord
 Le load balancer NGINX répartira le trafic entre les instances.
 
 ## 5. Vérification du bon fonctionnement
-- Faites un health check à [http://localhost:8090/actuator/health](http://localhost:8090/actuator/health)
-- Accédez à l’interface web : [http://localhost:8090](http://localhost:8090)
+- Faites un health check pour le gateway à [http://localhost:8079/actuator/health](http://localhost:8079/actuator/health)
+- Accédez à l’interface web : [http://localhost:3000](http://localhost:3000)
 - Vérifiez que la page d’accueil s’affiche.
 - Pour consulter les logs de l’application :
   ```
-  docker logs brokerx-app
+  docker logs [nom du container]
   ```
   (le nom du conteneur peut varier, vérifiez avec `docker ps`)
 - Pour vérifier la base de données :
-    - Utilisez un outil comme DBeaver ou TablePlus, ou connectez-vous en ligne de commande avec psql sur le port 5432 (voir `docker-compose.yml` pour les identifiants).
+    - Utilisez un outil comme DBeaver ou TablePlus, ou connectez-vous en ligne de commande avec psql (voir `docker-compose.yml` pour les identifiants).
+
+## 6. Utilisation de tous les services
+
+- **Swagger API Documentation** pour voir tous les endpoints disponibles : [http://localhost:8085](http://localhost:8085)
+![Swagger](docs/swagger.png)
+- **Prometheus** pour le monitoring des métriques : [http://localhost:8090](http://localhost:8090)
+![Prometheus](docs/prometheus.png)
+- **Grafana** pour visualiser les dashboards : [http://localhost:3001](http://localhost:3001)  
+  - Identifiants par défaut : `admin` / `admin`. Veuillez entrez ces informations, puis cliquer sur Skip lorsque l'on vous demande de changer le mot de passe.
+  - Puis, cliquez sur `Dashboards`, puis sur `BrokerX - 4 Golden Signals Dashboard`. Ce dashboard est le principal qui contient toues les informations voulues.
+![Grafana](docs/grafana.png)
 
 ## 6. Arrêt de l’application
 Pour arrêter tous les services :
@@ -1649,12 +1660,10 @@ docker-compose down -v
 
 ## 9. Pour rouler les tests en local
 - **Depuis l'IDE** :
-    1. Assurez-vous que les conteneurs Docker sont en marche.
-    2. Ouvrez votre fichier `application-prod.properties` et remplacez la ligne `spring.datasource.url=jdbc:postgresql://database:5432/brokerx` par `spring.datasource.url=jdbc:postgresql://localhost:5432/brokerx`.
-    3. Allez dans le fichier BrokerXTradingWorkflowE2E.java et assurez vous que la ligne @ActiveProfile("prod") n'est pas commentée.
-    4. Ouvrez votre terminal au dossier root du projet.
-    5. Assurez-vous d'avoir maven installé, puis faites `mvn test` ou `.\mvnw.cmd test`.
-    6. Si vous avez des problèmes de dépendances, faites `mvn clean install` ou `.\mvnw.cmd clean install` avant de relancer les tests.
+    1. Ouvrez un terminal.
+    2. Placez-vous dans le dossier du microservice à tester (ex : `cd order-service`).
+    3. Lancez les tests avec `mvn test` ou `.\mvnw.cmd test`.
+    4. Répétez l'opération pour chaque microservice.
 
 # Guide de démonstration BrokerX
 
