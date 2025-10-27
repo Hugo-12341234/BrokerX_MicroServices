@@ -1565,6 +1565,8 @@ Ce guide explique comment installer, configurer, lancer et tester BrokerX à par
 ## Prérequis
 - **Docker** (https://www.docker.com/products/docker-desktop) installé et fonctionnel (Windows, Mac ou Linux)
 - **Docker Compose** (inclus dans Docker Desktop)
+- Node.js 18+ et npm (pour le frontend React)
+- Java 17+ (pour les microservices Spring Boot)
 - Un éditeur de texte ou IDE pour consulter les fichiers
 
 ## 1. Récupération du projet
@@ -1579,15 +1581,23 @@ Ce guide explique comment installer, configurer, lancer et tester BrokerX à par
     2. Ouvrir le dossier du projet cloné dans l'IDE de votre choix (IntelliJ est recommandé)
 
 ## 2. Structure attendue du projet
-Vérifiez que vous avez bien les fichiers suivants à la racine du dossier :
-- `docker-compose.yml`
-- `Dockerfile`
-- `pom.xml`
-- `src/` (code source)
+Vérifiez que vous avez bien les dossiers et fichiers suivants à la racine du dossier :
+- `.github/` (CI/CD)
+- `api-gateway/`
+- `auth-service/`
 - `docs/` (documentation)
+- `frontend/` (React)
+- `matching-service/`
+- `monitoring`
+- `nginx`
+- `order-service/`
+- `wallet-service/`
+- `docker-compose.yml`
+- `pom.xml`
+- `run-load-test.bat`
 
 ## 3. Configuration (optionnelle)
-Par défaut, aucune modification n’est nécessaire. Les mots de passe, ports et variables sont déjà configurés pour un usage avec Docker. Assurez-vous d'avoir un fichier `application-prod.properties` ainsi qu'un fichier `application.properties`.
+Par défaut, aucune modification n’est nécessaire. Les mots de passe, ports et variables sont déjà configurés pour un usage avec Docker. Assurez-vous d'avoir un fichier `application-docker.properties` ainsi qu'un fichier `application.properties` dans chaque microservice.
 
 ## 4. Construction et lancement de l’application
 Assurez-vous que votre Docker Desktop est ouvert, ouvrez un terminal dans le dossier racine du projet, puis exécutez :
@@ -1596,8 +1606,17 @@ Assurez-vous que votre Docker Desktop est ouvert, ouvrez un terminal dans le dos
 docker-compose up --build -d
 ```
 
-- Cette commande construit l’image Docker de l’application (si nécessaire) et démarre tous les services (application Java, base PostgreSQL).
-- L’option `-d` lance les conteneurs en arrière-plan.
+Tous les microservices (auth-service, wallet-service, order-service, matching-service), l’API Gateway, PostgreSQL, Swagger, NGINX, Prometheus et Grafana sont lancés en arrière-plan
+
+Pour démarrer plusieurs instances d’un microservice (ex : order-service) :
+
+```
+docker compose up --scale order-service=3 -d
+```
+
+Ceci marche pour chacun des 4 microservices (auth-service, matching-service, order-service, wallet-service), mais il est plus pertinent pour le order-service dans le contexte de notre projet.
+
+Le load balancer NGINX répartira le trafic entre les instances.
 
 ## 5. Vérification du bon fonctionnement
 - Faites un health check à [http://localhost:8090/actuator/health](http://localhost:8090/actuator/health)
