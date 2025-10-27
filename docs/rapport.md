@@ -1686,7 +1686,7 @@ Ce guide explique comment réaliser chaque fonctionnalité principale de BrokerX
 
 ## 1. Inscription & Vérification d’identité (UC-01)
 
-1. Ouvrez l’application à l’adresse [http://localhost:8090](http://localhost:8090).
+1. Ouvrez l’application à l’adresse [http://localhost:3000](http://localhost:3000).
 2. Remplissez le formulaire : email, mot de passe, nom, adresse, date de naissance. (N'oubliez pas votre mot de passe)
 3. Cliquez sur “S’inscrire”. Un message apparaît : “Vérifiez votre e-mail pour activer votre compte”.
 4. Consultez votre boîte e-mail : ouvrez le message de vérification et cliquez sur le lien reçu. (Regardez dans les spams si nécessaire)
@@ -1706,9 +1706,9 @@ Ce guide explique comment réaliser chaque fonctionnalité principale de BrokerX
 
 ## 3. Dépôt dans le portefeuille (UC-03)
 
-1. Une fois connecté, accédez à la section “Portefeuille”.
-2. Indiquez le montant à déposer (veuillez respecter les montants minimum et maximum inscrits).
-3. Cliquez sur "Effectuer le dépôt".
+1. Une fois connecté, accédez à votre dashboard.
+2. Indiquez le montant à déposer dans la boîte prévue à cet effet (veuillez respecter les montants minimum et maximum de 10\$ et 50 000\$).
+3. Cliquez sur "Déposer".
 4. Le solde de votre portefeuille est mis à jour.
 
 ---
@@ -1716,21 +1716,28 @@ Ce guide explique comment réaliser chaque fonctionnalité principale de BrokerX
 ## 4. Placement d’un ordre (UC-05)
 
 1. Cliquez sur le bouton "Placer un ordre".
-2. Lisez bien les instructions vous informant des règles de placement d’ordre (ex. : Seulement TEST est permis comme symbole).
-3. Choisissez le type d’ordre (Marché ou Limite), la quantité, et le prix si nécessaire.
-4. Cliquez sur "Placer l'ordre".
-5. Un message de confirmation s’affiche : “Ordre placé avec succès” ou un message d’erreur si l’ordre est rejeté (ex : fonds insuffisants, tick size non respecté).
+2. Choisissez le symbole, le type d’ordre (Marché ou Limite), le côté (Achat ou Vente), la quantité, la durée et le prix si nécessaire.
+3. Cliquez sur "Placer l'ordre".
+4. Un message de confirmation s’affiche : “Ordre placé avec succès” ou un message d’erreur si l’ordre est rejeté (ex : fonds insuffisants, tick size non respecté).
 
 ---
 
-## 5. Déconnexion
+## 5. Appariement d’un ordre (UC-07)
 
-- Cliquez sur “Déconnexion” pour quitter votre session en toute sécurité.
+1. Dans votre dashboard, cliquez sur le bouton "Créer 4 Ordres Seed" pour générer des ordres de vente et obtenir un matching.
+2. Effectuez les mêmes étapes que pour le placement d’un ordre (voir section 4) pour créer un ordre d’achat correspondant.
+3. Si un ordre correspondant est trouvé, un message de confirmation s’affiche : `Ordre accepté !
+   ID: 148075
+   Statut: ACCEPTE
+   Détails:
+   Ordre DAY entièrement exécuté : 1 fulfilled. Exécutions: Deal: 1 AAPL @ 100.00 entre acheteur 1 et vendeur 9999`
+![Ordre apparié](docs/matching_success.png)
+4. Cliquez sur "Retour au dashboard" et observez que votre solde de portefeuille a changé et que vous avez un stock_position de plus.
 
 ---
 
 **Remarques :**
-- Si vous voulez tester le token, fermez votre onglet, puis réouvrez une onglet et tapez l'url [http://localhost:8090/auth/dashboard](http://localhost:8090/auth/dashboard). Vous aurez directement accès sans avoir à vous reconnecter.
+- Si vous voulez tester le token, fermez votre onglet, puis réouvrez une onglet et tapez l'url [http://localhost:3000/dashboard](http://localhost:3000/dashboard). Vous aurez directement accès sans avoir à vous reconnecter.
 - Toutes les opérations sensibles nécessitent un compte actif et une authentification MFA.
 - En cas d’erreur (mot de passe incorrect, code MFA expiré, fonds insuffisants…), un message explicatif s’affiche à l’écran.
 - Les notifications importantes (vérification, MFA, confirmation) sont envoyées par e-mail.
