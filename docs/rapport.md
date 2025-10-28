@@ -1,3 +1,5 @@
+[TOC]
+
 # Début de la documentation arc42
 
 # 1. Introduction & Objectifs
