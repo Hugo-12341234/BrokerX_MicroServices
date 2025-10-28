@@ -1472,7 +1472,7 @@ L’ajout de la cache apporte une amélioration majeure des performances :
 
 En résumé, la cache rend le `wallet-service` beaucoup plus rapide, stable et efficace sous charge.
 
-## Test de charge — Service des ordres (architecture microservices)
+## Test de charge — Service des ordres (architecture microservices avec gateway)
 
 ### Contexte
 Ce test de charge (`load-test-orders.js`) vise à évaluer la performance du traitement des **ordres** dans l’architecture **microservices**.  
@@ -1539,7 +1539,7 @@ Ce test montre que dans un environnement **microservices non optimisé et limit�
 Cependant, il met en évidence la **résilience et la stabilité fonctionnelle** du système : aucune requête n’a échoué malgré une forte charge et des délais importants.
 
 
-## Test de charge — Architecture monolithique
+## Test de charge — Appels direct avec architecture monolithique (A/B direct)
 
 ### Contexte
 Ce test a pour objectif d’évaluer les performances du **service des ordres** dans une architecture **monolithique**, afin de les comparer à celles de l’architecture microservices.  
@@ -1577,7 +1577,7 @@ Ces résultats démontrent que l’architecture monolithique ne parvient pas à 
 
 ---
 
-## Comparaison — Microservices vs Monolithique
+## Comparaison — Microservices (Gateway) vs Monolithique (A/B direct)
 
 | Critère | Monolithique                 | Microservices | Amélioration |
 |----------|------------------------------|----------------|---------------|
