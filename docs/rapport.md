@@ -1161,7 +1161,10 @@ Chaque microservice dispose d’une base PostgreSQL dédiée, avec schéma et mi
 En architecture microservices, la gestion des erreurs, du versionnage d’API et de la conformité (audit, sécurité, traçabilité) est essentielle pour garantir la robustesse, l’évolutivité et la conformité réglementaire. Les erreurs doivent être normalisées (JSON, codes HTTP), le versionnage doit permettre l’évolution sans rupture, et la traçabilité doit répondre aux exigences KYC/AML et audit métier.
 
 ## Décision
-Les erreurs sont normalisées en JSON avec des codes HTTP explicites et des messages détaillés. Le versionnage des routes est systématique (/api/v1/...), permettant l’évolution des contrats sans impacter les clients existants. Un audit append-only est mis en place pour toutes les opérations sensibles, et la conformité est assurée par la journalisation et la validation des entrées (authentification, sécurité JWT, validation des payloads). La conformité réglementaire et l’audit sont garantis par la journalisation append-only de toutes les opérations sensibles, permettant une traçabilité complète et un accès aux historiques pour contrôle externe.
+- **Versionnage** : Chaque endpoint de chaque microservice commence systématiquement par `/api/v1`, ce qui permet de gérer l’évolution des contrats d’API sans impacter les clients existants.
+- **Stratégie d’erreur** : Chaque microservice retourne ses erreurs dans un format JSON standardisé (code HTTP, identifiant d’erreur, message, détails éventuels). L’API Gateway collecte ces erreurs et les reformate selon le format attendu par le frontend, garantissant ainsi une normalisation et une cohérence parfaite des réponses d’erreur pour l’interface utilisateur.
+- **Audit** : Un audit append-only est mis en place pour toutes les opérations sensibles, et la conformité est assurée par la journalisation et la validation des entrées (authentification, sécurité JWT, validation des payloads). La conformité réglementaire et l’audit sont garantis par la journalisation append-only de toutes les opérations sensibles, permettant une traçabilité complète et un accès aux historiques pour contrôle externe.
+
 Ce mécanisme assure que chaque action critique est enregistrée de façon immuable, répondant aux exigences d’audit métier et réglementaire (KYC/AML, contrôle interne, audit externe).
 
 ## Conséquences
@@ -1863,6 +1866,69 @@ docker-compose down -v
 - Assurez-vous que Docker est en cours d’exécution et que tous les services sont lancés (voir section 4).
 - Ouvrez un terminal dans le dossier racine du projet.
 - Exécutez la commande suivante pour lancer le tests de charge K6 : `k6 run load-test-wallet.js`
+
+## 13. Pour utiliser le script de déploiement (Optionnel)
+
+Le script `deploy.sh` permet d’automatiser le déploiement de l’ensemble de la solution conteneurisée.  
+Ce script utilise **Docker Compose** pour lancer tous les services du projet : les microservices applicatifs, la base de données, le *gateway*, ainsi que les services de monitoring (Prometheus et Grafana).
+
+> **Important :**  
+> Ce script déploie **une seule instance de chaque microservice**.  
+> Il ne s’agit donc pas d’un déploiement distribué ni d’un équilibrage de charge (*scaling*).  
+> L’objectif est d’offrir un déploiement reproductible et fonctionnel de l’environnement complet sur une machine locale.
+
+Ce script :
+
+1. Reconstruit les images Docker si nécessaire (docker compose build)
+
+2. Arrête les conteneurs existants (docker compose down)
+
+3. Démarre tous les services définis dans docker-compose.yml (docker compose up -d)
+
+4. Attends quelques secondes avant d’effectuer un healthcheck automatique sur l’URL définie (http://localhost:8079/actuator/health)
+
+5. Affiche le résultat du déploiement dans la console
+
+En cas de rollback, les conteneurs actuels sont arrêtés et remplacés par les versions stables précédemment taguées.
+
+---
+
+### Exécution du script sur Windows
+
+Sous Windows, il est recommandé d’utiliser **Git Bash** (installé avec Git pour Windows).
+
+1. Ouvrez le dossier du projet dans l’explorateur de fichiers.
+2. Cliquez droit → **“Git Bash Here”**.
+3. Tapez la commande suivante pour rendre le script exécutable :
+   ```bash
+   chmod +x deploy.sh
+    ```
+4. Lancez le script avec :
+   ```bash
+   ./deploy.sh
+   ``` 
+5. Pour effectuer un rollback vers la dernière version stable, faites :
+    ```bash
+    ./deploy.sh rollback
+   ```
+---
+
+### Exécution du script sur Linux/MacOS
+
+Sous Linux ou MacOS, ouvrez un terminal dans le dossier du projet et lancez :
+
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+
+Pour effectuer un rollback vers la dernière version stable, faites :
+
+```bash
+./deploy.sh rollback
+```
+
+Le comportement est identique à celui décrit pour Windows.
 
 # Guide de démonstration BrokerX
 
