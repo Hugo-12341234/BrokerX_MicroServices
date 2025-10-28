@@ -49,7 +49,7 @@ Cette section synthétise les besoins métier, techniques et réglementaires qui
 | Appariement interne & Exécution (matching) | Assure l’exécution automatique des ordres selon la priorité prix/temps, rapproche acheteurs et vendeurs, génère les transactions | UC07.md |
 | Consultation du portefeuille et des ordres | Permet à un utilisateur de consulter ses positions, ordres et historiques | UC07.md |
 
-## 1.6 Priorisation MoSCoW des cas d’utilisation
+## 1.6 Priorisation MoSCoW des cas d’utilisation (DDD)
 
 # Priorisation MoSCoW des cas d'utilisation
 
@@ -66,7 +66,7 @@ Cette section synthétise les besoins métier, techniques et réglementaires qui
 
 > Cette priorisation MoSCoW garantit que les fonctionnalités critiques (Must) sont livrées en priorité pour assurer la valeur métier, la conformité et la sécurité, tandis que les autres (Should/Could) enrichissent l'expérience ou optimisent le service. Les éléments en Won't Have sont explicitement exclus pour permettre une livraison rapide et maîtrisée du périmètre minimal.
 
-## 1.7 Description détaillée des cas d’utilisation
+## 1.7 Description détaillée des cas d’utilisation (DDD)
 
 ### UC-01 — Inscription & Vérification d’identité
 
@@ -326,7 +326,7 @@ Le diagramme de contexte ci-dessous illustre les frontières du système BrokerX
 
 ![Diagramme de contexte DDD](docs/ddd/diagrammeDeContexte/diagrammeDeContexte.png)
 
-### 3.3 Diagramme des bounded contexts
+### 3.3 Diagramme des bounded contexts (DDD)
 
 Le diagramme des bounded contexts présente la découpe du domaine BrokerX en sous-domaines fonctionnels cohérents (bounded contexts), chacun représentant une zone de responsabilité métier distincte. Cette vue permet de visualiser les interactions et les frontières entre les différents contextes métier.
 
