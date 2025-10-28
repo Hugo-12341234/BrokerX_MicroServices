@@ -11,6 +11,7 @@ skinparam ActorStyle awesome
 autonumber
 
 actor Client
+participant APIGateway
 participant AuthController
 participant AuthenticationService
 participant "Domains (Audit, MfaChallenge, User)" as Domain
@@ -19,7 +20,8 @@ participant "Persistence (JPA Repos)" as Persistence
 
 
 == Étape 1 : Login ==
-Client -> AuthController: POST /api/v1/auth/login\nLoginRequest(email: String, password: String)
+Client -> APIGateway: POST localhost:8079/api/v1/auth/login\nLoginRequest(email: String, password: String)
+APIGateway -> AuthController: POST /api/v1/auth/login\nLoginRequest(email: String, password: String)
 AuthController -> AuthenticationService: authenticate(email: String, password: String)
 
 AuthenticationService -> Adapters: findByEmail(email)
@@ -38,7 +40,8 @@ alt erreurs de login (user non trouvé, inactif,\nsuspendu, mauvais mot de passe
   Persistence --> Adapters: Audit
   Adapters --> AuthenticationService: Audit
   AuthenticationService --> AuthController: Exception(4XX/5XX)
-  AuthController --> Client: Erreur 401/403/500
+  AuthController --> APIGateway: Erreur 401/403/500
+  APIGateway --> Client: Erreur 401/403/500
 else informations valides
   AuthenticationService -> Domain: créer MfaChallenge
   Domain --> AuthenticationService: mfaChallenge
@@ -51,15 +54,18 @@ else informations valides
 
   alt erreur d'envoi d'email
     AuthenticationService --> AuthController: LoginResult.failure("UNABLE_TO_SEND_MFA_CODE")
-    AuthController --> Client: 401 Error
+    AuthController --> APIGateway: 401 Error
+    APIGateway --> Client: 401 Error
   else email envoyé
     AuthenticationService --> AuthController: LoginResult.mfaRequired(code: String)
-    AuthController --> Client: 202 (code)
+    AuthController --> APIGateway: 202 (code)
+    APIGateway --> Client: 202 (code)
   end
 end
 
 == Étape 2 : Vérification MFA ==
-Client -> AuthController: POST /api/v1/auth/verify-mfa\nMfaVerifyRequest(userId: Long, code: String)
+Client -> APIGateway: POST localhost:8079/api/v1/auth/verify-mfa\nMfaVerifyRequest(userId: Long, code: String)
+APIGateway -> AuthController: POST /api/v1/auth/verify-mfa\nMfaVerifyRequest(userId: Long, code: String)
 AuthController -> AuthenticationService: verifyMfa(challengeId: String,\ncode: String, ipAddress: String,\nuserAgent: String)
 
 AuthenticationService -> Adapters: findActiveMfaChallenge(challengeId)
@@ -78,7 +84,8 @@ alt erreurs (pas de challenge, expiré)
   Persistence --> Adapters: Audit
   Adapters --> AuthenticationService: Audit
   AuthenticationService --> AuthController: VerifyResult.failure(errorCode)
-  AuthController --> Client: 401 Error
+  AuthController --> APIGateway: 401 Error
+  APIGateway --> Client: 401 Error
  end
 alt code invalide et trop d'essais
   AuthenticationService -> Adapters: findUserById(challengeId)
@@ -91,7 +98,8 @@ alt code invalide et trop d'essais
     Persistence --> Adapters: User
     Adapters --> AuthenticationService: User
     AuthenticationService --> AuthController: VerifyResult.failure("TOO_MANY_ATTEMPTS_USER_SUSPENDED")
-    AuthController --> Client: 403 Error
+    AuthController --> APIGateway: 403 Error
+    APIGateway --> Client: 403 Error
 else code valide
   AuthenticationService -> Domain: markAsUsed(MfaChallenge)
   AuthenticationService -> Adapters: save(mfaChallenge)
@@ -110,7 +118,8 @@ else code valide
     Adapters --> AuthenticationService: Audit
 
   AuthenticationService --> AuthController: VerifyResult.success(jwtToken)
-  AuthController --> Client: 200 { token }
+  AuthController --> APIGateway: 200 { token }
+  APIGateway --> Client: 200 { token }
 end
 
 @enduml

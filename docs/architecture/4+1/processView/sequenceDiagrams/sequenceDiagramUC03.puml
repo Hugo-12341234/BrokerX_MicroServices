@@ -11,6 +11,7 @@ skinparam ActorStyle awesome
 autonumber
 
 actor Client
+participant APIGateway
 participant WalletController
 participant WalletDepositService as WalletService
 participant "Domain(Audit, Transaction, Wallet)" as Domain
@@ -18,7 +19,8 @@ participant "Adapters (Transaction, User, Wallet)" as Adapters
 participant "Persistence (JPA Repos)" as Persistence
 
 == Soumission du dépôt ==
-Client -> WalletController: POST /api/v1/wallet/deposit\nDepositRequest(amount, idempotencyKey)
+Client -> APIGateway: POST localhost:8079/api/v1/wallet/deposit\nDepositRequest(amount, idempotencyKey)
+APIGateway -> WalletController: POST /api/v1/wallet/deposit\nDepositRequest(amount, idempotencyKey)
 WalletController -> WalletService: deposit(userId, amount, idempotencyKey)
 
 ' Récupération du portefeuille
@@ -43,7 +45,8 @@ alt erreur de validation (montant invalide, clé manquante, compte introuvable o
     Persistence --> Adapters: Audit
     Adapters --> WalletService: Audit
   WalletService --> WalletController: Exception (4xx/5xx)
-  WalletController --> Client: Réponse d'erreur
+  WalletController --> APIGateway: Réponse d'erreur
+  APIGateway --> Client: Réponse d'erreur
 else dépôt accepté
     WalletService -> Adapters: findByIdempotencyKey(idempotencyKey)
     Adapters -> Persistence: findByIdempotencyKey(idempotencyKey)
@@ -51,7 +54,8 @@ else dépôt accepté
     Adapters --> WalletService: Optional<Transaction>
   opt idempotence (transaction qui existe déjà)
     WalletService --> WalletController: transaction.id
-    WalletController --> Client: 200 OK DepositResponse(transaction.id)
+    WalletController --> APIGateway: 200 OK DepositResponse(transaction.id)
+    APIGateway --> Client: 200 OK DepositResponse(transaction.id, status=SETTLED)
   end
 
   WalletService -> Domain: créer Transaction (PENDING)
@@ -77,14 +81,15 @@ else dépôt accepté
     Persistence --> Adapters: Audit
     Adapters --> WalletService: Audit
     WalletService --> WalletController: DepositResult.failure("Paiement refusé")
-    WalletController --> Client: Réponse d'erreur
+    WalletController --> APIGateway: Réponse d'erreur
+    APIGateway --> Client: Réponse d'erreur
    end
 
   WalletService -> Domain: setBalance(amount)
-  WalletService -> Adapters: save(user)
-  Adapters -> Persistence: save(user)
-  Persistence --> Adapters: user
-  Adapters --> WalletService: user
+  WalletService -> Adapters: save(wallet)
+  Adapters -> Persistence: save(wallet)
+  Persistence --> Adapters: wallet
+  Adapters --> WalletService: wallet
 
     WalletService -> Domain: markAsSettled(transaction)
     WalletService -> Adapters: save(transaction)
@@ -98,7 +103,6 @@ else dépôt accepté
   Adapters --> WalletService: Audit
 
   WalletService --> WalletController: DepositResult.success(transaction.id)
-  WalletController --> Client: 200 OK DepositResponse(id, status=SETTLED)
-end
-
-@enduml
+  WalletController --> APIGateway: 200 OK DepositResponse(id, status=SETTLED)
+  APIGateway --> Client: 200 OK DepositResponse(id, status=SETTLED)
+@end

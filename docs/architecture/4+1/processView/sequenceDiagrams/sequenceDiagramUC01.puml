@@ -11,6 +11,7 @@ skinparam ActorStyle awesome
 autonumber
 
 actor Client
+participant APIGateway
 participant UserController
 participant RegistrationService
 participant "Domain (User, VerificationToken, Audit)" as Domain
@@ -19,7 +20,9 @@ participant "Persistence (JPA Repos)" as Persistence
 participant UserVerificationController
 
 == Inscription ==
-Client -> UserController: POST /api/v1/users/register\n(userForm: UserForm,\nmodel: Model)
+Client -> APIGateway: POST localhost:8079/api/v1/users/register\n(userForm: UserForm,\nmodel: Model)
+
+APIGateway -> UserController: POST /api/v1/users/register\n(userForm: UserForm,\nmodel: Model)
 UserController -> RegistrationService: register(email: String,\nnom: String, mdp: String,\nadresse: String,\ndateDeNaissance: LocalDate)
 
 RegistrationService -> Adapters: findByEmail(email)
@@ -29,7 +32,8 @@ Adapters --> RegistrationService: Optional<User>
 
 alt email déjà utilisé ou données invalides
   RegistrationService --> UserController: Exception (4xx)
-  UserController --> Client: Erreur ("Email déjà utilisé")
+  UserController --> APIGateway: Erreur ("Email déjà utilisé")
+  APIGateway --> Client: Erreur (4xx)
 else succès
   RegistrationService -> Adapters: hash mot de passe
   RegistrationService -> Domain: créer User (statut PENDING)
@@ -47,11 +51,13 @@ else succès
   RegistrationService -> Adapters: envoyer email de vérification
 
   RegistrationService --> UserController: User
-  UserController --> Client: 200 OK (User)
+  UserController --> APIGateway: 200 OK (User)
+  APIGateway --> Client: 200 OK (User)
 end
 
 == Vérification d'identité ==
-Client -> UserVerificationController: GET /api/v1/verify?token=...\n(token: String, model: Model)
+Client -> APIGateway: GET localhost:8079/api/v1/verify?token=...\n(token: String,\nmodel: Model)
+APIGateway -> UserVerificationController: GET /api/v1/verify?token=...\n(token: String, model: Model)
 UserVerificationController -> RegistrationService: verifyUser(token: String)
 
 RegistrationService -> Adapters: findByTokenHash(tokenHash: String)
@@ -61,7 +67,8 @@ Adapters --> RegistrationService: Optional<VerificationToken>
 
 alt token invalide ou expiré
   RegistrationService --> UserVerificationController: False
-  UserVerificationController --> Client: Erreur (False)
+  UserVerificationController --> APIGateway: Erreur (False)
+  APIGateway --> Client: Erreur (False)
 else succès
   RegistrationService -> Domain: activate(User)
   RegistrationService -> Adapters: save(User)
@@ -80,7 +87,9 @@ else succès
   Adapters --> RegistrationService: Audit
 
   RegistrationService --> UserVerificationController: succès
-  UserVerificationController --> Client: 200 OK (True)
+  UserVerificationController --> APIGateway: 200 OK (True)
+
+    APIGateway --> Client: 200 OK (True)
 end
 
 @enduml

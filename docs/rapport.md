@@ -1,23 +1,3 @@
-# Rapport final BrokerX phase 2 (Microservices)
-
-<img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Ets_quebec_logo.png" width="250">\
-Hugo Vaillant\
-Rapport de laboratoire\
-LOG430 — Architecture logicielle\
-28 octobre 2025\
-École de technologie supérieure
-
-Ce document constitue le rapport final de la phase 2 du projet BrokerX. Il regroupe l’ensemble de la documentation d’architecture (arc42), ainsi que les guides pratiques nécessaires à l’exploitation et à la démonstration du système. Vous y trouverez :
-- La documentation complète de l’architecture (arc42)
-- Les rapports comparatifs montrant l'usage de grafana et de tests de charge
-- Une explication des travaux CI/CD accomplis
-- Un guide d’exploitation (runbook) pour l’administration et la maintenance
-- Un guide de démonstration pour présenter les fonctionnalités clés
-
-*note : Le guide d'exploitation ainsi que le guide de démonstration se trouvent à la toute fin du document.*
-
----
-
 # Début de la documentation arc42
 
 # 1. Introduction & Objectifs

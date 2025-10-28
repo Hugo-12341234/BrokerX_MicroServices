@@ -11,6 +11,7 @@ skinparam ActorStyle awesome
 autonumber
 
 actor Client
+participant APIGateway
 participant OrderController
 participant OrderService
 participant PreTradeValidationService
@@ -25,7 +26,8 @@ Contrôles pré-trade : statut du compte, pouvoir d’achat, bandes, ticks, shor
 end note
 
 == Soumission de l’ordre ==
-Client -> OrderController: POST /api/v1/orders/place\nOrderRequest(symbol, side, type, timeInForce, quantity, limitPrice, clientOrderId)
+Client -> APIGateway: POST localhost:8079/api/v1/orders/place\nOrderRequest(symbol, side, type, timeInForce, quantity, limitPrice, clientOrderId)
+APIGateway -> OrderController: POST /api/v1/orders/place\nOrderRequest(symbol, side, type, timeInForce, quantity, limitPrice, clientOrderId)
 OrderController -> OrderService: placeOrder(symbol, side, type, timeInForce, quantity, limitPrice, userID)
 
 OrderService -> Adapters: findByClientOrderId(clientOrderId)
@@ -35,7 +37,8 @@ Adapters --> OrderService: Optional<Order>
 
 opt idempotence (ordre déjà placé)
     OrderService --> OrderController: Order(orderId, status)
-    OrderController --> Client: 200 OrderResponse(orderId, status)
+    OrderController --> APIGateway: 200 OrderResponse(orderId, status)
+    APIGateway --> Client: 200 OrderResponse(orderId, status)
 end
 
 OrderService -> WalletAPI: GET /api/v1/wallet/
@@ -43,7 +46,8 @@ WalletAPI --> OrderService: Wallet(userId, balance, stockPositions)
 
 opt erreur de l'appel API ou wallet inexistant
   OrderService --> OrderController: Exception(500, "Portefeuille introuvable ou réponse invalide")
-  OrderController --> Client: 500 Error("Portefeuille introuvable ou réponse invalide")
+  OrderController --> APIGateway: 500 Error("Portefeuille introuvable ou réponse invalide")
+  APIGateway --> Client: 500 Error("Portefeuille introuvable ou réponse invalide")
 end
 
 OrderService -> PreTradeValidationService: validateOrder(user, symbol, side, type, timeInForce, quantity, limitPrice)
@@ -57,7 +61,8 @@ alt erreur de validation ou pré-trade (quantité, prix, pouvoir d’achat, band
     Persistence --> Adapters: Order(REJECTED)
     Adapters --> OrderService: Order(REJECTED)
   OrderService --> OrderController: Order(REJECTED)
-  OrderController --> Client: 400 OrderResponse(REJETÉ, raison)
+  OrderController --> APIGateway: 400 OrderResponse(REJETÉ, raison)
+  APIGateway --> Client: 400 OrderResponse(REJETÉ, raison)
 else ordre accepté
     PreTradeValidationService --> OrderService: ValidationSuccess
   OrderService -> Domain: créer l'ordre(ACCEPTED)
@@ -77,14 +82,16 @@ else ordre accepté
     Persistence --> Adapters: Order(REJECTED)
     Adapters --> OrderService: Order(REJECTED)
     OrderService --> OrderController: Order(REJECTED)
-    OrderController --> Client: 400 OrderResponse(REJETÉ, raison)
+    OrderController --> APIGateway: 400 OrderResponse(REJETÉ, raison)
+    APIGateway --> Client: 400 OrderResponse(REJETÉ, raison)
   else matching réussi
     MatchingAPI --> OrderService: success
     ' Appel API vers le wallet service pour mise à jour portefeuille
     OrderService -> WalletAPI: POST /api/v1/wallet/updateWallet\n(solde: BigDecimal, stockPositions: Map<String, Integer>)
     WalletAPI --> OrderService: OK
     OrderService --> OrderController: Order(ACCEPTED)
-    OrderController --> Client: 200 OK OrderResponse(orderId, "ACCEPTÉ")
+    OrderController --> APIGateway: 200 OK OrderResponse(orderId, "ACCEPTÉ")
+    APIGateway --> Client: 200 OK OrderResponse(orderId, "ACCEPTÉ")
   end
 end
 
