@@ -46,6 +46,7 @@ public class DebugController {
             appleOrder.setStatus("Working");
             appleOrder.setQuantityRemaining(10);
             appleOrder.setOrderId(baseOrderId + 1);
+            appleOrder.setVersion(0L);
 
             logger.debug("Creating MSFT seed order");
             OrderBookEntity msftOrder = new OrderBookEntity();
@@ -61,6 +62,7 @@ public class DebugController {
             msftOrder.setStatus("Working");
             msftOrder.setQuantityRemaining(10);
             msftOrder.setOrderId(baseOrderId + 2);
+            msftOrder.setVersion(0L);
 
             logger.debug("Creating TSLA seed order");
             OrderBookEntity tslaOrder = new OrderBookEntity();
@@ -76,6 +78,7 @@ public class DebugController {
             tslaOrder.setStatus("Working");
             tslaOrder.setQuantityRemaining(15);
             tslaOrder.setOrderId(baseOrderId + 3);
+            tslaOrder.setVersion(0L);
 
             logger.debug("Creating GOOG seed order");
             OrderBookEntity googOrder = new OrderBookEntity();
@@ -91,6 +94,7 @@ public class DebugController {
             googOrder.setStatus("Working");
             googOrder.setQuantityRemaining(17);
             googOrder.setOrderId(baseOrderId + 4);
+            googOrder.setVersion(0L);
 
             seedOrders.add(appleOrder);
             seedOrders.add(msftOrder);

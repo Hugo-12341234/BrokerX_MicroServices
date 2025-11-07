@@ -267,8 +267,8 @@ public class MatchingService implements MatchingPort {
     }
 
     @Override
-    public OrderBook modifyOrder(Long orderId, OrderBook orderBook) {
-        Optional<OrderBook> existingOrder = orderBookPort.findById(orderId);
+    public OrderBook modifyOrder(String clientOrderId, OrderBook orderBook) {
+        Optional<OrderBook> existingOrder = orderBookPort.findByClientOrderId(clientOrderId);
         if (existingOrder.isEmpty()) throw new IllegalArgumentException("Ordre non trouvé");
         OrderBook existing = existingOrder.get();
         if ("Filled".equals(existing.getStatus()) || "Cancelled".equals(existing.getStatus())) {

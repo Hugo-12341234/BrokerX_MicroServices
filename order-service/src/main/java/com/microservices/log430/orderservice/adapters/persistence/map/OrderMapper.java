@@ -19,6 +19,7 @@ public class OrderMapper {
         entity.setTimestamp(order.getTimestamp());
         entity.setStatus(order.getStatus() == null ? null : OrderEntity.OrderStatus.valueOf(order.getStatus().name()));
         entity.setRejectReason(order.getRejectReason());
+        entity.setVersion(order.getVersion());
         return entity;
     }
 
@@ -37,6 +38,7 @@ public class OrderMapper {
         order.setTimestamp(entity.getTimestamp());
         order.setStatus(entity.getStatus() == null ? null : Order.OrderStatus.valueOf(entity.getStatus().name()));
         order.setRejectReason(entity.getRejectReason());
+        order.setVersion(entity.getVersion());
         return order;
     }
 }

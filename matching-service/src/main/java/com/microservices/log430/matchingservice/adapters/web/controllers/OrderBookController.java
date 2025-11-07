@@ -28,9 +28,11 @@ public class OrderBookController {
         String path = httpRequest.getRequestURI();
         String requestId = httpRequest.getHeader("X-Request-Id");
         try {
-            logger.info("Réception d'un nouvel ordre à apparier : clientOrderId={}, symbol={}, side={}, quantity={}, price={}",
-                    orderDto.clientOrderId, orderDto.symbol, orderDto.side, orderDto.quantity, orderDto.price);
+            logger.info("Réception d'un nouvel ordre à apparier : clientOrderId={}, symbol={}, side={}, quantity={}, price={}, version={}",
+                    orderDto.clientOrderId, orderDto.symbol, orderDto.side, orderDto.quantity, orderDto.price, orderDto.version);
             OrderBook orderBook = OrderToOrderBookMapper.toOrderBook(orderDto);
+            logger.info("OrderBook : clientOrderId={}, symbol={}, side={}, quantity={}, price={}, version={}",
+                    orderBook.getClientOrderId(), orderBook.getSymbol(), orderBook.getSide(), orderBook.getQuantity(), orderBook.getPrice(), orderBook.getVersion());
             MatchingResult result = matchingPort.matchOrder(orderBook);
             logger.info("Matching terminé pour clientOrderId={}, statut={}, executions={}",
                     result.updatedOrder.getClientOrderId(), result.updatedOrder.getStatus(), result.executions.size());
@@ -49,20 +51,20 @@ public class OrderBookController {
         }
     }
 
-    @PutMapping("/{orderId}")
-    public ResponseEntity<?> modifyOrder(@PathVariable Long orderId, @RequestBody OrderDTO orderDto, HttpServletRequest httpRequest) {
+    @PutMapping("/{clientOrderId}")
+    public ResponseEntity<?> modifyOrder(@PathVariable String clientOrderId, @RequestBody OrderDTO orderDto, HttpServletRequest httpRequest) {
         String path = httpRequest.getRequestURI();
         String requestId = httpRequest.getHeader("X-Request-Id");
         try {
             OrderBook orderBook = OrderToOrderBookMapper.toOrderBook(orderDto);
-            OrderBook updatedOrder = matchingPort.modifyOrder(orderId, orderBook);
+            OrderBook updatedOrder = matchingPort.modifyOrder(clientOrderId, orderBook);
             return ResponseEntity.ok(updatedOrder);
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(Instant.now(), path, 404, "Not Found", ex.getMessage(), requestId != null ? requestId : ""));
         } catch (IllegalStateException ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(Instant.now(), path, 400, "Bad Request", ex.getMessage(), requestId != null ? requestId : ""));
         } catch (Exception e) {
-            logger.error("Erreur lors de la modification de l'ordre {}: {}", orderId, e.getMessage(), e);
+            logger.error("Erreur lors de la modification de l'ordre {}: {}", clientOrderId, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponse(Instant.now(), path, 500, "Internal Server Error", "Erreur lors de la modification de l'ordre : " + e.getMessage(), requestId != null ? requestId : ""));
         }
     }

@@ -11,8 +11,8 @@ public interface MatchingClient {
     @PostMapping("/api/v1/orderbook")
     MatchingResult matchOrder(@RequestBody OrderDTO orderDTO);
 
-    @PutMapping("/api/v1/orderbook/{orderId}")
-    void modifyOrder(@PathVariable("orderId") Long orderId, @RequestBody OrderDTO orderDTO);
+    @PutMapping("/api/v1/orderbook/{clientOrderId}")
+    void modifyOrder(@PathVariable("clientOrderId") String clientOrderId, @RequestBody OrderDTO orderDTO);
 
     @DeleteMapping("/api/v1/orderbook/{orderId}")
     void cancelOrder(@PathVariable("orderId") Long orderId, @RequestBody OrderDTO orderDTO);

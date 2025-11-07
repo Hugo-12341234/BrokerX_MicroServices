@@ -21,6 +21,7 @@ public class OrderToOrderBookMapper {
         ob.setRejectReason(order.rejectReason);
         ob.setQuantityRemaining(order.quantity); // Initialisé à la quantité totale
         ob.setOrderId(order.id);
+        ob.setVersion(order.version);
         return ob;
     }
 }

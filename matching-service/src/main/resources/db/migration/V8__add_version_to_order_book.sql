@@ -1,0 +1,2 @@
+ALTER TABLE order_book ADD COLUMN version BIGINT DEFAULT 0 NOT NULL;
+

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import DepositForm from './DepositForm';
 import QuickOrders from './QuickOrders';
 import { useNavigate } from 'react-router-dom';
+import OrdersDashboard from '../OrdersDashboard';
+import '../OrdersDashboard.css';
 
 function Dashboard() {
   const [wallet, setWallet] = useState(null);
@@ -99,6 +101,9 @@ function Dashboard() {
           </table>
         </div>
       )}
+      <div style={{ marginTop: 40 }}>
+        <OrdersDashboard userId={localStorage.getItem('userId')} />
+      </div>
     </div>
   );
 }

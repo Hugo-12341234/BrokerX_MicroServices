@@ -21,6 +21,7 @@ public class OrderBookMapper {
         domain.setRejectReason(entity.getRejectReason());
         domain.setQuantityRemaining(entity.getQuantityRemaining());
         domain.setOrderId(entity.getOrderId());
+        domain.setVersion(entity.getVersion());
         return domain;
     }
 
@@ -41,6 +42,7 @@ public class OrderBookMapper {
         entity.setRejectReason(domain.getRejectReason());
         entity.setQuantityRemaining(domain.getQuantityRemaining());
         entity.setOrderId(domain.getOrderId());
+        entity.setVersion(domain.getVersion());
         return entity;
     }
 }

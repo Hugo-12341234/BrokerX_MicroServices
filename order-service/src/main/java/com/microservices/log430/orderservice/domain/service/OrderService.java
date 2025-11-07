@@ -123,8 +123,10 @@ public class OrderService implements OrderPlacementPort {
                 savedOrder.getDuration().name(),
                 savedOrder.getTimestamp(),
                 savedOrder.getStatus().name(),
-                savedOrder.getRejectReason()
+                savedOrder.getRejectReason(),
+                savedOrder.getVersion()
             );
+            logger.info("orderDTO version : {}", orderDTO.version);
             MatchingResult matchingResult = null;
             try {
                 matchingResult = matchingClient.matchOrder(orderDTO);
@@ -307,6 +309,7 @@ public class OrderService implements OrderPlacementPort {
         if (!versionBefore.equals(updatedOrder.getVersion() - 1)) {
             throw new RuntimeException("Conflit de version : l'ordre a été modifié par une autre transaction");
         }
+        logger.info("Order id : {}, version after update : {}, clientOrderId : {}", updatedOrder.getId(), updatedOrder.getVersion(), updatedOrder.getClientOrderId());
         // Synchronisation avec le matching-service
         OrderDTO orderDTO = new OrderDTO(
             updatedOrder.getId(),
@@ -320,10 +323,11 @@ public class OrderService implements OrderPlacementPort {
             updatedOrder.getDuration().name(),
             updatedOrder.getTimestamp(),
             updatedOrder.getStatus().name(),
-            updatedOrder.getRejectReason()
+            updatedOrder.getRejectReason(),
+            updatedOrder.getVersion()
         );
         try {
-            matchingClient.modifyOrder(updatedOrder.getId(), orderDTO);
+            matchingClient.modifyOrder(updatedOrder.getClientOrderId(), orderDTO);
         } catch (Exception e) {
             logger.error("Erreur lors de la synchronisation avec le matching-service : {}", e.getMessage(), e);
         }
@@ -357,7 +361,8 @@ public class OrderService implements OrderPlacementPort {
             updatedOrder.getDuration().name(),
             updatedOrder.getTimestamp(),
             updatedOrder.getStatus().name(),
-            updatedOrder.getRejectReason()
+            updatedOrder.getRejectReason(),
+            updatedOrder.getVersion()
         );
         try {
             matchingClient.cancelOrder(updatedOrder.getId(), orderDTO);

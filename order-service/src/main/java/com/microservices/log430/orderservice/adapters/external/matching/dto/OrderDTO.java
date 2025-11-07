@@ -16,10 +16,11 @@ public class OrderDTO {
     public Instant timestamp;
     public String status;
     public String rejectReason;
+    public Long version;
 
     public OrderDTO() {}
 
-    public OrderDTO(Long id, String clientOrderId, Long userId, String symbol, String side, String type, int quantity, Double price, String duration, Instant timestamp, String status, String rejectReason) {
+    public OrderDTO(Long id, String clientOrderId, Long userId, String symbol, String side, String type, int quantity, Double price, String duration, Instant timestamp, String status, String rejectReason, Long version) {
         this.id = id;
         this.clientOrderId = clientOrderId;
         this.userId = userId;
@@ -32,6 +33,7 @@ public class OrderDTO {
         this.timestamp = timestamp;
         this.status = status;
         this.rejectReason = rejectReason;
+        this.version = version;
     }
 
     // getters and setters
@@ -59,4 +61,6 @@ public class OrderDTO {
     public void setStatus(String status) { this.status = status; }
     public String getRejectReason() { return rejectReason; }
     public void setRejectReason(String rejectReason) { this.rejectReason = rejectReason; }
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 }

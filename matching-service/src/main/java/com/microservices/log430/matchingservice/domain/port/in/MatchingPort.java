@@ -5,6 +5,6 @@ import com.microservices.log430.matchingservice.adapters.web.dto.MatchingResult;
 
 public interface MatchingPort {
     MatchingResult matchOrder(OrderBook orderBook);
-    OrderBook modifyOrder(Long orderId, OrderBook orderDto);
+    OrderBook modifyOrder(String clientOrderId, OrderBook orderDto);
     OrderBook cancelOrder(Long orderId);
 }

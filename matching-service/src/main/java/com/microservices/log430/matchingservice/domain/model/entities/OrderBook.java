@@ -17,6 +17,7 @@ public class OrderBook {
     private String rejectReason;
     private Integer quantityRemaining;
     private Long orderId;
+    private Long version;
 
     // Getters and Setters
     public Long getId() { return id; }
@@ -60,4 +61,7 @@ public class OrderBook {
 
     public Long getOrderId() { return orderId; }
     public void setOrderId(Long orderId) { this.orderId = orderId; }
+
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 }

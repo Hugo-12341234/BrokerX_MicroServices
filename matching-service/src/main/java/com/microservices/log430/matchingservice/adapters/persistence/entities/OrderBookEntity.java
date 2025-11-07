@@ -49,6 +49,10 @@ public class OrderBookEntity {
     @Column(name = "order_id", nullable = false)
     private Long orderId;
 
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -91,4 +95,7 @@ public class OrderBookEntity {
 
     public Long getOrderId() { return orderId; }
     public void setOrderId(Long orderId) { this.orderId = orderId; }
+
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 }

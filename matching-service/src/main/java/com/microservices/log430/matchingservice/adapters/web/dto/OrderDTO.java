@@ -15,4 +15,5 @@ public class OrderDTO {
     public Instant timestamp;
     public String status;
     public String rejectReason;
+    public Long version;
 }
