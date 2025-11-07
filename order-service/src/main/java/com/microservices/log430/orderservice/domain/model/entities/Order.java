@@ -15,6 +15,7 @@ public class Order {
     private Instant timestamp;
     private OrderStatus status;
     private String rejectReason;
+    private Long version;
 
     public enum Side {
         ACHAT, VENTE
@@ -122,5 +123,11 @@ public class Order {
     }
     public void setRejectReason(String rejectReason) {
         this.rejectReason = rejectReason;
+    }
+    public Long getVersion() {
+        return version;
+    }
+    public void setVersion(Long version) {
+        this.version = version;
     }
 }

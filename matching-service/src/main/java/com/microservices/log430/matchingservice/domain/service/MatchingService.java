@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Comparator;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Service
 public class MatchingService implements MatchingPort {
@@ -263,5 +264,38 @@ public class MatchingService implements MatchingPort {
             }
         }
         return modifiedOrders;
+    }
+
+    @Override
+    public OrderBook modifyOrder(Long orderId, OrderBook orderBook) {
+        Optional<OrderBook> existingOrder = orderBookPort.findById(orderId);
+        if (existingOrder.isEmpty()) throw new IllegalArgumentException("Ordre non trouvé");
+        OrderBook existing = existingOrder.get();
+        if ("Filled".equals(existing.getStatus()) || "Cancelled".equals(existing.getStatus())) {
+            throw new IllegalStateException("Impossible de modifier un ordre rempli ou annulé");
+        }
+        // Appliquer les modifications sur les quantités restantes
+        existing.setQuantity(orderBook.getQuantity());
+        existing.setPrice(orderBook.getPrice());
+        existing.setType(orderBook.getType());
+        existing.setDuration(orderBook.getDuration());
+        // Si besoin, d'autres champs peuvent être mis à jour ici
+        OrderBook updatedOrder = orderBookPort.save(existing);
+        logger.info("Ordre modifié : id={}, clientOrderId={}, status={}", updatedOrder.getId(), updatedOrder.getClientOrderId(), updatedOrder.getStatus());
+        return updatedOrder;
+    }
+
+    @Override
+    public OrderBook cancelOrder(Long orderId) {
+        Optional<OrderBook> existingOrder = orderBookPort.findById(orderId);
+        if (existingOrder.isEmpty()) throw new IllegalArgumentException("Ordre non trouvé");
+        OrderBook existing = existingOrder.get();
+        if ("Filled".equals(existing.getStatus()) || "Cancelled".equals(existing.getStatus())) {
+            throw new IllegalStateException("Impossible d'annuler un ordre rempli ou déjà annulé");
+        }
+        existing.setStatus("Cancelled");
+        OrderBook cancelledOrder = orderBookPort.save(existing);
+        logger.info("Ordre annulé : id={}, clientOrderId={}, status={}", cancelledOrder.getId(), cancelledOrder.getClientOrderId(), cancelledOrder.getStatus());
+        return cancelledOrder;
     }
 }

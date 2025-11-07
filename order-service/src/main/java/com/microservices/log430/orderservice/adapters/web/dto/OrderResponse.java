@@ -18,4 +18,8 @@ public class OrderResponse {
     public void setStatus(String status) { this.status = status; }
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
+
+    public static OrderResponse fromOrder(com.microservices.log430.orderservice.domain.model.entities.Order order) {
+        return new OrderResponse(order.getId(), order.getStatus().name(), order.getRejectReason());
+    }
 }

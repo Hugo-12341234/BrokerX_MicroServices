@@ -48,4 +48,39 @@ public class OrderBookController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
         }
     }
+
+    @PutMapping("/{orderId}")
+    public ResponseEntity<?> modifyOrder(@PathVariable Long orderId, @RequestBody OrderDTO orderDto, HttpServletRequest httpRequest) {
+        String path = httpRequest.getRequestURI();
+        String requestId = httpRequest.getHeader("X-Request-Id");
+        try {
+            OrderBook orderBook = OrderToOrderBookMapper.toOrderBook(orderDto);
+            OrderBook updatedOrder = matchingPort.modifyOrder(orderId, orderBook);
+            return ResponseEntity.ok(updatedOrder);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(Instant.now(), path, 404, "Not Found", ex.getMessage(), requestId != null ? requestId : ""));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(Instant.now(), path, 400, "Bad Request", ex.getMessage(), requestId != null ? requestId : ""));
+        } catch (Exception e) {
+            logger.error("Erreur lors de la modification de l'ordre {}: {}", orderId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponse(Instant.now(), path, 500, "Internal Server Error", "Erreur lors de la modification de l'ordre : " + e.getMessage(), requestId != null ? requestId : ""));
+        }
+    }
+
+    @DeleteMapping("/{orderId}")
+    public ResponseEntity<?> cancelOrder(@PathVariable Long orderId, HttpServletRequest httpRequest) {
+        String path = httpRequest.getRequestURI();
+        String requestId = httpRequest.getHeader("X-Request-Id");
+        try {
+            OrderBook cancelledOrder = matchingPort.cancelOrder(orderId);
+            return ResponseEntity.ok(cancelledOrder);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(Instant.now(), path, 404, "Not Found", ex.getMessage(), requestId != null ? requestId : ""));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(Instant.now(), path, 400, "Bad Request", ex.getMessage(), requestId != null ? requestId : ""));
+        } catch (Exception e) {
+            logger.error("Erreur lors de l'annulation de l'ordre {}: {}", orderId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponse(Instant.now(), path, 500, "Internal Server Error", "Erreur lors de l'annulation de l'ordre : " + e.getMessage(), requestId != null ? requestId : ""));
+        }
+    }
 }

@@ -14,6 +14,7 @@ import com.microservices.log430.orderservice.adapters.external.matching.dto.Orde
 import com.microservices.log430.orderservice.adapters.external.matching.dto.MatchingResult;
 import com.microservices.log430.orderservice.adapters.external.matching.dto.ExecutionReportDTO;
 import com.microservices.log430.orderservice.adapters.external.matching.dto.OrderBookDTO;
+import com.microservices.log430.orderservice.adapters.web.dto.OrderResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -267,5 +268,102 @@ public class OrderService implements OrderPlacementPort {
             }
             return OrderPlacementResult.success(savedOrder.getId(), message.toString());
         }
+    }
+
+    @Override
+    public OrderResponse modifyOrder(Long orderId, OrderRequest orderRequest, Long userId) {
+        Optional<Order> orderOpt = orderPort.findById(orderId);
+        if (orderOpt.isEmpty()) throw new IllegalArgumentException("Ordre non trouvé");
+        Order order = orderOpt.get();
+        // Vérification du verrouillage optimiste
+        Long versionBefore = order.getVersion();
+        if (Order.OrderStatus.FILLED.equals(order.getStatus()) || Order.OrderStatus.CANCELLED.equals(order.getStatus())) {
+            throw new IllegalStateException("Impossible de modifier un ordre rempli ou annulé");
+        }
+        // Contrôles pré-trade
+        PreTradeValidationPort.ValidationRequest validationRequest = new PreTradeValidationPort.ValidationRequest(
+            orderRequest.getSymbol(),
+            Order.Side.valueOf(orderRequest.getSide()),
+            Order.OrderType.valueOf(orderRequest.getType()),
+            orderRequest.getQuantity(),
+            orderRequest.getPrice(),
+            walletClient.getWallet(userId).getWallet()
+        );
+        PreTradeValidationPort.ValidationResult validation = preTradeValidationPort.validateOrder(validationRequest);
+        if (!validation.isValid()) {
+            order.setStatus(Order.OrderStatus.REJETE);
+            order.setRejectReason(validation.getRejectReason());
+            orderPort.save(order);
+            throw new IllegalStateException("Modification rejetée : " + validation.getRejectReason());
+        }
+        // Appliquer les modifications
+        order.setQuantity(orderRequest.getQuantity());
+        order.setPrice(orderRequest.getPrice());
+        order.setType(Order.OrderType.valueOf(orderRequest.getType()));
+        order.setDuration(Order.DurationType.valueOf(orderRequest.getDuration()));
+        order.setTimestamp(Instant.now());
+        Order updatedOrder = orderPort.save(order);
+        // Vérification du verrouillage optimiste
+        if (!versionBefore.equals(updatedOrder.getVersion() - 1)) {
+            throw new RuntimeException("Conflit de version : l'ordre a été modifié par une autre transaction");
+        }
+        // Synchronisation avec le matching-service
+        OrderDTO orderDTO = new OrderDTO(
+            updatedOrder.getId(),
+            updatedOrder.getClientOrderId(),
+            updatedOrder.getUserId(),
+            updatedOrder.getSymbol(),
+            updatedOrder.getSide().name(),
+            updatedOrder.getType().name(),
+            updatedOrder.getQuantity(),
+            updatedOrder.getPrice(),
+            updatedOrder.getDuration().name(),
+            updatedOrder.getTimestamp(),
+            updatedOrder.getStatus().name(),
+            updatedOrder.getRejectReason()
+        );
+        try {
+            matchingClient.modifyOrder(updatedOrder.getId(), orderDTO);
+        } catch (Exception e) {
+            logger.error("Erreur lors de la synchronisation avec le matching-service : {}", e.getMessage(), e);
+        }
+        return OrderResponse.fromOrder(updatedOrder);
+    }
+
+    public OrderResponse cancelOrder(Long orderId) {
+        Optional<Order> orderOpt = orderPort.findById(orderId);
+        if (orderOpt.isEmpty()) throw new IllegalArgumentException("Ordre non trouvé");
+        Order order = orderOpt.get();
+        Long versionBefore = order.getVersion();
+        if (Order.OrderStatus.FILLED.equals(order.getStatus()) || Order.OrderStatus.CANCELLED.equals(order.getStatus())) {
+            throw new IllegalStateException("Impossible d'annuler un ordre rempli ou déjà annulé");
+        }
+        order.setStatus(Order.OrderStatus.CANCELLED);
+        order.setTimestamp(Instant.now());
+        Order updatedOrder = orderPort.save(order);
+        if (!versionBefore.equals(updatedOrder.getVersion() - 1)) {
+            throw new RuntimeException("Conflit de version : l'ordre a été modifié par une autre transaction");
+        }
+        // Synchronisation avec le matching-service
+        OrderDTO orderDTO = new OrderDTO(
+            updatedOrder.getId(),
+            updatedOrder.getClientOrderId(),
+            updatedOrder.getUserId(),
+            updatedOrder.getSymbol(),
+            updatedOrder.getSide().name(),
+            updatedOrder.getType().name(),
+            updatedOrder.getQuantity(),
+            updatedOrder.getPrice(),
+            updatedOrder.getDuration().name(),
+            updatedOrder.getTimestamp(),
+            updatedOrder.getStatus().name(),
+            updatedOrder.getRejectReason()
+        );
+        try {
+            matchingClient.cancelOrder(updatedOrder.getId(), orderDTO);
+        } catch (Exception e) {
+            logger.error("Erreur lors de la synchronisation avec le matching-service : {}", e.getMessage(), e);
+        }
+        return OrderResponse.fromOrder(updatedOrder);
     }
 }

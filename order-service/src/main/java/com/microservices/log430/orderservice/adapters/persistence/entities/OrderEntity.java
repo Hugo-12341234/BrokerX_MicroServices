@@ -48,6 +48,9 @@ public class OrderEntity {
     @Column(name = "reject_reason")
     private String rejectReason;
 
+    @Version
+    private Long version;
+
     public enum Side {
         ACHAT, VENTE
     }
@@ -136,4 +139,6 @@ public class OrderEntity {
     public void setRejectReason(String rejectReason) {
         this.rejectReason = rejectReason;
     }
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 }

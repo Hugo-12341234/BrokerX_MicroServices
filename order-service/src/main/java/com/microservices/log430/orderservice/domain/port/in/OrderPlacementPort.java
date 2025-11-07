@@ -5,6 +5,8 @@ import com.microservices.log430.orderservice.adapters.web.dto.OrderResponse;
 
 public interface OrderPlacementPort {
     OrderPlacementResult placeOrder(OrderPlacementRequest request, String clientOrderId);
+    OrderResponse modifyOrder(Long orderId, OrderRequest orderRequest, Long userId);
+    OrderResponse cancelOrder(Long orderId);
 
     class OrderPlacementRequest {
         private final OrderRequest orderRequest;
@@ -54,4 +56,3 @@ public interface OrderPlacementPort {
         }
     }
 }
-
