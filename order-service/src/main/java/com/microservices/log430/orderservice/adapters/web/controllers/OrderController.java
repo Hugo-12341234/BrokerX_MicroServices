@@ -146,4 +146,28 @@ public class OrderController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponse(Instant.now(), path, 500, "Internal Server Error", "Erreur lors de l'annulation de l'ordre : " + e.getMessage(), requestId != null ? requestId : ""));
         }
     }
+
+    @GetMapping
+    public ResponseEntity<?> getOrdersByUser(HttpServletRequest httpRequest) {
+        String userIdHeader = httpRequest.getHeader("X-User-Id");
+        String path = httpRequest.getRequestURI();
+        String requestId = httpRequest.getHeader("X-Request-Id");
+        if (userIdHeader == null || userIdHeader.trim().isEmpty()) {
+            ErrorResponse err = new ErrorResponse(Instant.now(), path, 400, "Bad Request", "Header X-User-Id manquant", requestId != null ? requestId : "");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(err);
+        }
+        Long userId;
+        try { userId = Long.valueOf(userIdHeader); } catch (NumberFormatException e) {
+            ErrorResponse err = new ErrorResponse(Instant.now(), path, 400, "Bad Request", "Header X-User-Id invalide", requestId != null ? requestId : "");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(err);
+        }
+        try {
+            var orders = orderPlacementPort.findOrdersByUserId(userId);
+            return ResponseEntity.ok(orders);
+        } catch (Exception e) {
+            logger.error("Erreur lors de la récupération des ordres pour userId={}: {}", userId, e.getMessage(), e);
+            ErrorResponse err = new ErrorResponse(Instant.now(), path, 500, "Internal Server Error", "Erreur lors de la récupération des ordres : " + e.getMessage(), requestId != null ? requestId : "");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
+        }
+    }
 }

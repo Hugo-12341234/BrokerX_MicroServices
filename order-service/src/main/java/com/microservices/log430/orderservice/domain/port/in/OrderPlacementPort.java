@@ -2,11 +2,15 @@ package com.microservices.log430.orderservice.domain.port.in;
 
 import com.microservices.log430.orderservice.adapters.web.dto.OrderRequest;
 import com.microservices.log430.orderservice.adapters.web.dto.OrderResponse;
+import com.microservices.log430.orderservice.domain.model.entities.Order;
+
+import java.util.List;
 
 public interface OrderPlacementPort {
     OrderPlacementResult placeOrder(OrderPlacementRequest request, String clientOrderId);
     OrderResponse modifyOrder(Long orderId, OrderRequest orderRequest, Long userId);
     OrderResponse cancelOrder(Long orderId);
+    List<Order> findOrdersByUserId(Long userId);
 
     class OrderPlacementRequest {
         private final OrderRequest orderRequest;

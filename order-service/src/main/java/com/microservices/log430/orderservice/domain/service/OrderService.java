@@ -366,4 +366,9 @@ public class OrderService implements OrderPlacementPort {
         }
         return OrderResponse.fromOrder(updatedOrder);
     }
+
+    @Override
+    public List<Order> findOrdersByUserId(Long userId) {
+        return orderPort.findByUserId(userId);
+    }
 }
