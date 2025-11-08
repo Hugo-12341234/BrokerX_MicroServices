@@ -277,6 +277,10 @@ public class OrderService implements OrderPlacementPort {
         Optional<Order> orderOpt = orderPort.findById(orderId);
         if (orderOpt.isEmpty()) throw new IllegalArgumentException("Ordre non trouvé");
         Order order = orderOpt.get();
+        // Vérification de l'expiration pour les ordres DAY
+        if (isOrderExpired(order)) {
+            throw new IllegalStateException("Impossible de modifier un ordre expiré (DAY)");
+        }
         // Vérification du verrouillage optimiste
         Long versionBefore = order.getVersion();
         if (Order.OrderStatus.FILLED.equals(order.getStatus()) || Order.OrderStatus.CANCELLED.equals(order.getStatus())) {
@@ -338,6 +342,10 @@ public class OrderService implements OrderPlacementPort {
         Optional<Order> orderOpt = orderPort.findById(orderId);
         if (orderOpt.isEmpty()) throw new IllegalArgumentException("Ordre non trouvé");
         Order order = orderOpt.get();
+        // Vérification de l'expiration pour les ordres DAY
+        if (isOrderExpired(order)) {
+            throw new IllegalStateException("Impossible d'annuler un ordre expiré (DAY)");
+        }
         Long versionBefore = order.getVersion();
         if (Order.OrderStatus.FILLED.equals(order.getStatus()) || Order.OrderStatus.CANCELLED.equals(order.getStatus())) {
             throw new IllegalStateException("Impossible d'annuler un ordre rempli ou déjà annulé");
@@ -375,5 +383,13 @@ public class OrderService implements OrderPlacementPort {
     @Override
     public List<Order> findOrdersByUserId(Long userId) {
         return orderPort.findByUserId(userId);
+    }
+
+    private boolean isOrderExpired(Order order) {
+        if (order.getDuration() == Order.DurationType.DAY) {
+            Instant expiration = order.getTimestamp().plusSeconds(24 * 3600);
+            return Instant.now().isAfter(expiration);
+        }
+        return false;
     }
 }

@@ -107,7 +107,7 @@ const OrdersDashboard = ({ userId }) => {
             </tr>
           </thead>
           <tbody>
-            {orders.map(order => (
+            {[...orders].reverse().map(order => (
               <tr key={order.id}>
                 <td>{order.id}</td>
                 <td>{order.symbol}</td>

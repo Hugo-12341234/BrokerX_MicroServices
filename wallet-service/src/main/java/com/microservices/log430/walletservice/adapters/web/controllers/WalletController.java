@@ -97,10 +97,11 @@ public class WalletController {
     }
 
     @PostMapping("/deposit")
-    public ResponseEntity<?> deposit(@RequestBody DepositRequest request,
-                                                   HttpServletRequest httpRequest) {
+    @CacheEvict(value = "walletCache", key = "T(java.lang.Long).valueOf(#userIdHeader)")
+    public ResponseEntity<?> deposit(@RequestHeader("X-User-Id") String userIdHeader,
+                                     @RequestBody DepositRequest request,
+                                     HttpServletRequest httpRequest) {
         try {
-            String userIdHeader = httpRequest.getHeader("X-User-Id");
             String path = httpRequest.getRequestURI();
             String requestId = httpRequest.getHeader("X-Request-Id");
             logger.info("Requête dépôt reçue. Path: {}, RequestId: {}, X-User-Id: {}", path, requestId, userIdHeader);

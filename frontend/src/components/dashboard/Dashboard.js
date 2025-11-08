@@ -38,6 +38,7 @@ function Dashboard() {
             return;
         }
         const data = await response.json();
+        console.log('Fetch Wallet Response Data:', data); // Debug log
         if (response.ok && data.success && data.wallet) {
           setWallet(data.wallet);
           setBalance(data.wallet.balance);
