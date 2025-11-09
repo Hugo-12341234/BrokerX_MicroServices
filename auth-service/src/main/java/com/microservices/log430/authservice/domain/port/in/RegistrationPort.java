@@ -6,4 +6,5 @@ import java.time.LocalDate;
 public interface RegistrationPort {
     User register(String email, String rawPassword, String name, String adresse, LocalDate dateDeNaissance);
     boolean verifyUser(String token);
+    User getUserInfo(Long userId);
 }

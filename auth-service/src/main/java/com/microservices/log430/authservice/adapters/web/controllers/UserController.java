@@ -3,12 +3,9 @@ package com.microservices.log430.authservice.adapters.web.controllers;
 import com.microservices.log430.authservice.adapters.web.dto.ErrorResponse;
 import com.microservices.log430.authservice.adapters.web.dto.UserForm;
 import com.microservices.log430.authservice.domain.port.in.RegistrationPort;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -96,6 +93,41 @@ public class UserController {
                 requestId != null ? requestId : ""
             );
             return ResponseEntity.status(status).body(err);
+        }
+    }
+
+    @GetMapping("/{userId}")
+    public ResponseEntity<?> getUserInfo(@PathVariable Long userId, HttpServletRequest httpRequest) {
+        logger.info("Récupération des informations pour l'utilisateur ID : {}", userId);
+        String path = httpRequest.getRequestURI();
+        String requestId = httpRequest.getHeader("X-Request-Id");
+        try {
+            var userInfo = registrationPort.getUserInfo(userId);
+            if (userInfo == null) {
+                logger.warn("Utilisateur non trouvé pour l'ID : {}", userId);
+                ErrorResponse err = new ErrorResponse(
+                    java.time.Instant.now(),
+                    path,
+                    HttpStatus.NOT_FOUND.value(),
+                    "Not Found",
+                    "Utilisateur non trouvé.",
+                    requestId != null ? requestId : ""
+                );
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(err);
+            }
+            logger.info("Informations récupérées pour l'utilisateur ID : {}", userId);
+            return ResponseEntity.ok(userInfo);
+        } catch (Exception e) {
+            logger.error("Erreur lors de la récupération des informations utilisateur : {}", e.getMessage());
+            ErrorResponse err = new ErrorResponse(
+                java.time.Instant.now(),
+                path,
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "Internal Server Error",
+                "Erreur lors de la récupération des informations utilisateur.",
+                requestId != null ? requestId : ""
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
         }
     }
 }

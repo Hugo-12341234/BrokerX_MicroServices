@@ -15,6 +15,10 @@ import com.microservices.log430.orderservice.adapters.external.matching.dto.Matc
 import com.microservices.log430.orderservice.adapters.external.matching.dto.ExecutionReportDTO;
 import com.microservices.log430.orderservice.adapters.external.matching.dto.OrderBookDTO;
 import com.microservices.log430.orderservice.adapters.web.dto.OrderResponse;
+import com.microservices.log430.orderservice.adapters.external.notification.NotificationClient;
+import com.microservices.log430.orderservice.adapters.external.notification.dto.NotificationLogDTO;
+import com.microservices.log430.orderservice.adapters.external.auth.UserInfoClient;
+import com.microservices.log430.orderservice.adapters.external.auth.dto.UserDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -32,13 +36,17 @@ public class OrderService implements OrderPlacementPort {
     private final PreTradeValidationPort preTradeValidationPort;
     private final WalletClient walletClient;
     private final MatchingClient matchingClient;
+    private final NotificationClient notificationClient;
+    private final UserInfoClient userInfoClient;
 
     @Autowired
-    public OrderService(OrderPort orderPort, PreTradeValidationPort preTradeValidationPort, WalletClient walletClient, MatchingClient matchingClient) {
+    public OrderService(OrderPort orderPort, PreTradeValidationPort preTradeValidationPort, WalletClient walletClient, MatchingClient matchingClient, NotificationClient notificationClient, UserInfoClient userInfoClient) {
         this.orderPort = orderPort;
         this.preTradeValidationPort = preTradeValidationPort;
         this.walletClient = walletClient;
         this.matchingClient = matchingClient;
+        this.notificationClient = notificationClient;
+        this.userInfoClient = userInfoClient;
     }
 
     @Override
@@ -204,9 +212,39 @@ public class OrderService implements OrderPlacementPort {
                             logger.info("Portefeuille mis à jour pour le vendeur userId={} : -{} {} et +{} en cash",
                                 exec.getSellerUserId(), exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice() * exec.getFillQuantity());
                         }
+                        // Notification buyer
+                        String buyerEmail = null;
+                        if (exec.getBuyerUserId() != null && exec.getBuyerUserId() != 9999L) {
+                            try {
+                                UserDTO buyerInfo = userInfoClient.getUserInfo(exec.getBuyerUserId());
+                                buyerEmail = buyerInfo != null ? buyerInfo.getEmail() : null;
+                            } catch (Exception e) {
+                                logger.warn("Impossible d'obtenir l'email de l'acheteur userId={}", exec.getBuyerUserId());
+                            }
+                            String buyerMsg = String.format("Exécution d'ordre ACHAT : %d %s @ %.2f. OrderId: %s. ExecutionReportId: %s. Date: %s.",
+                                exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice(), exec.getOrderId(), exec.getId(), Instant.now());
+                            NotificationLogDTO buyerNotif = new NotificationLogDTO(
+                                exec.getBuyerUserId(), buyerMsg, Instant.now(), "WEBSOCKET", buyerEmail);
+                            notificationClient.sendNotification(buyerNotif);
+                        }
+                        // Notification seller
+                        String sellerEmail = null;
+                        if (exec.getSellerUserId() != null && exec.getSellerUserId() != 9999L) {
+                            try {
+                                UserDTO sellerInfo = userInfoClient.getUserInfo(exec.getSellerUserId());
+                                sellerEmail = sellerInfo != null ? sellerInfo.getEmail() : null;
+                            } catch (Exception e) {
+                                logger.warn("Impossible d'obtenir l'email du vendeur userId={}", exec.getSellerUserId());
+                            }
+                            String sellerMsg = String.format("Exécution d'ordre VENTE : %d %s @ %.2f. OrderId: %s. ExecutionReportId: %s. Date: %s.",
+                                exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice(), exec.getOrderId(), exec.getId(), Instant.now());
+                            NotificationLogDTO sellerNotif = new NotificationLogDTO(
+                                exec.getSellerUserId(), sellerMsg, Instant.now(), "WEBSOCKET", sellerEmail);
+                            notificationClient.sendNotification(sellerNotif);
+                        }
                         deals.add(String.format("Deal: %d %s @ %.2f entre acheteur %d et vendeur %d", exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice(), exec.getBuyerUserId(), exec.getSellerUserId()));
                     } catch (Exception ex) {
-                        logger.error("Erreur lors de la mise à jour du portefeuille pour le deal : {}", ex.getMessage(), ex);
+                        logger.error("Erreur lors de la mise à jour du portefeuille ou de la notification pour le deal : {}", ex.getMessage(), ex);
                     }
                 }
             }

@@ -104,6 +104,12 @@ public class RegistrationService implements RegistrationPort {
         return false;
     }
 
+    @Override
+    public User getUserInfo(Long userId) {
+        Optional<User> userOpt = userPort.findById(userId);
+        return userOpt.orElse(null);
+    }
+
     private String hashToken(String token) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
