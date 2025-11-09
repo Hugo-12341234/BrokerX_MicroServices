@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
+import NotificationsListener from '../NotificationsListener';
 
 const SYMBOLS = ['AAPL', 'MSFT', 'TSLA'];
 const SIDES = [
@@ -29,6 +30,7 @@ function PlaceOrderPage() {
   });
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [notification, setNotification] = useState(null);
 
   const handleChange = e => {
     const { name, value } = e.target;
@@ -70,6 +72,12 @@ function PlaceOrderPage() {
 
   return (
     <div style={{ maxWidth: 400, margin: 'auto' }}>
+      <NotificationsListener userId={localStorage.getItem('userId')} onNotification={msg => setNotification(msg)} />
+      {notification && (
+        <div style={{ background: '#ffeeba', color: '#856404', padding: '10px', borderRadius: '5px', marginBottom: '1rem', fontWeight: 'bold' }}>
+          Notification : {notification}
+        </div>
+      )}
       <button onClick={() => navigate('/dashboard')} style={{ marginBottom: '1rem' }}>Retour au dashboard</button>
       <h2>Placer un ordre</h2>
       <form onSubmit={handleSubmit}>

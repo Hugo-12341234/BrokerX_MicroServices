@@ -3,6 +3,7 @@ package com.microservices.log430.notificationservice.adapters.web.controllers;
 import com.microservices.log430.notificationservice.adapters.web.dto.ErrorResponse;
 import com.microservices.log430.notificationservice.domain.port.in.NotificationPort;
 import com.microservices.log430.notificationservice.domain.model.entities.NotificationLog;
+import com.microservices.log430.notificationservice.adapters.web.dto.NotificationLogDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,10 +24,10 @@ public class NotificationController {
     }
 
     @PostMapping("")
-    public ResponseEntity<?> notify(@RequestBody NotificationLog notificationLog) {
-        logger.info("Réception d'une notification à envoyer : userId={}, channel={}, message={}", notificationLog.getUserId(), notificationLog.getChannel(), notificationLog.getMessage());
+    public ResponseEntity<?> notify(@RequestBody NotificationLogDTO notificationLogDTO) {
+        logger.info("Réception d'une notification à envoyer : userId={}, channel={}, message={}, email={}", notificationLogDTO.getUserId(), notificationLogDTO.getChannel(), notificationLogDTO.getMessage(), notificationLogDTO.getEmail());
         try {
-            NotificationLog saved = notificationPort.sendNotification(notificationLog);
+            NotificationLog saved = notificationPort.sendNotification(notificationLogDTO);
             logger.info("Notification envoyée et journalisée : id={}, userId={}, channel={}", saved.getId(), saved.getUserId(), saved.getChannel());
             return ResponseEntity.ok(saved);
         } catch (Exception e) {

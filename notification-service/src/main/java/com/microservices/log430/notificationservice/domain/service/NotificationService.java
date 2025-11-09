@@ -1,5 +1,6 @@
 package com.microservices.log430.notificationservice.domain.service;
 
+import com.microservices.log430.notificationservice.adapters.web.dto.NotificationLogDTO;
 import com.microservices.log430.notificationservice.domain.port.in.NotificationPort;
 import com.microservices.log430.notificationservice.domain.port.out.NotificationLogPort;
 import com.microservices.log430.notificationservice.domain.model.entities.NotificationLog;
@@ -28,38 +29,44 @@ public class NotificationService implements NotificationPort {
     }
 
     @Override
-    public NotificationLog sendNotification(NotificationLog notificationLog) {
+    public NotificationLog sendNotification(NotificationLogDTO notificationLogDTO) {
         // Ajoute l'horodatage ici si non fourni
-        if (notificationLog.getTimestamp() == null) {
-            notificationLog.setTimestamp(Instant.now());
+        if (notificationLogDTO.getTimestamp() == null) {
+            notificationLogDTO.setTimestamp(Instant.now());
         }
         boolean websocketSent = false;
         try {
-            logger.info("Tentative d'envoi WebSocket à userId={}, channel={}", notificationLog.getUserId(), notificationLog.getChannel());
+            logger.info("Tentative d'envoi WebSocket à userId={}, channel={}", notificationLogDTO.getUserId(), notificationLogDTO.getChannel());
             // Envoi WebSocket (topic par userId)
-            messagingTemplate.convertAndSend("/topic/notifications/" + notificationLog.getUserId(), notificationLog.getMessage());
+            messagingTemplate.convertAndSend("/topic/notifications/" + notificationLogDTO.getUserId(), notificationLogDTO.getMessage());
             websocketSent = true;
-            logger.info("Notification WebSocket envoyée avec succès à userId={}", notificationLog.getUserId());
+            logger.info("Notification WebSocket envoyée avec succès à userId={}", notificationLogDTO.getUserId());
         } catch (Exception e) {
-            logger.error("Échec de l'envoi WebSocket à userId={}: {}", notificationLog.getUserId(), e.getMessage(), e);
+            logger.error("Échec de l'envoi WebSocket à userId={}: {}", notificationLogDTO.getUserId(), e.getMessage(), e);
             websocketSent = false;
         }
         if (!websocketSent) {
             // Fallback email
             try {
-                logger.info("Envoi fallback email à userId={}", notificationLog.getUserId());
+                logger.info("Envoi fallback email à userId={}", notificationLogDTO.getUserId());
                 SimpleMailMessage mail = new SimpleMailMessage();
-                mail.setTo("user" + notificationLog.getUserId() + "@example.com");
+                mail.setTo(notificationLogDTO.getEmail());
                 mail.setSubject("Notification BrokerX");
-                mail.setText(notificationLog.getMessage());
+                mail.setText(notificationLogDTO.getMessage());
                 mailSender.send(mail);
-                logger.info("Email envoyé avec succès à userId={}", notificationLog.getUserId());
+                logger.info("Email envoyé avec succès à userId={}", notificationLogDTO.getUserId());
             } catch (Exception e) {
-                logger.error("Échec de l'envoi email à userId={}: {}", notificationLog.getUserId(), e.getMessage(), e);
+                logger.error("Échec de l'envoi email à userId={}: {}", notificationLogDTO.getUserId(), e.getMessage(), e);
             }
         }
-        logger.info("Journalisation de la notification pour userId={}, channel={}", notificationLog.getUserId(), notificationLog.getChannel());
+        logger.info("Journalisation de la notification pour userId={}, channel={}", notificationLogDTO.getUserId(), notificationLogDTO.getChannel());
         // Journalisation
+        NotificationLog notificationLog = new NotificationLog(
+                notificationLogDTO.getUserId(),
+                notificationLogDTO.getMessage(),
+                notificationLogDTO.getTimestamp(),
+                notificationLogDTO.getChannel()
+        );
         return notificationLogPort.save(notificationLog);
     }
 }

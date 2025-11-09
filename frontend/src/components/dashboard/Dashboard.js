@@ -4,12 +4,14 @@ import QuickOrders from './QuickOrders';
 import { useNavigate } from 'react-router-dom';
 import OrdersDashboard from '../OrdersDashboard';
 import '../OrdersDashboard.css';
+import NotificationsListener from '../NotificationsListener';
 
 function Dashboard() {
   const [wallet, setWallet] = useState(null);
   const [balance, setBalance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notification, setNotification] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -64,6 +66,12 @@ function Dashboard() {
 
   return (
     <div style={{ maxWidth: 500, margin: '0 auto', padding: '2rem' }}>
+      <NotificationsListener userId={localStorage.getItem('userId')} onNotification={msg => setNotification(msg)} />
+      {notification && (
+        <div style={{ background: '#ffeeba', color: '#856404', padding: '10px', borderRadius: '5px', marginBottom: '1rem', fontWeight: 'bold' }}>
+          Notification : {notification}
+        </div>
+      )}
       <h2>Tableau de bord du portefeuille</h2>
       {loading ? (
         <div>Chargement du solde...</div>
