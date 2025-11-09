@@ -12,6 +12,7 @@
     <module>api-gateway</module>
     <module>auth-service</module>
     <module>matching-service</module>
+    <module>notification-service</module>
     <module>order-service</module>
     <module>wallet-service</module>
   </modules>
