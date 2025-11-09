@@ -1,25 +1,12 @@
 package com.microservices.log430.notificationservice.domain.model.entities;
 
-import jakarta.persistence.*;
 import java.time.Instant;
 
-@Entity
-@Table(name = "notification_log")
 public class NotificationLog {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(nullable = false)
     private Long userId;
-
-    @Column(nullable = false)
     private String message;
-
-    @Column(nullable = false)
     private Instant timestamp;
-
-    @Column(nullable = false)
     private String channel;
 
     public NotificationLog() {}
@@ -43,4 +30,3 @@ public class NotificationLog {
     public String getChannel() { return channel; }
     public void setChannel(String channel) { this.channel = channel; }
 }
-
