@@ -80,6 +80,25 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres-notification:
+    image: postgres:15-alpine
+    container_name: brokerx-postgres-notification
+    environment:
+      POSTGRES_DB: brokerxdb_notification
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_notification_data:/var/lib/postgresql/data
+    ports:
+      - "5437:5432"
+    networks:
+      - brokerx-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d brokerxdb_notification"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ===========================================
   # MICROSERVICES SPRING BOOT
   # ===========================================
@@ -160,6 +179,24 @@ services:
       retries: 3
       start_period: 40s
 
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      postgres-notification:
+        condition: service_healthy
+    networks:
+      - brokerx-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   api-gateway:
     build:
       context: .
@@ -224,6 +261,7 @@ services:
       - order-service
       - wallet-service
       - matching-service
+      - notification-service
 
   # ===========================================
   # MONITORING - PROMETHEUS & GRAFANA
@@ -297,6 +335,8 @@ volumes:
   postgres_wallet_data:
     driver: local
   postgres_matching_data:
+    driver: local
+  postgres_notification_data:
     driver: local
   prometheus_data:
     driver: local

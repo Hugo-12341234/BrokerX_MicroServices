@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 @FeignClient(name = "notification-service", url = "${gateway.url:http://api-gateway:8079}", configuration = GlobalFeignConfig.class)
 public interface NotificationClient {
-    @PostMapping("/api/v1/notifications")
+    @PostMapping("/api/v1/notification")
     void sendNotification(@RequestBody NotificationLogDTO notificationLogDTO);
 }
 

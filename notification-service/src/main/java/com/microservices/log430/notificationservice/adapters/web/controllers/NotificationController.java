@@ -13,7 +13,7 @@ import org.springframework.http.HttpStatus;
 import java.time.Instant;
 
 @RestController
-@RequestMapping("/api/v1/notifications")
+@RequestMapping("/api/v1/notification")
 public class NotificationController {
     private static final Logger logger = LoggerFactory.getLogger(NotificationController.class);
     private final NotificationPort notificationPort;
