@@ -47,6 +47,14 @@ scrape_configs:
     scrape_interval: 15s
     scrape_timeout: 10s
 
+  # Notification Service
+  - job_name: 'notification-service'
+    static_configs:
+      - targets: ['notification-service:8086']
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
   # Prometheus self-monitoring
   - job_name: 'prometheus'
     static_configs:
