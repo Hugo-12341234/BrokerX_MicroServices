@@ -7,22 +7,34 @@ const NotificationsListener = ({ userId, onNotification }) => {
 
   useEffect(() => {
     if (!userId) return;
-    const socket = new SockJS(`${process.env.REACT_APP_API_URL.replace('/api/v1', '')}/ws`);
-    const stompClient = new Client({
-      webSocketFactory: () => socket,
-      reconnectDelay: 5000,
-      onConnect: () => {
-        stompClient.subscribe(`/topic/notifications/${userId}`, (message) => {
-          if (onNotification) onNotification(message.body);
-        });
-      },
-      onStompError: (frame) => {
-        console.error('STOMP error:', frame);
-      }
-    });
+    // Construction de l'URL WebSocket
+    const wsBaseUrl = process.env.REACT_APP_API_URL.replace('/api/v1', '');
+    const wsUrl = `${wsBaseUrl}/ws`;
+    console.log('[NotificationsListener] WebSocket URL utilisé :', wsUrl);
+    const socket = new SockJS(wsUrl);
+    const stompClient = new Client();
+    stompClient.webSocketFactory = () => socket;
+    stompClient.reconnectDelay = 5000;
+    stompClient.onConnect = () => {
+      console.log('[NotificationsListener] Connecté au WebSocket');
+      stompClient.subscribe(`/topic/notifications/${userId}`, (message) => {
+        console.log('[NotificationsListener] Message reçu :', message.body);
+        if (onNotification) onNotification(message.body);
+      });
+    };
+    stompClient.onStompError = (frame) => {
+      console.error('[NotificationsListener] Erreur STOMP :', frame);
+    };
+    stompClient.onWebSocketClose = (event) => {
+      console.warn('[NotificationsListener] WebSocket fermé :', event);
+    };
+    stompClient.onWebSocketError = (event) => {
+      console.error('[NotificationsListener] Erreur WebSocket :', event);
+    };
     stompClient.activate();
     stompClientRef.current = stompClient;
     return () => {
+      console.log('[NotificationsListener] Déconnexion du WebSocket');
       stompClientRef.current && stompClientRef.current.deactivate();
     };
   }, [userId, onNotification]);
@@ -31,4 +43,3 @@ const NotificationsListener = ({ userId, onNotification }) => {
 };
 
 export default NotificationsListener;
-
