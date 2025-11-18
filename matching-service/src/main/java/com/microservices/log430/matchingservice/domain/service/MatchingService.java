@@ -1,5 +1,7 @@
 package com.microservices.log430.matchingservice.domain.service;
 
+import com.microservices.log430.matchingservice.adapters.web.dto.LastPriceDTO;
+import com.microservices.log430.matchingservice.adapters.web.dto.OrderBookDTO;
 import com.microservices.log430.matchingservice.domain.model.entities.OrderBook;
 import com.microservices.log430.matchingservice.domain.model.entities.ExecutionReport;
 import com.microservices.log430.matchingservice.adapters.web.dto.MatchingResult;
@@ -299,5 +301,17 @@ public class MatchingService implements MatchingPort {
         OrderBook cancelledOrder = orderBookPort.save(existing);
         logger.info("Ordre annulé : id={}, clientOrderId={}, status={}", cancelledOrder.getId(), cancelledOrder.getClientOrderId(), cancelledOrder.getStatus());
         return cancelledOrder;
+    }
+
+    @Override
+    public OrderBookDTO getOrderBookBySymbol(String symbol) {
+        // Logique pour récupérer le snapshot du carnet d'ordres pour le symbole
+        return orderBookPort.getOrderBookSnapshot(symbol);
+    }
+
+    @Override
+    public LastPriceDTO getLastPriceBySymbol(String symbol) {
+        // Logique pour récupérer le dernier prix d'une transaction réalisée pour le symbole
+        return orderBookPort.getLastExecutionPrice(symbol);
     }
 }

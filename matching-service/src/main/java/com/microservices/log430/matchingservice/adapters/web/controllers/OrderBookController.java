@@ -1,10 +1,8 @@
 package com.microservices.log430.matchingservice.adapters.web.controllers;
 
+import com.microservices.log430.matchingservice.adapters.web.dto.*;
 import com.microservices.log430.matchingservice.domain.model.entities.OrderBook;
 import com.microservices.log430.matchingservice.domain.port.in.MatchingPort;
-import com.microservices.log430.matchingservice.adapters.web.dto.MatchingResult;
-import com.microservices.log430.matchingservice.adapters.web.dto.OrderDTO;
-import com.microservices.log430.matchingservice.adapters.web.dto.ErrorResponse;
 import com.microservices.log430.matchingservice.adapters.persistence.map.OrderToOrderBookMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -83,6 +81,68 @@ public class OrderBookController {
         } catch (Exception e) {
             logger.error("Erreur lors de l'annulation de l'ordre {}: {}", orderId, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponse(Instant.now(), path, 500, "Internal Server Error", "Erreur lors de l'annulation de l'ordre : " + e.getMessage(), requestId != null ? requestId : ""));
+        }
+    }
+
+    @GetMapping("")
+    public ResponseEntity<?> getOrderBookBySymbol(@RequestParam("symbol") String symbol) {
+        logger.info("GET /orderbook pour symbol: {}", symbol);
+        try {
+            OrderBookDTO orderBook = matchingPort.getOrderBookBySymbol(symbol);
+            if (orderBook == null) {
+                ErrorResponse err = new ErrorResponse(
+                        java.time.Instant.now(),
+                        "/api/v1/orderbook?symbol=" + symbol,
+                        404,
+                        "Not Found",
+                        "OrderBook introuvable pour ce symbole",
+                        null
+                );
+                return ResponseEntity.status(404).body(err);
+            }
+            return ResponseEntity.ok(orderBook);
+        } catch (Exception e) {
+            logger.error("Erreur lors de la récupération du orderbook pour symbol {}", symbol, e);
+            ErrorResponse err = new ErrorResponse(
+                    java.time.Instant.now(),
+                    "/api/v1/orderbook?symbol=" + symbol,
+                    500,
+                    "Internal Server Error",
+                    "Erreur interne lors de la récupération du orderbook",
+                    null
+            );
+            return ResponseEntity.status(500).body(err);
+        }
+    }
+
+    @GetMapping("/last-price")
+    public ResponseEntity<?> getLastPriceBySymbol(@RequestParam("symbol") String symbol) {
+        logger.info("GET /last-price pour symbol: {}", symbol);
+        try {
+            LastPriceDTO lastPrice = matchingPort.getLastPriceBySymbol(symbol);
+            if (lastPrice == null) {
+                ErrorResponse err = new ErrorResponse(
+                        java.time.Instant.now(),
+                        "/api/v1/last-price?symbol=" + symbol,
+                        404,
+                        "Not Found",
+                        "Dernier prix introuvable pour ce symbole",
+                        null
+                );
+                return ResponseEntity.status(404).body(err);
+            }
+            return ResponseEntity.ok(lastPrice);
+        } catch (Exception e) {
+            logger.error("Erreur lors de la récupération du dernier prix pour symbol {}", symbol, e);
+            ErrorResponse err = new ErrorResponse(
+                    java.time.Instant.now(),
+                    "/api/v1/last-price?symbol=" + symbol,
+                    500,
+                    "Internal Server Error",
+                    "Erreur interne lors de la récupération du dernier prix",
+                    null
+            );
+            return ResponseEntity.status(500).body(err);
         }
     }
 }

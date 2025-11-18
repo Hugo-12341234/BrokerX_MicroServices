@@ -1,5 +1,7 @@
 package com.microservices.log430.orderservice.domain.service;
 
+import com.microservices.log430.orderservice.adapters.external.marketdata.MarketDataClient;
+import com.microservices.log430.orderservice.adapters.external.marketdata.MarketDataUpdateDTO;
 import com.microservices.log430.orderservice.adapters.web.dto.OrderRequest;
 import com.microservices.log430.orderservice.domain.model.entities.Order;
 import com.microservices.log430.orderservice.domain.port.in.OrderPlacementPort;
@@ -38,15 +40,29 @@ public class OrderService implements OrderPlacementPort {
     private final MatchingClient matchingClient;
     private final NotificationClient notificationClient;
     private final UserInfoClient userInfoClient;
+    private final MarketDataClient marketDataClient;
 
     @Autowired
-    public OrderService(OrderPort orderPort, PreTradeValidationPort preTradeValidationPort, WalletClient walletClient, MatchingClient matchingClient, NotificationClient notificationClient, UserInfoClient userInfoClient) {
+    public OrderService(OrderPort orderPort, PreTradeValidationPort preTradeValidationPort, WalletClient walletClient,
+                        MatchingClient matchingClient, NotificationClient notificationClient, UserInfoClient userInfoClient,
+                        MarketDataClient marketDataClient) {
         this.orderPort = orderPort;
         this.preTradeValidationPort = preTradeValidationPort;
         this.walletClient = walletClient;
         this.matchingClient = matchingClient;
         this.notificationClient = notificationClient;
         this.userInfoClient = userInfoClient;
+        this.marketDataClient = marketDataClient;
+    }
+
+    private void notifyMarketData(String symbol, Double lastPrice, Object orderBook) {
+        MarketDataUpdateDTO dto = new MarketDataUpdateDTO(lastPrice, orderBook);
+        try {
+            marketDataClient.streamMarketData(symbol, dto);
+            logger.info("Market data notification envoyée pour symbol {}", symbol);
+        } catch (Exception e) {
+            logger.error("Erreur lors de l'envoi de la notification market data pour symbol {}", symbol, e);
+        }
     }
 
     @Override
@@ -142,6 +158,12 @@ public class OrderService implements OrderPlacementPort {
                 logger.error("Erreur lors de l'appel au matching-service : {}", e.getMessage(), e);
                 return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé, mais matching non effectué : " + e.getMessage());
             }
+
+            // Notification market-data avec le dernier prix et l'ordre book mis à jour
+            notifyMarketData(orderRequest.getSymbol(), matchingResult != null && matchingResult.executions != null && !matchingResult.executions.isEmpty() ?
+                matchingResult.executions.get(matchingResult.executions.size() - 1).getFillPrice() : null,
+                matchingResult != null ? matchingResult.updatedOrder : null);
+
             // Mise à jour du statut du Order selon le résultat du matching-service
             if (matchingResult != null && matchingResult.updatedOrder != null) {
                 OrderBookDTO ob = matchingResult.updatedOrder;
