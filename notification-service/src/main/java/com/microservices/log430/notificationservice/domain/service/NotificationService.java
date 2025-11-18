@@ -37,6 +37,7 @@ public class NotificationService implements NotificationPort {
         boolean websocketSent = false;
         try {
             logger.info("Tentative d'envoi WebSocket à userId={}, channel={}", notificationLogDTO.getUserId(), notificationLogDTO.getChannel());
+            logger.info("Message: {}", notificationLogDTO.getMessage());
             // Envoi WebSocket (topic par userId)
             messagingTemplate.convertAndSend("/topic/notifications/" + notificationLogDTO.getUserId(), notificationLogDTO.getMessage());
             websocketSent = true;

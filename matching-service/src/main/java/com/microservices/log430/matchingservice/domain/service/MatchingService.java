@@ -157,8 +157,10 @@ public class MatchingService implements MatchingPort {
             // log pour savoir ce qui est dans l'exécution
             logger.info("Création de l'exécution : orderId={}, fillQty={}, fillPrice={}, fillType={}, buyerUserId={}, sellerUserId={}",
                     exec.getOrderId(), exec.getFillQuantity(), exec.getFillPrice(), exec.getFillType(), exec.getBuyerUserId(), exec.getSellerUserId());
-            executionReportPort.save(exec);
-            executions.add(exec);
+            ExecutionReport savedExec = executionReportPort.save(exec);
+            executions.add(savedExec);
+            logger.info("Exécution sauvegardée : id={}, orderId={}, fillQty={}, fillPrice={}",
+                    savedExec.getId(), savedExec.getOrderId(), savedExec.getFillQuantity(), savedExec.getFillPrice());
             // Mise à jour des quantités
             int savedOrderInitialQty = savedOrder.getQuantity();
             int candidateInitialQty = candidate.getQuantity();
