@@ -10,8 +10,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 
 @RestController
@@ -63,5 +65,27 @@ public class MarketDataController {
             marketDataService.sendError(symbol, errorResponse);
             return ResponseEntity.status(500).body(errorResponse);
         }
+    }
+
+    @GetMapping("/stock")
+    public ResponseEntity<?> getStockBySymbol(@RequestParam("symbol") String symbol, HttpServletRequest httpRequest) {
+        String path = httpRequest.getRequestURI();
+        String requestId = httpRequest.getHeader("X-Request-Id");
+        var stockRuleOpt = marketDataService.getStockRuleBySymbol(symbol);
+        if (stockRuleOpt.isEmpty()) {
+            logger.warn("StockRule introuvable pour le symbole '{}'. Path: {}, RequestId: {}", symbol, path, requestId);
+            ErrorResponse err = new ErrorResponse(
+                java.time.Instant.now(),
+                path,
+                404,
+                "Not Found",
+                "StockRule introuvable pour ce symbole",
+                requestId != null ? requestId : ""
+            );
+            return ResponseEntity.status(404).body(err);
+        }
+        var stockRule = stockRuleOpt.get();
+        logger.info("StockRule récupéré avec succès pour le symbole '{}'", symbol);
+        return ResponseEntity.ok(stockRule);
     }
 }

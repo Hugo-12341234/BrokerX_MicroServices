@@ -50,4 +50,12 @@ public class MarketDataService implements MarketDataServicePort {
         logger.warn("Sending error for symbol {}: {}", symbol, errorResponse.getMessage());
         messagingTemplate.convertAndSend("/topic/market-data/" + symbol, errorResponse);
     }
+
+    @Override
+    public java.util.Optional<StockRule> getStockRuleBySymbol(String symbol) {
+        if (symbol == null || symbol.trim().isEmpty()) {
+            return java.util.Optional.empty();
+        }
+        return stockRulePort.findBySymbol(symbol.trim());
+    }
 }

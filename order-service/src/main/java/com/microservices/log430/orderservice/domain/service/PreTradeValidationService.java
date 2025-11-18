@@ -1,6 +1,7 @@
 package com.microservices.log430.orderservice.domain.service;
 
-import com.microservices.log430.orderservice.adapters.external.wallet.StockRule;
+import com.microservices.log430.orderservice.adapters.external.marketdata.MarketDataClient;
+import com.microservices.log430.orderservice.adapters.external.marketdata.StockRule;
 import com.microservices.log430.orderservice.adapters.external.wallet.Wallet;
 import com.microservices.log430.orderservice.adapters.external.wallet.WalletClient;
 import com.microservices.log430.orderservice.domain.model.entities.Order;
@@ -17,11 +18,11 @@ import java.math.BigDecimal;
 public class PreTradeValidationService implements PreTradeValidationPort {
     private static final Logger logger = LoggerFactory.getLogger(PreTradeValidationService.class);
 
-    private final WalletClient walletClient;
+    private final MarketDataClient marketDataClient;
 
     @Autowired
-    public PreTradeValidationService(WalletClient walletClient) {
-        this.walletClient = walletClient;
+    public PreTradeValidationService(MarketDataClient marketDataClient) {
+        this.marketDataClient = marketDataClient;
     }
 
     @Override
@@ -78,10 +79,10 @@ public class PreTradeValidationService implements PreTradeValidationPort {
             return null;
         }
         try {
-            logger.info("Récupération du stock pour symbol='{}'", symbol.trim());
-            return walletClient.getStockBySymbol(symbol.trim());
+            logger.info("Récupération du stock pour symbol='{}' via market-data-service", symbol.trim());
+            return marketDataClient.getStockBySymbol(symbol.trim());
         } catch (Exception e) {
-            logger.error("Erreur lors de la récupération du stock pour symbol='{}': {}", symbol, e.getMessage(), e);
+            logger.error("Erreur lors de la récupération du stock via market-data-service pour symbol='{}': {}", symbol, e.getMessage(), e);
             return null;
         }
     }
