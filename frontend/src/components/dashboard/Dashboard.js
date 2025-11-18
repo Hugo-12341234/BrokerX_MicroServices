@@ -87,7 +87,8 @@ function Dashboard() {
       <button onClick={() => navigate('/order')} style={{ marginBottom: '1rem' }}>
         Placer un ordre
       </button>
-      <DepositForm onDeposit={handleDeposit} />
+        <button onClick={() => navigate('/marche')}>Marché</button>
+        <DepositForm onDeposit={handleDeposit} />
       <QuickOrders wallet={wallet} />
       {wallet && wallet.stockPositions && wallet.stockPositions.length > 0 && (
         <div style={{ marginTop: 30 }}>

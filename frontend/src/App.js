@@ -7,6 +7,7 @@ import LoginPage from './components/login/LoginPage';
 import MfaPage from './components/login/MfaPage';
 import Dashboard from './components/dashboard/Dashboard';
 import PlaceOrderPage from './components/order/PlaceOrderPage';
+import MarketPage from './components/MarketPage';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
         <Route path="/mfa" element={<MfaPage />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/order" element={<PlaceOrderPage />} />
+        <Route path="/marche" element={<MarketPage />} />
         {/* D'autres routes pourront être ajoutées ici */}
       </Routes>
     </BrowserRouter>

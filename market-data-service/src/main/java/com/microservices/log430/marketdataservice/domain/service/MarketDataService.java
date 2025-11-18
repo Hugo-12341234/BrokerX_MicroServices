@@ -26,10 +26,10 @@ public class MarketDataService implements MarketDataServicePort {
     private static final Logger logger = LoggerFactory.getLogger(MarketDataService.class);
 
     @Autowired
-    public MarketDataService(StockRulePort stockRulePort, SimpMessagingTemplate messagingTemplate, MatchingClient matchingClient) {
+    public MarketDataService(MatchingClient matchingClient, StockRulePort stockRulePort, SimpMessagingTemplate messagingTemplate) {
+        this.matchingClient = matchingClient;
         this.stockRulePort = stockRulePort;
         this.messagingTemplate = messagingTemplate;
-        this.matchingClient = matchingClient;
     }
 
     @Override
