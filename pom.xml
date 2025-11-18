@@ -11,6 +11,7 @@
   <modules>
     <module>api-gateway</module>
     <module>auth-service</module>
+    <module>market-data-service</module>
     <module>matching-service</module>
     <module>notification-service</module>
     <module>order-service</module>
