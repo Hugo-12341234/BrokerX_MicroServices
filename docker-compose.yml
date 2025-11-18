@@ -99,6 +99,25 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres-market-data:
+    image: postgres:15-alpine
+    container_name: brokerx-postgres-market-data
+    environment:
+      POSTGRES_DB: brokerxdb_market_data
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_market_data_data:/var/lib/postgresql/data
+    ports:
+      - "5438:5432"
+    networks:
+      - brokerx-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d brokerxdb_market_data"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ===========================================
   # MICROSERVICES SPRING BOOT
   # ===========================================
@@ -192,6 +211,24 @@ services:
       - brokerx-network
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  market-data-service:
+    build:
+      context: .
+      dockerfile: market-data-service/Dockerfile
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      postgres-market-data:
+        condition: service_healthy
+    networks:
+      - brokerx-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8087/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -337,6 +374,8 @@ volumes:
   postgres_matching_data:
     driver: local
   postgres_notification_data:
+    driver: local
+  postgres_market_data_data:
     driver: local
   prometheus_data:
     driver: local

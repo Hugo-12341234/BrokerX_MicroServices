@@ -26,7 +26,7 @@ public class NotificationServiceApplication {
 
         @Override
         public void registerStompEndpoints(StompEndpointRegistry registry) {
-            registry.addEndpoint("/ws").setAllowedOriginPatterns("*").withSockJS();
+            registry.addEndpoint("/ws/notification").setAllowedOriginPatterns("*").withSockJS();
         }
     }
 }

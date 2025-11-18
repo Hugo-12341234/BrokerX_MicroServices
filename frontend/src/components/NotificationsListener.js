@@ -9,7 +9,7 @@ const NotificationsListener = ({ userId, onNotification }) => {
     if (!userId) return;
     // Construction de l'URL WebSocket
     const wsBaseUrl = process.env.REACT_APP_API_URL.replace('/api/v1', '');
-    const wsUrl = `${wsBaseUrl}/ws`;
+    const wsUrl = `${wsBaseUrl}/ws/notification`;
     console.log('[NotificationsListener] WebSocket URL utilisé :', wsUrl);
     const socket = new SockJS(wsUrl);
     const stompClient = new Client();
