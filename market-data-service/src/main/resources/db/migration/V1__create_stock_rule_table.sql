@@ -1,0 +1,8 @@
+CREATE TABLE stock_rule (
+    symbol VARCHAR(16) PRIMARY KEY,
+    tick_size DECIMAL(10,4) NOT NULL,
+    min_band DECIMAL(18,2) NOT NULL,
+    max_band DECIMAL(18,2) NOT NULL,
+    price DECIMAL(18,2) NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
