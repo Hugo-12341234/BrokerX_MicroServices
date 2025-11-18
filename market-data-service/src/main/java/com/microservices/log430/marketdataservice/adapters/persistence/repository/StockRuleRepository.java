@@ -1,6 +1,6 @@
 package com.microservices.log430.marketdataservice.adapters.persistence.repository;
 
-import com.microservices.log430.walletservice.adapters.persistence.entities.StockRuleEntity;
+import com.microservices.log430.marketdataservice.adapters.persistence.entities.StockRuleEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

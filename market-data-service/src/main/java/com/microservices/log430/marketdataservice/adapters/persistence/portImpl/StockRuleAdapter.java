@@ -7,6 +7,7 @@ import com.microservices.log430.marketdataservice.domain.port.out.StockRulePort;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -22,5 +23,12 @@ public class StockRuleAdapter implements StockRulePort {
     public Optional<StockRule> findBySymbol(String symbol) {
         return stockRuleRepository.findBySymbol(symbol)
                 .map(StockRuleMapper::toDomain);
+    }
+
+    @Override
+    public List<StockRule> findAll() {
+        return stockRuleRepository.findAll().stream()
+                .map(StockRuleMapper::toDomain)
+                .toList();
     }
 }
