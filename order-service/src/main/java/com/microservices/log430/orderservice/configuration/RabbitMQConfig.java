@@ -14,22 +14,42 @@ public class RabbitMQConfig {
     @Value("${messaging.exchange.order}")
     private String orderExchange;
 
+    @Value("${messaging.exchange.matching}")
+    private String matchingExchange;
+
     @Value("${messaging.queue.order-placed}")
     private String orderPlacedQueue;
+
+    @Value("${messaging.queue.order-matched}")
+    private String orderMatchedQueue;
+
+    @Value("${messaging.queue.order-rejected}")
+    private String orderRejectedQueue;
 
     @Value("${messaging.routing-key.order-placed}")
     private String orderPlacedRoutingKey;
 
+    @Value("${messaging.routing-key.order-matched}")
+    private String orderMatchedRoutingKey;
+
+    @Value("${messaging.routing-key.order-rejected}")
+    private String orderRejectedRoutingKey;
+
     /**
-     * Déclaration de l'exchange pour les événements d'ordre
+     * Déclaration des exchanges
      */
     @Bean
     public TopicExchange orderExchange() {
         return new TopicExchange(orderExchange, true, false);
     }
 
+    @Bean
+    public TopicExchange matchingExchange() {
+        return new TopicExchange(matchingExchange, true, false);
+    }
+
     /**
-     * Déclaration de la queue pour les ordres placés
+     * Déclaration des queues
      */
     @Bean
     public Queue orderPlacedQueue() {
@@ -38,8 +58,18 @@ public class RabbitMQConfig {
                 .build();
     }
 
+    @Bean
+    public Queue orderMatchedQueue() {
+        return QueueBuilder.durable(orderMatchedQueue).build();
+    }
+
+    @Bean
+    public Queue orderRejectedQueue() {
+        return QueueBuilder.durable(orderRejectedQueue).build();
+    }
+
     /**
-     * Binding entre la queue et l'exchange
+     * Bindings entre les queues et les exchanges
      */
     @Bean
     public Binding orderPlacedBinding() {
@@ -47,6 +77,22 @@ public class RabbitMQConfig {
                 .bind(orderPlacedQueue())
                 .to(orderExchange())
                 .with(orderPlacedRoutingKey);
+    }
+
+    @Bean
+    public Binding orderMatchedBinding() {
+        return BindingBuilder
+                .bind(orderMatchedQueue())
+                .to(matchingExchange())
+                .with(orderMatchedRoutingKey);
+    }
+
+    @Bean
+    public Binding orderRejectedBinding() {
+        return BindingBuilder
+                .bind(orderRejectedQueue())
+                .to(matchingExchange())
+                .with(orderRejectedRoutingKey);
     }
 
     /**

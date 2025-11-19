@@ -168,7 +168,7 @@ public class OrderService implements OrderPlacementPort {
 
             // L'ordre est maintenant accepté et l'événement est dans l'outbox
             // Le matching sera traité de façon asynchrone par le matching-service
-            return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé avec succès et en attente de matching");
+            return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé avec succès. Le matching sera traité sous peu.");
 
             /*
             ==================================================================================
