@@ -9,5 +9,5 @@ public interface ExecutionReportPort {
     Optional<ExecutionReport> findById(Long id);
     List<ExecutionReport> findAllByOrderId(Long orderId);
     List<ExecutionReport> findAll();
+    Optional<ExecutionReport> findLastBySymbol(String symbol);
 }
-

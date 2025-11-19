@@ -17,6 +17,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws/market-data").setAllowedOrigins("*").withSockJS();
+        registry.addEndpoint("/ws/market-data")
+            .setAllowedOrigins("http://localhost:3000") // CORS pour le frontend
+            .withSockJS();
     }
 }

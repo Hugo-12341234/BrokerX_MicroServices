@@ -40,5 +40,10 @@ public class ExecutionReportPersistenceAdapter implements ExecutionReportPort {
     public List<ExecutionReport> findAll() {
         return repository.findAll().stream().map(ExecutionReportMapper::toDomain).collect(Collectors.toList());
     }
-}
 
+    @Override
+    public Optional<ExecutionReport> findLastBySymbol(String symbol) {
+        ExecutionReportEntity entity = repository.findTopBySymbolOrderByExecutionTimeDesc(symbol);
+        return Optional.ofNullable(ExecutionReportMapper.toDomain(entity));
+    }
+}

@@ -81,6 +81,7 @@ public class MarketDataService implements MarketDataServicePort {
     public Optional<LastPriceDTO> getLastPriceBySymbol(String symbol) {
         try {
             LastPriceDTO dto = matchingClient.getLastPriceBySymbol(symbol);
+            logger.info("Récupéré LastPriceDTO pour symbol {}: {}", symbol, dto);
             return java.util.Optional.ofNullable(dto);
         } catch (Exception e) {
             logger.error("Erreur lors de l'appel à matchingClient.getLastPriceBySymbol pour symbol {}", symbol, e);

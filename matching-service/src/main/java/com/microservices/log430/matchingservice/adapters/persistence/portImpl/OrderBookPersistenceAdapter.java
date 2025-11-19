@@ -59,9 +59,10 @@ public class OrderBookPersistenceAdapter implements OrderBookPort {
 
     @Override
     public LastPriceDTO getLastExecutionPrice(String symbol) {
-        ExecutionReport lastExec = executionReportRepository.findTopBySymbolOrderByExecutionTimeDesc(symbol);
-        if (lastExec == null) return null;
-        return new LastPriceDTO(symbol, lastExec.getFillPrice(), lastExec.getExecutionTime().toString());
+        var entity = executionReportRepository.findTopBySymbolOrderByExecutionTimeDesc(symbol);
+        if (entity == null) return null;
+        // Mapping manuel de l'entité vers le DTO
+        return new LastPriceDTO(symbol, entity.getFillPrice(), entity.getExecutionTime().toString());
     }
 
     @Override

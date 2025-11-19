@@ -311,7 +311,9 @@ public class MatchingService implements MatchingPort {
 
     @Override
     public LastPriceDTO getLastPriceBySymbol(String symbol) {
-        // Logique pour récupérer le dernier prix d'une transaction réalisée pour le symbole
-        return orderBookPort.getLastExecutionPrice(symbol);
+        Optional<ExecutionReport> lastReportOpt = executionReportPort.findLastBySymbol(symbol);
+        if (lastReportOpt.isEmpty()) return null;
+        ExecutionReport lastReport = lastReportOpt.get();
+        return new LastPriceDTO(symbol, lastReport.getFillPrice(), lastReport.getExecutionTime().toString());
     }
 }

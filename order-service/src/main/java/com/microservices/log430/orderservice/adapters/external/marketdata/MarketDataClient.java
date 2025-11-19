@@ -11,7 +11,7 @@ public interface MarketDataClient {
     @GetMapping("/api/v1/market-data/stock")
     StockRule getStockBySymbol(@RequestParam("symbol") String symbol);
 
-    @PostMapping("/send-market-data/{symbol}")
+    @PostMapping("/api/v1/market-data/send-market-data/{symbol}")
     void streamMarketData(@PathVariable("symbol") String symbol, @RequestBody MarketDataUpdateDTO marketDataUpdate);
 }
 

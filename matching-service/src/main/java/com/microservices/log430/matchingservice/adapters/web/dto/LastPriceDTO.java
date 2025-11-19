@@ -5,6 +5,9 @@ public class LastPriceDTO {
     private Double lastPrice;
     private String timestamp;
 
+    // Constructeur par défaut
+    public LastPriceDTO() {}
+
     public LastPriceDTO(String symbol, Double lastPrice, String timestamp) {
         this.symbol = symbol;
         this.lastPrice = lastPrice;
