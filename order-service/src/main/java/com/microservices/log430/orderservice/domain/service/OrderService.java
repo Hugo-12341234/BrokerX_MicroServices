@@ -21,6 +21,8 @@ import com.microservices.log430.orderservice.adapters.external.notification.Noti
 import com.microservices.log430.orderservice.adapters.external.notification.dto.NotificationLogDTO;
 import com.microservices.log430.orderservice.adapters.external.auth.UserInfoClient;
 import com.microservices.log430.orderservice.adapters.external.auth.dto.UserDTO;
+import com.microservices.log430.orderservice.adapters.messaging.outbox.OutboxService;
+import com.microservices.log430.orderservice.adapters.messaging.events.OrderPlacedEvent;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -41,11 +43,12 @@ public class OrderService implements OrderPlacementPort {
     private final NotificationClient notificationClient;
     private final UserInfoClient userInfoClient;
     private final MarketDataClient marketDataClient;
+    private final OutboxService outboxService;
 
     @Autowired
     public OrderService(OrderPort orderPort, PreTradeValidationPort preTradeValidationPort, WalletClient walletClient,
                         MatchingClient matchingClient, NotificationClient notificationClient, UserInfoClient userInfoClient,
-                        MarketDataClient marketDataClient) {
+                        MarketDataClient marketDataClient, OutboxService outboxService) {
         this.orderPort = orderPort;
         this.preTradeValidationPort = preTradeValidationPort;
         this.walletClient = walletClient;
@@ -53,6 +56,7 @@ public class OrderService implements OrderPlacementPort {
         this.notificationClient = notificationClient;
         this.userInfoClient = userInfoClient;
         this.marketDataClient = marketDataClient;
+        this.outboxService = outboxService;
     }
 
     private void notifyMarketData(String symbol, Double lastPrice, Object orderBook) {
@@ -80,10 +84,10 @@ public class OrderService implements OrderPlacementPort {
             Order existing = existingOrder.get();
             logger.info("Idempotence : ordre déjà existant. clientOrderId={}, status={}, orderId={}", clientOrderId, existing.getStatus(), existing.getId());
             return OrderPlacementResult.of(
-                existing.getStatus() == Order.OrderStatus.ACCEPTE,
+                existing.getStatus() == Order.OrderStatus.ACCEPTE || existing.getStatus() == Order.OrderStatus.WORKING,
                 existing.getId(),
                 existing.getStatus().name(),
-                existing.getStatus() == Order.OrderStatus.ACCEPTE ?
+                (existing.getStatus() == Order.OrderStatus.ACCEPTE || existing.getStatus() == Order.OrderStatus.WORKING) ?
                     "Ordre placé avec succès" : existing.getRejectReason()
             );
         }
@@ -130,9 +134,46 @@ public class OrderService implements OrderPlacementPort {
             return OrderPlacementResult.failure(savedOrder.getId(), validation.getRejectReason());
         } else {
             logger.info("Ordre accepté pour userId={}, clientOrderId={}, orderId={}", request.getUserId(), clientOrderId, order.getId());
-            order.setStatus(Order.OrderStatus.WORKING);
+            order.setStatus(Order.OrderStatus.WORKING); // Working (en attente de matching asynchrone)
             order.setRejectReason(null);
             Order savedOrder = orderPort.save(order);
+
+            // Publication d'un événement OrderPlaced dans l'outbox (architecture événementielle)
+            try {
+                OrderPlacedEvent event = new OrderPlacedEvent(
+                    savedOrder.getId(),
+                    savedOrder.getClientOrderId(),
+                    savedOrder.getUserId(),
+                    savedOrder.getSymbol(),
+                    savedOrder.getSide().name(),
+                    savedOrder.getType().name(),
+                    savedOrder.getQuantity(),
+                    savedOrder.getPrice(),
+                    savedOrder.getDuration().name(),
+                    savedOrder.getTimestamp(),
+                    savedOrder.getStatus().name(),
+                    savedOrder.getRejectReason(),
+                    savedOrder.getVersion()
+                );
+
+                outboxService.saveEvent("ORDER_PLACED", savedOrder.getId(), event);
+                logger.info("Événement OrderPlaced sauvegardé dans l'outbox pour orderId={}, clientOrderId={}",
+                           savedOrder.getId(), savedOrder.getClientOrderId());
+
+            } catch (Exception e) {
+                logger.error("Erreur lors de la sauvegarde de l'événement OrderPlaced : {}", e.getMessage(), e);
+                // L'ordre est déjà sauvé, mais l'événement n'a pas pu être publié
+                return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé, mais événement non publié : " + e.getMessage());
+            }
+
+            // L'ordre est maintenant accepté et l'événement est dans l'outbox
+            // Le matching sera traité de façon asynchrone par le matching-service
+            return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé avec succès et en attente de matching");
+
+            /*
+            ==================================================================================
+            ANCIEN CODE SYNCHRONE - CONSERVÉ POUR RÉFÉRENCE (à utiliser dans les listeners)
+            ==================================================================================
 
             // Appel au matching-service
             OrderDTO orderDTO = new OrderDTO(
@@ -329,6 +370,11 @@ public class OrderService implements OrderPlacementPort {
                 }
             }
             return OrderPlacementResult.success(savedOrder.getId(), message.toString());
+
+            ==================================================================================
+            FIN ANCIEN CODE SYNCHRONE
+            ==================================================================================
+            */
         }
     }
 

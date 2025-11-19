@@ -2,6 +2,31 @@ version: '3.8'
 
 services:
   # ===========================================
+  # MESSAGE BROKER RABBITMQ
+  # ===========================================
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: brokerx-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: -rabbitmq_management load_definitions "/etc/rabbitmq/definitions.json"
+    ports:
+      - "5672:5672"    # Port AMQP
+      - "15672:15672"  # Port Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq-definitions.json:/etc/rabbitmq/definitions.json:ro
+    networks:
+      - brokerx-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ===========================================
   # BASES DE DONNÉES POSTGRESQL
   # ===========================================
   postgres-auth:
@@ -151,6 +176,8 @@ services:
     depends_on:
       postgres-order:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - brokerx-network
     healthcheck:
@@ -188,6 +215,8 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
     depends_on:
       postgres-matching:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - brokerx-network
@@ -365,6 +394,8 @@ services:
 # VOLUMES PERSISTANTS
 # ===========================================
 volumes:
+  rabbitmq_data:
+    driver: local
   postgres_auth_data:
     driver: local
   postgres_order_data:
