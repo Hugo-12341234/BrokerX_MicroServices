@@ -85,6 +85,7 @@ public class OrderPlacedEventListener {
     private OrderBook convertOrderPlacedEventToOrderBook(OrderPlacedEvent event) {
         OrderBook orderBook = new OrderBook();
         orderBook.setId(event.getId());
+        orderBook.setOrderId(event.getId()); // Assigner l'orderId depuis l'événement
         orderBook.setClientOrderId(event.getClientOrderId());
         orderBook.setUserId(event.getUserId());
         orderBook.setSymbol(event.getSymbol());

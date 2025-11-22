@@ -1,6 +1,8 @@
 package com.microservices.log430.orderservice.adapters.persistence.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -21,7 +23,8 @@ public class OutboxEventEntity {
     @Column(name = "aggregate_id", nullable = false, length = 100)
     private String aggregateId;
 
-    @Column(name = "payload", nullable = false, columnDefinition = "jsonb")
+    @Column(name = "payload", nullable = false)
+    @JdbcTypeCode(SqlTypes.JSON)
     private String payload;
 
     @Column(name = "created_at", nullable = false)
