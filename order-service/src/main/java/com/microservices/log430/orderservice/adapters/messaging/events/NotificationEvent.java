@@ -1,4 +1,4 @@
-package com.microservices.log430.matchingservice.adapters.messaging.events;
+package com.microservices.log430.orderservice.adapters.messaging.events;
 
 import java.time.Instant;
 

@@ -26,6 +26,7 @@ public class EventPublisher {
 
     private final RabbitTemplate rabbitTemplate;
     private final TopicExchange orderExchange;
+    private final TopicExchange notificationExchange;
     private final OutboxEventRepository outboxEventRepository;
     private final OutboxService outboxService;
     private final ObjectMapper objectMapper;
@@ -33,13 +34,18 @@ public class EventPublisher {
     @Value("${messaging.routing-key.order-placed}")
     private String orderPlacedRoutingKey;
 
+    @Value("${messaging.routing-key.notification-send}")
+    private String notificationSendRoutingKey;
+
     @Autowired
     public EventPublisher(RabbitTemplate rabbitTemplate,
                          TopicExchange orderExchange,
+                         TopicExchange notificationExchange,
                          OutboxEventRepository outboxEventRepository,
                          OutboxService outboxService) {
         this.rabbitTemplate = rabbitTemplate;
         this.orderExchange = orderExchange;
+        this.notificationExchange = notificationExchange;
         this.outboxEventRepository = outboxEventRepository;
         this.outboxService = outboxService;
         this.objectMapper = new ObjectMapper();
@@ -80,16 +86,17 @@ public class EventPublisher {
      */
     private void publishEvent(OutboxEventEntity event) {
         String routingKey = getRoutingKeyForEventType(event.getEventType());
+        String exchangeName = getExchangeNameForEventType(event.getEventType());
 
-        logger.info("Publication de l'événement: eventId={}, type={}, routingKey={}",
-                   event.getEventId(), event.getEventType(), routingKey);
+        logger.info("Publication de l'événement: eventId={}, type={}, exchange={}, routingKey={}",
+                   event.getEventId(), event.getEventType(), exchangeName, routingKey);
 
         try {
             // Le payload est déjà sérialisé en JSON dans l'outbox
             Object eventData = objectMapper.readValue(event.getPayload(), Object.class);
 
             rabbitTemplate.convertAndSend(
-                orderExchange.getName(),
+                exchangeName,
                 routingKey,
                 eventData
             );
@@ -108,6 +115,18 @@ public class EventPublisher {
     private String getRoutingKeyForEventType(String eventType) {
         return switch (eventType) {
             case "ORDER_PLACED" -> orderPlacedRoutingKey;
+            case "NOTIFICATION_SEND" -> notificationSendRoutingKey;
+            default -> throw new IllegalArgumentException("Type d'événement non supporté: " + eventType);
+        };
+    }
+
+    /**
+     * Détermine le nom de l'exchange basé sur le type d'événement
+     */
+    private String getExchangeNameForEventType(String eventType) {
+        return switch (eventType) {
+            case "ORDER_PLACED" -> orderExchange.getName();
+            case "NOTIFICATION_SEND" -> notificationExchange.getName();
             default -> throw new IllegalArgumentException("Type d'événement non supporté: " + eventType);
         };
     }

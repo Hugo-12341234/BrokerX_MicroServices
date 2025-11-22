@@ -245,6 +245,7 @@ public class MatchingService implements MatchingPort {
             }
         }
 
+
         logger.info("Matching terminé pour clientOrderId={}, statut final={}, nombre d'exécutions={}, candidats modifiés={}",
                 savedOrder.getClientOrderId(), savedOrder.getStatus(), executions.size(), modifiedCandidates.size());
         return new MatchingResult(savedOrder, executions, modifiedCandidates);
@@ -316,4 +317,6 @@ public class MatchingService implements MatchingPort {
         ExecutionReport lastReport = lastReportOpt.get();
         return new LastPriceDTO(symbol, lastReport.getFillPrice(), lastReport.getExecutionTime().toString());
     }
+
+
 }

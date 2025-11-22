@@ -23,6 +23,7 @@ import com.microservices.log430.orderservice.adapters.external.auth.UserInfoClie
 import com.microservices.log430.orderservice.adapters.external.auth.dto.UserDTO;
 import com.microservices.log430.orderservice.adapters.messaging.outbox.OutboxService;
 import com.microservices.log430.orderservice.adapters.messaging.events.OrderPlacedEvent;
+import com.microservices.log430.orderservice.adapters.messaging.events.NotificationEvent;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -131,6 +132,31 @@ public class OrderService implements OrderPlacementPort {
             order.setStatus(Order.OrderStatus.REJETE);
             order.setRejectReason(validation.getRejectReason());
             Order savedOrder = orderPort.save(order);
+
+            // Publication d'un événement de notification pour ordre rejeté lors de la validation pré-trade
+            try {
+                String rejectionMessage = String.format("Ordre REJETÉ : %s %d %s @ %.2f$. Raison : %s. OrderId : %s",
+                    orderRequest.getSide(), orderRequest.getQuantity(), orderRequest.getSymbol(),
+                    orderRequest.getPrice() != null ? orderRequest.getPrice() : 0.0,
+                    validation.getRejectReason(), savedOrder.getId());
+
+                NotificationEvent notificationEvent = new NotificationEvent(
+                    request.getUserId(),
+                    rejectionMessage,
+                    Instant.now(),
+                    "WEBSOCKET",
+                    null, // email sera récupéré par le notification-service
+                    "REJECTED"
+                );
+
+                outboxService.saveEvent("NOTIFICATION_SEND", savedOrder.getId(), notificationEvent);
+                logger.info("Événement de notification pour ordre rejeté sauvegardé dans l'outbox pour orderId={}, clientOrderId={}",
+                           savedOrder.getId(), savedOrder.getClientOrderId());
+
+            } catch (Exception e) {
+                logger.error("Erreur lors de la sauvegarde de l'événement de notification pour ordre rejeté : {}", e.getMessage(), e);
+            }
+
             return OrderPlacementResult.failure(savedOrder.getId(), validation.getRejectReason());
         } else {
             logger.info("Ordre accepté pour userId={}, clientOrderId={}, orderId={}", request.getUserId(), clientOrderId, order.getId());

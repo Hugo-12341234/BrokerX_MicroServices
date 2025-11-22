@@ -107,23 +107,23 @@ public class OrderPlacedEventListener {
      */
     private void publishMatchingEvents(MatchingResult result, OrderPlacedEvent originalOrder) {
         try {
-            if (result.executions != null && !result.executions.isEmpty()) {
-                // Il y a eu des exécutions -> ORDER_MATCHED
-                publishOrderMatched(result, originalOrder);
-                publishNotificationEvents(result);
-
-            } else if ("REJETE".equals(result.updatedOrder.getStatus()) ||
-                      (result.updatedOrder.getRejectReason() != null && !result.updatedOrder.getRejectReason().isEmpty())) {
+            // Publier l'événement ORDER_MATCHED ou ORDER_REJECTED selon le cas
+            if ("REJETE".equals(result.updatedOrder.getStatus()) ||
+                (result.updatedOrder.getRejectReason() != null && !result.updatedOrder.getRejectReason().isEmpty())) {
                 // Ordre rejeté
                 publishOrderRejected(originalOrder, result.updatedOrder.getRejectReason());
-
             } else {
-                // Ordre accepté mais pas d'exécution immédiate (DAY order par exemple)
+                // Ordre accepté (avec ou sans exécutions)
                 publishOrderMatched(result, originalOrder);
             }
 
+            // Publier les notifications spécifiques selon le résultat
+            publishDetailedNotifications(result, originalOrder);
+
         } catch (Exception e) {
             logger.error("Erreur lors de la publication des événements de matching: {}", e.getMessage(), e);
+            // Publier une notification d'erreur
+            publishErrorNotification(originalOrder, "Erreur lors du traitement: " + e.getMessage());
         }
     }
 
@@ -203,35 +203,170 @@ public class OrderPlacedEventListener {
     }
 
     /**
-     * Publie les événements de notification
+     * Publie les notifications détaillées selon le résultat du matching
      */
-    private void publishNotificationEvents(MatchingResult result) {
-        if (result.executions != null) {
-            for (ExecutionReport exec : result.executions) {
-                // Notification pour l'acheteur
-                if (exec.getBuyerUserId() != null && exec.getBuyerUserId() != 9999L) {
-                    String buyerMsg = String.format("Exécution d'ordre ACHAT : %d %s @ %.2f. OrderId: %s. ExecutionReportId: %s. Date: %s.",
-                        exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice(), exec.getOrderId(), exec.getId(), Instant.now());
+    private void publishDetailedNotifications(MatchingResult result, OrderPlacedEvent originalOrder) {
+        try {
+            // Déterminer le type d'ordre et son statut final
+            boolean isDAY = "DAY".equalsIgnoreCase(originalOrder.getDuration());
+            boolean isIOC = "IOC".equalsIgnoreCase(originalOrder.getDuration());
+            boolean isFOK = "FOK".equalsIgnoreCase(originalOrder.getDuration());
 
-                    NotificationEvent buyerNotification = new NotificationEvent(
-                        exec.getBuyerUserId(), buyerMsg, Instant.now(), "WEBSOCKET", null
-                    );
+            String finalStatus = result.updatedOrder.getStatus();
+            boolean hasExecutions = result.executions != null && !result.executions.isEmpty();
 
-                    outboxService.saveEvent("NOTIFICATION_SEND", exec.getBuyerUserId(), buyerNotification);
-                }
+            // Publier notification de statut d'ordre
+            publishOrderStatusNotification(result, originalOrder, isDAY, isIOC, isFOK, hasExecutions);
 
-                // Notification pour le vendeur
-                if (exec.getSellerUserId() != null && exec.getSellerUserId() != 9999L) {
-                    String sellerMsg = String.format("Exécution d'ordre VENTE : %d %s @ %.2f. OrderId: %s. ExecutionReportId: %s. Date: %s.",
-                        exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice(), exec.getOrderId(), exec.getId(), Instant.now());
-
-                    NotificationEvent sellerNotification = new NotificationEvent(
-                        exec.getSellerUserId(), sellerMsg, Instant.now(), "WEBSOCKET", null
-                    );
-
-                    outboxService.saveEvent("NOTIFICATION_SEND", exec.getSellerUserId(), sellerNotification);
-                }
+            // Publier notifications d'exécution individuelles si il y en a
+            if (hasExecutions) {
+                publishExecutionNotifications(result.executions);
             }
+
+        } catch (Exception e) {
+            logger.error("Erreur lors de la publication des notifications détaillées: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Publie la notification de statut d'ordre
+     */
+    private void publishOrderStatusNotification(MatchingResult result, OrderPlacedEvent originalOrder,
+                                              boolean isDAY, boolean isIOC, boolean isFOK, boolean hasExecutions) {
+        String notificationMessage;
+        String status;
+        String finalStatus = result.updatedOrder.getStatus();
+
+        // Déterminer le message et le statut selon le type d'ordre et le résultat
+        if ("Cancelled".equals(finalStatus) && isFOK) {
+            notificationMessage = String.format("Ordre FOK ANNULÉ : %s %d %s @ %.2f$. Liquidité insuffisante. OrderId : %s",
+                originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
+            status = "FOK_CANCELLED";
+
+        } else if ("Cancelled".equals(finalStatus) && isIOC) {
+            notificationMessage = String.format("Ordre IOC traité : %s %d %s @ %.2f$. Partie non exécutée annulée. OrderId : %s",
+                originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
+            status = "IOC_PARTIAL_CANCELLED";
+
+        } else if ("PartiallyFilled".equals(finalStatus) && isIOC) {
+            notificationMessage = String.format("Ordre IOC partiellement exécuté : %s %s @ %.2f$. Reste annulé. OrderId : %s",
+                originalOrder.getSide(), originalOrder.getSymbol(),
+                originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
+            status = "IOC_PARTIAL_FILLED";
+
+        } else if ("Working".equals(finalStatus) && isDAY) {
+            if (!hasExecutions) {
+                notificationMessage = String.format("Ordre DAY PLACÉ : %s %d %s @ %.2f$. En attente dans le carnet. OrderId : %s",
+                    originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                    originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
+                status = "DAY_PLACED_NO_MATCH";
+            } else {
+                notificationMessage = String.format("Ordre DAY partiellement exécuté : %s %s @ %.2f$. Reste en attente. OrderId : %s",
+                    originalOrder.getSide(), originalOrder.getSymbol(),
+                    originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
+                status = "DAY_PARTIAL_FILLED";
+            }
+
+        } else if ("PartiallyFilled".equals(finalStatus) && isDAY) {
+            notificationMessage = String.format("Ordre DAY partiellement exécuté : %s %s @ %.2f$. Reste en attente. OrderId : %s",
+                originalOrder.getSide(), originalOrder.getSymbol(),
+                originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
+            status = "DAY_PARTIAL_FILLED";
+
+        } else if ("Filled".equals(finalStatus)) {
+            notificationMessage = String.format("Ordre COMPLÈTEMENT EXÉCUTÉ : %s %d %s @ %.2f$. OrderId : %s",
+                originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
+            status = "FILLED";
+
+        } else if ("Cancelled".equals(finalStatus)) {
+            notificationMessage = String.format("Ordre ANNULÉ : %s %d %s @ %.2f$. OrderId : %s",
+                originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
+            status = "CANCELLED";
+
+        } else {
+            notificationMessage = String.format("Ordre traité : %s %d %s @ %.2f$. Statut : %s. OrderId : %s",
+                originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, finalStatus, originalOrder.getId());
+            status = "PROCESSED";
+        }
+
+        // Publier la notification de statut
+        NotificationEvent orderStatusEvent = new NotificationEvent(
+            originalOrder.getUserId(),
+            notificationMessage,
+            Instant.now(),
+            "WEBSOCKET",
+            null,
+            status
+        );
+
+        outboxService.saveEvent("NOTIFICATION_SEND", originalOrder.getId(), orderStatusEvent);
+        logger.info("Notification de statut publiée pour orderId={}, userId={}, status={}",
+                   originalOrder.getId(), originalOrder.getUserId(), status);
+    }
+
+    /**
+     * Publie les notifications d'exécution individuelles
+     */
+    private void publishExecutionNotifications(List<ExecutionReport> executions) {
+        for (ExecutionReport exec : executions) {
+            // Notification pour l'acheteur
+            if (exec.getBuyerUserId() != null && exec.getBuyerUserId() != 9999L) {
+                String buyerMsg = String.format("Exécution d'ordre ACHAT : %d %s @ %.2f$. OrderId: %s. ExecutionReportId: %s. Date: %s",
+                    exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice(), exec.getOrderId(), exec.getId(), Instant.now());
+
+                NotificationEvent buyerNotification = new NotificationEvent(
+                    exec.getBuyerUserId(), buyerMsg, Instant.now(), "WEBSOCKET", null, "EXECUTED"
+                );
+
+                outboxService.saveEvent("NOTIFICATION_SEND", exec.getBuyerUserId(), buyerNotification);
+                logger.info("Notification d'exécution publiée pour buyer userId={}, executionId={}",
+                           exec.getBuyerUserId(), exec.getId());
+            }
+
+            // Notification pour le vendeur
+            if (exec.getSellerUserId() != null && exec.getSellerUserId() != 9999L) {
+                String sellerMsg = String.format("Exécution d'ordre VENTE : %d %s @ %.2f$. OrderId: %s. ExecutionReportId: %s. Date: %s",
+                    exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice(), exec.getOrderId(), exec.getId(), Instant.now());
+
+                NotificationEvent sellerNotification = new NotificationEvent(
+                    exec.getSellerUserId(), sellerMsg, Instant.now(), "WEBSOCKET", null, "EXECUTED"
+                );
+
+                outboxService.saveEvent("NOTIFICATION_SEND", exec.getSellerUserId(), sellerNotification);
+                logger.info("Notification d'exécution publiée pour seller userId={}, executionId={}",
+                           exec.getSellerUserId(), exec.getId());
+            }
+        }
+    }
+
+    /**
+     * Publie une notification d'erreur
+     */
+    private void publishErrorNotification(OrderPlacedEvent originalOrder, String errorMessage) {
+        try {
+            String message = String.format("Erreur lors du traitement de l'ordre : %s %d %s. OrderId : %s. Erreur : %s",
+                originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                originalOrder.getId(), errorMessage);
+
+            NotificationEvent errorEvent = new NotificationEvent(
+                originalOrder.getUserId(),
+                message,
+                Instant.now(),
+                "WEBSOCKET",
+                null,
+                "ERROR"
+            );
+
+            outboxService.saveEvent("NOTIFICATION_SEND", originalOrder.getId(), errorEvent);
+            logger.info("Notification d'erreur publiée pour orderId={}, userId={}",
+                       originalOrder.getId(), originalOrder.getUserId());
+        } catch (Exception e) {
+            logger.error("Impossible de publier la notification d'erreur : {}", e.getMessage(), e);
         }
     }
 }

@@ -17,6 +17,9 @@ public class RabbitMQConfig {
     @Value("${messaging.exchange.matching}")
     private String matchingExchange;
 
+    @Value("${messaging.exchange.notification}")
+    private String notificationExchange;
+
     @Value("${messaging.queue.order-placed}")
     private String orderPlacedQueue;
 
@@ -46,6 +49,11 @@ public class RabbitMQConfig {
     @Bean
     public TopicExchange matchingExchange() {
         return new TopicExchange(matchingExchange, true, false);
+    }
+
+    @Bean
+    public TopicExchange notificationExchange() {
+        return new TopicExchange(notificationExchange, true, false);
     }
 
     /**
