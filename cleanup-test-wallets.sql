@@ -8,19 +8,19 @@
 -- Supprimer toutes les positions d'actions des utilisateurs de test
 DELETE FROM stock_position
 WHERE wallet_id IN (
-    SELECT id FROM wallet WHERE user_id BETWEEN 1 AND 100
+    SELECT id FROM wallet WHERE user_id BETWEEN 2 AND 100
 );
 
 -- Supprimer tous les portefeuilles des utilisateurs de test
-DELETE FROM wallet WHERE user_id BETWEEN 1 AND 100;
+DELETE FROM wallet WHERE user_id BETWEEN 2 AND 100;
 
 -- Afficher le résumé du nettoyage pour wallet-service
 SELECT
     'Positions supprimées' as action,
-    'Toutes les positions des utilisateurs 1-100' as details
+    'Toutes les positions des utilisateurs 2-100' as details
 UNION ALL
 SELECT
     'Portefeuilles supprimés' as action,
-    'Tous les portefeuilles des utilisateurs 1-100' as details;
+    'Tous les portefeuilles des utilisateurs 2-100' as details;
 
 COMMIT;

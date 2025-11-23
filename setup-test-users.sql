@@ -8,10 +8,10 @@
 -- Supprimer les utilisateurs de test existants (pour pouvoir relancer le script)
 DELETE FROM Users WHERE email LIKE 'testuser%@loadtest.com';
 
--- Insérer 100 utilisateurs de test (IDs 1-100)
+-- Insérer 99 utilisateurs de test (IDs 2-100, en évitant 1 existant)
 INSERT INTO Users (id, email, passwordHash, name, adresse, dateDeNaissance, status) VALUES
--- Utilisateurs 1-10
-(1, 'testuser1@loadtest.com', '$2a$10$dummy.hash.for.testing', 'Test User 1', '123 Test St, Montreal', '1990-01-01', 'ACTIVE'),
+-- Utilisateurs 2-10
+
 (2, 'testuser2@loadtest.com', '$2a$10$dummy.hash.for.testing', 'Test User 2', '124 Test St, Montreal', '1990-01-02', 'ACTIVE'),
 (3, 'testuser3@loadtest.com', '$2a$10$dummy.hash.for.testing', 'Test User 3', '125 Test St, Montreal', '1990-01-03', 'ACTIVE'),
 (4, 'testuser4@loadtest.com', '$2a$10$dummy.hash.for.testing', 'Test User 4', '126 Test St, Montreal', '1990-01-04', 'ACTIVE'),

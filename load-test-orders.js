@@ -43,11 +43,11 @@ const ORDER_ENDPOINT = `${API_GATEWAY_URL}/api/v1/orders/place`;
 
 // Pool de données pour la variété - AJUSTÉ selon les actions disponibles
 const SYMBOLS = ['AAPL', 'MSFT', 'TSLA']; // Seulement les 3 actions disponibles dans votre système
-const USER_POOL_SIZE = 100;
+const USER_POOL_SIZE = 99; // Users 2-100
 
 // Génération d'utilisateurs virtuels (IDs numériques selon votre controller)
 function generateUserId() {
-  return Math.floor(Math.random() * USER_POOL_SIZE) + 1; // IDs de 1 à 100
+  return Math.floor(Math.random() * (USER_POOL_SIZE - 1)) + 2; // IDs de 2 à 100
 }
 
 function generateOrderData() {

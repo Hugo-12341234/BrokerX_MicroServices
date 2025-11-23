@@ -6,17 +6,17 @@
 -- ===========================================
 
 -- Supprimer les portefeuilles de test existants (pour pouvoir relancer le script)
-DELETE FROM stock_position WHERE wallet_id IN (SELECT id FROM wallet WHERE user_id BETWEEN 1 AND 100);
-DELETE FROM wallet WHERE user_id BETWEEN 1 AND 100;
+DELETE FROM stock_position WHERE wallet_id IN (SELECT id FROM wallet WHERE user_id BETWEEN 2 AND 100);
+DELETE FROM wallet WHERE user_id BETWEEN 2 AND 100;
 
--- Insérer les portefeuilles pour les utilisateurs 1-100
+-- Insérer les portefeuilles pour les utilisateurs 2-100 (99 utilisateurs)
 -- Chaque utilisateur aura 50,000$ en cash pour commencer
 DO $$
 DECLARE
     i INTEGER;
     wallet_uuid UUID;
 BEGIN
-    FOR i IN 1..100 LOOP
+    FOR i IN 2..100 LOOP
         -- Générer un UUID pour le portefeuille
         wallet_uuid := gen_random_uuid();
 

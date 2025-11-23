@@ -4,7 +4,7 @@ echo NETTOYAGE DES DONNEES DE TEST
 echo ========================================
 echo.
 echo Ce script va supprimer TOUTES les donnees de test:
-echo - 100 utilisateurs (testuser1-100@loadtest.com)
+echo - 99 utilisateurs (testuser2-100@loadtest.com)
 echo - Tous leurs portefeuilles
 echo - Toutes leurs positions d'actions
 echo.
@@ -66,7 +66,7 @@ docker exec brokerx-postgres-auth psql -U postgres -d brokerxdb_auth -c "SELECT 
 
 echo.
 echo Verification - portefeuilles restants:
-docker exec brokerx-postgres-wallet psql -U postgres -d brokerxdb_wallet -c "SELECT COUNT(*) as remaining_test_wallets FROM wallet WHERE user_id BETWEEN 1 AND 100;"
+docker exec brokerx-postgres-wallet psql -U postgres -d brokerxdb_wallet -c "SELECT COUNT(*) as remaining_test_wallets FROM wallet WHERE user_id BETWEEN 2 AND 100;"
 
 echo.
 echo ========================================

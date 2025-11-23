@@ -37,14 +37,14 @@ export const options = {
 
 const API_GATEWAY_URL = 'http://localhost:8079';
 const WALLET_ENDPOINT = `${API_GATEWAY_URL}/api/v1/wallet`;
-const USER_POOL_SIZE = 100;
+const USER_POOL_SIZE = 99; // Users 2-100
 
 function generateUserId() {
-  return Math.floor(Math.random() * USER_POOL_SIZE) + 1;
+  return Math.floor(Math.random() * (USER_POOL_SIZE - 1)) + 2; // IDs de 2 à 100
 }
 
 export default function () {
-  const userId = 1; // Utilise toujours le même userId pour maximiser l'utilisation du cache
+  const userId = 2; // Utilise toujours le même userId pour maximiser l'utilisation du cache
   const headers = {
     'Content-Type': 'application/json',
     'X-User-Id': userId.toString(),
