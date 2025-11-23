@@ -55,6 +55,15 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd="pg_isready -U postgres" --health-interval=10s --health-timeout=5s --health-retries=5
+      rabbitmq:
+        image: rabbitmq:3.13-management-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: guest
+          RABBITMQ_DEFAULT_PASS: guest
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd="rabbitmq-diagnostics -q ping" --health-interval=30s --health-timeout=10s --health-retries=3
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -69,15 +78,28 @@ jobs:
             pg_isready -h localhost -p 5432 -U postgres && break
             sleep 2
           done
+      - name: Wait for RabbitMQ
+        run: |
+          for i in {1..10}; do
+            curl -f http://localhost:15672 && break
+            sleep 5
+          done
       - name: Create databases for microservices
         run: |
           psql -h localhost -U postgres -c "CREATE DATABASE brokerxdb_order;"
           psql -h localhost -U postgres -c "CREATE DATABASE brokerxdb_wallet;"
           psql -h localhost -U postgres -c "CREATE DATABASE brokerxdb_matching;"
+          psql -h localhost -U postgres -c "CREATE DATABASE brokerxdb_notification;"
+          psql -h localhost -U postgres -c "CREATE DATABASE brokerxdb_market_data;"
         env:
           PGPASSWORD: Hugovaillant2110
       - name: Run tests (unit, integration, E2E)
         run: mvn verify
+        env:
+          SPRING_RABBITMQ_HOST: localhost
+          SPRING_RABBITMQ_PORT: 5672
+          SPRING_RABBITMQ_USERNAME: guest
+          SPRING_RABBITMQ_PASSWORD: guest
       - name: Upload test reports
         uses: actions/upload-artifact@v4
         with:
@@ -85,3 +107,5 @@ jobs:
           path: |
             **/target/surefire-reports/
             **/target/failsafe-reports/
+
+
