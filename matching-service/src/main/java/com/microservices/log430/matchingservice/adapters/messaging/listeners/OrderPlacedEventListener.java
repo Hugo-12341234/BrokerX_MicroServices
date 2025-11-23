@@ -11,7 +11,6 @@ import com.microservices.log430.matchingservice.domain.model.entities.OrderBook;
 import com.microservices.log430.matchingservice.domain.model.entities.ExecutionReport;
 import com.microservices.log430.matchingservice.domain.service.MatchingService;
 import com.microservices.log430.matchingservice.adapters.web.dto.MatchingResult;
-import com.microservices.log430.matchingservice.adapters.web.dto.OrderBookDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -20,9 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -152,7 +149,7 @@ public class OrderPlacedEventListener {
         List<String> modifiedCandidateIds = null;
         if (result.modifiedCandidates != null) {
             modifiedCandidateIds = result.modifiedCandidates.stream()
-                .map(candidate -> candidate.getClientOrderId())
+                .map(OrderBook::getClientOrderId)
                 .collect(Collectors.toList());
         }
 
@@ -213,7 +210,6 @@ public class OrderPlacedEventListener {
             boolean isIOC = "IOC".equalsIgnoreCase(originalOrder.getDuration());
             boolean isFOK = "FOK".equalsIgnoreCase(originalOrder.getDuration());
 
-            String finalStatus = result.updatedOrder.getStatus();
             boolean hasExecutions = result.executions != null && !result.executions.isEmpty();
 
             // Publier notification de statut d'ordre
@@ -237,61 +233,171 @@ public class OrderPlacedEventListener {
         String notificationMessage;
         String status;
         String finalStatus = result.updatedOrder.getStatus();
+        boolean isMarketOrder = "MARKET".equalsIgnoreCase(originalOrder.getType());
+
+        // Calculer les quantités exécutées et annulées pour IOC
+        int executedQuantity = 0;
+        Double averageExecutionPrice = null;
+        if (hasExecutions && result.executions != null) {
+            executedQuantity = result.executions.stream()
+                .mapToInt(ExecutionReport::getFillQuantity)
+                .sum();
+
+            // Calculer le prix moyen d'exécution pour les ordres marché
+            if (isMarketOrder && executedQuantity > 0) {
+                double totalValue = result.executions.stream()
+                    .mapToDouble(exec -> exec.getFillQuantity() * exec.getFillPrice())
+                    .sum();
+                averageExecutionPrice = totalValue / executedQuantity;
+            }
+        }
+        int cancelledQuantity = originalOrder.getQuantity() - executedQuantity;
 
         // Déterminer le message et le statut selon le type d'ordre et le résultat
         if ("Cancelled".equals(finalStatus) && isFOK) {
-            notificationMessage = String.format("Ordre FOK ANNULÉ : %s %d %s @ %.2f$. Liquidité insuffisante. OrderId : %s",
-                originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
-                originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
+            // FOK annulé - aucun match trouvé
+            if (isMarketOrder) {
+                notificationMessage = String.format("Ordre FOK ANNULÉ : %s %d %s (ordre marché). Aucun match trouvé. OrderId : %s",
+                    originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(), originalOrder.getId());
+            } else {
+                notificationMessage = String.format("Ordre FOK ANNULÉ : %s %d %s @ %.2f$. Aucun match trouvé. OrderId : %s",
+                    originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                    originalOrder.getPrice(), originalOrder.getId());
+            }
             status = "FOK_CANCELLED";
 
         } else if ("Cancelled".equals(finalStatus) && isIOC) {
-            notificationMessage = String.format("Ordre IOC traité : %s %d %s @ %.2f$. Partie non exécutée annulée. OrderId : %s",
-                originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
-                originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
-            status = "IOC_PARTIAL_CANCELLED";
+            // IOC complètement annulé - aucune exécution
+            if (isMarketOrder) {
+                notificationMessage = String.format("Ordre IOC ANNULÉ : %s %d %s (ordre marché). 0 exécuté, %d annulé. OrderId : %s",
+                    originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                    originalOrder.getQuantity(), originalOrder.getId());
+            } else {
+                notificationMessage = String.format("Ordre IOC ANNULÉ : %s %d %s @ %.2f$. 0 exécuté, %d annulé. OrderId : %s",
+                    originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                    originalOrder.getPrice(), originalOrder.getQuantity(), originalOrder.getId());
+            }
+            status = "IOC_CANCELLED";
 
         } else if ("PartiallyFilled".equals(finalStatus) && isIOC) {
-            notificationMessage = String.format("Ordre IOC partiellement exécuté : %s %s @ %.2f$. Reste annulé. OrderId : %s",
-                originalOrder.getSide(), originalOrder.getSymbol(),
-                originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
+            // IOC partiellement exécuté
+            if (isMarketOrder) {
+                if (averageExecutionPrice != null) {
+                    notificationMessage = String.format("Ordre IOC TRAITÉ : %s %s @ %.2f$ moyen (ordre marché). %d exécuté, %d annulé. OrderId : %s",
+                        originalOrder.getSide(), originalOrder.getSymbol(), averageExecutionPrice,
+                        executedQuantity, cancelledQuantity, originalOrder.getId());
+                } else {
+                    notificationMessage = String.format("Ordre IOC TRAITÉ : %s %s (ordre marché). %d exécuté, %d annulé. OrderId : %s",
+                        originalOrder.getSide(), originalOrder.getSymbol(),
+                        executedQuantity, cancelledQuantity, originalOrder.getId());
+                }
+            } else {
+                notificationMessage = String.format("Ordre IOC TRAITÉ : %s %s @ %.2f$. %d exécuté, %d annulé. OrderId : %s",
+                    originalOrder.getSide(), originalOrder.getSymbol(),
+                    originalOrder.getPrice(), executedQuantity, cancelledQuantity, originalOrder.getId());
+            }
             status = "IOC_PARTIAL_FILLED";
+
+        } else if ("Filled".equals(finalStatus) && isIOC) {
+            // IOC complètement exécuté
+            if (isMarketOrder) {
+                if (averageExecutionPrice != null) {
+                    notificationMessage = String.format("Ordre IOC COMPLÈTEMENT EXÉCUTÉ : %s %d %s @ %.2f$ moyen (ordre marché). OrderId : %s",
+                        originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                        averageExecutionPrice, originalOrder.getId());
+                } else {
+                    notificationMessage = String.format("Ordre IOC COMPLÈTEMENT EXÉCUTÉ : %s %d %s (ordre marché). OrderId : %s",
+                        originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(), originalOrder.getId());
+                }
+            } else {
+                notificationMessage = String.format("Ordre IOC COMPLÈTEMENT EXÉCUTÉ : %s %d %s @ %.2f$. OrderId : %s",
+                    originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                    originalOrder.getPrice(), originalOrder.getId());
+            }
+            status = "IOC_FILLED";
 
         } else if ("Working".equals(finalStatus) && isDAY) {
             if (!hasExecutions) {
-                notificationMessage = String.format("Ordre DAY PLACÉ : %s %d %s @ %.2f$. En attente dans le carnet. OrderId : %s",
-                    originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
-                    originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
+                if (isMarketOrder) {
+                    notificationMessage = String.format("Ordre DAY PLACÉ : %s %d %s (ordre marché). En attente dans le carnet. OrderId : %s",
+                        originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(), originalOrder.getId());
+                } else {
+                    notificationMessage = String.format("Ordre DAY PLACÉ : %s %d %s @ %.2f$. En attente dans le carnet. OrderId : %s",
+                        originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                        originalOrder.getPrice(), originalOrder.getId());
+                }
                 status = "DAY_PLACED_NO_MATCH";
             } else {
-                notificationMessage = String.format("Ordre DAY partiellement exécuté : %s %s @ %.2f$. Reste en attente. OrderId : %s",
-                    originalOrder.getSide(), originalOrder.getSymbol(),
-                    originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
+                if (isMarketOrder) {
+                    if (averageExecutionPrice != null) {
+                        notificationMessage = String.format("Ordre DAY partiellement exécuté : %s %s @ %.2f$ moyen (ordre marché). Reste en attente. OrderId : %s",
+                            originalOrder.getSide(), originalOrder.getSymbol(), averageExecutionPrice, originalOrder.getId());
+                    } else {
+                        notificationMessage = String.format("Ordre DAY partiellement exécuté : %s %s (ordre marché). Reste en attente. OrderId : %s",
+                            originalOrder.getSide(), originalOrder.getSymbol(), originalOrder.getId());
+                    }
+                } else {
+                    notificationMessage = String.format("Ordre DAY partiellement exécuté : %s %s @ %.2f$. Reste en attente. OrderId : %s",
+                        originalOrder.getSide(), originalOrder.getSymbol(),
+                        originalOrder.getPrice(), originalOrder.getId());
+                }
                 status = "DAY_PARTIAL_FILLED";
             }
 
         } else if ("PartiallyFilled".equals(finalStatus) && isDAY) {
-            notificationMessage = String.format("Ordre DAY partiellement exécuté : %s %s @ %.2f$. Reste en attente. OrderId : %s",
-                originalOrder.getSide(), originalOrder.getSymbol(),
-                originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
+            if (isMarketOrder) {
+                if (averageExecutionPrice != null) {
+                    notificationMessage = String.format("Ordre DAY partiellement exécuté : %s %s @ %.2f$ moyen (ordre marché). Reste en attente. OrderId : %s",
+                        originalOrder.getSide(), originalOrder.getSymbol(), averageExecutionPrice, originalOrder.getId());
+                } else {
+                    notificationMessage = String.format("Ordre DAY partiellement exécuté : %s %s (ordre marché). Reste en attente. OrderId : %s",
+                        originalOrder.getSide(), originalOrder.getSymbol(), originalOrder.getId());
+                }
+            } else {
+                notificationMessage = String.format("Ordre DAY partiellement exécuté : %s %s @ %.2f$. Reste en attente. OrderId : %s",
+                    originalOrder.getSide(), originalOrder.getSymbol(),
+                    originalOrder.getPrice(), originalOrder.getId());
+            }
             status = "DAY_PARTIAL_FILLED";
 
         } else if ("Filled".equals(finalStatus)) {
-            notificationMessage = String.format("Ordre COMPLÈTEMENT EXÉCUTÉ : %s %d %s @ %.2f$. OrderId : %s",
-                originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
-                originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
+            if (isMarketOrder) {
+                if (averageExecutionPrice != null) {
+                    notificationMessage = String.format("Ordre COMPLÈTEMENT EXÉCUTÉ : %s %d %s @ %.2f$ moyen (ordre marché). OrderId : %s",
+                        originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                        averageExecutionPrice, originalOrder.getId());
+                } else {
+                    notificationMessage = String.format("Ordre COMPLÈTEMENT EXÉCUTÉ : %s %d %s (ordre marché). OrderId : %s",
+                        originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(), originalOrder.getId());
+                }
+            } else {
+                notificationMessage = String.format("Ordre COMPLÈTEMENT EXÉCUTÉ : %s %d %s @ %.2f$. OrderId : %s",
+                    originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                    originalOrder.getPrice(), originalOrder.getId());
+            }
             status = "FILLED";
 
         } else if ("Cancelled".equals(finalStatus)) {
-            notificationMessage = String.format("Ordre ANNULÉ : %s %d %s @ %.2f$. OrderId : %s",
-                originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
-                originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, originalOrder.getId());
+            if (isMarketOrder) {
+                notificationMessage = String.format("Ordre ANNULÉ : %s %d %s (ordre marché). OrderId : %s",
+                    originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(), originalOrder.getId());
+            } else {
+                notificationMessage = String.format("Ordre ANNULÉ : %s %d %s @ %.2f$. OrderId : %s",
+                    originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                    originalOrder.getPrice(), originalOrder.getId());
+            }
             status = "CANCELLED";
 
         } else {
-            notificationMessage = String.format("Ordre traité : %s %d %s @ %.2f$. Statut : %s. OrderId : %s",
-                originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
-                originalOrder.getPrice() != null ? originalOrder.getPrice() : 0.0, finalStatus, originalOrder.getId());
+            if (isMarketOrder) {
+                notificationMessage = String.format("Ordre traité : %s %d %s (ordre marché). Statut : %s. OrderId : %s",
+                    originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                    finalStatus, originalOrder.getId());
+            } else {
+                notificationMessage = String.format("Ordre traité : %s %d %s @ %.2f$. Statut : %s. OrderId : %s",
+                    originalOrder.getSide(), originalOrder.getQuantity(), originalOrder.getSymbol(),
+                    originalOrder.getPrice(), finalStatus, originalOrder.getId());
+            }
             status = "PROCESSED";
         }
 

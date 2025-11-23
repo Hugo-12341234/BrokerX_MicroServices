@@ -28,7 +28,7 @@ public class OutboxScheduler {
     /**
      * Traite les événements de l'outbox toutes les 10 secondes
      */
-    @Scheduled(fixedDelay = 2000) // 2 secondes - plus rapide pour dev
+    @Scheduled(fixedDelay = 1000) // 1 seconde - plus rapide pour dev
     public void processOutboxEvents() {
         try {
             logger.debug("Début du traitement schedulé de l'outbox");
