@@ -209,38 +209,43 @@
 # 1. Introduction & Objectifs
 
 ## 1.1 Objectifs métier
-BrokerX est une plateforme de courtage en ligne, désormais migrée vers une architecture microservices (phase 2). Les utilisateurs peuvent s’inscrire, vérifier leur identité, s’authentifier avec MFA, déposer des fonds, placer des ordres et consulter leur portefeuille. L’objectif principal reste d’offrir une expérience sécurisée, fluide et conforme aux exigences réglementaires du secteur financier, tout en améliorant la performance, la disponibilité et la scalabilité grâce au découpage en services indépendants et à l’API Gateway.
+BrokerX est une plateforme de courtage en ligne, désormais migrée vers une architecture microservices (phase 2) et événementielle (phase 3). Les utilisateurs peuvent s’inscrire, vérifier leur identité, s’authentifier avec MFA, déposer des fonds, s'abonner aux données du marché, placer des ordres, modifier ou annuler des ordres, recevoir des notifications et consulter leur portefeuille. L’objectif principal reste d’offrir une expérience sécurisée, fluide et conforme aux exigences réglementaires du secteur financier, tout en améliorant la performance, la disponibilité et la scalabilité grâce au découpage en services indépendants et à l’API Gateway.
 
 ## 1.2 Fonctionnalités essentielles
 - Inscription et vérification d’identité (KYC)
 - Authentification forte avec MFA
 - Gestion du portefeuille virtuel (dépôt, solde)
+- Données de marché en temps réel via WebSockets
 - Placement d’ordres d’achat et de vente
+- Modification et annulation d'ordres existants
+- Notifications push en temps réel
 - Gestion de l’idempotence et de la traçabilité des opérations
 - Journalisation des actions et audit de sécurité
 - Observabilité avancée (logs structurés, métriques Golden Signals)
 
-## 1.3 Objectifs de qualité pour l’architecture
+## 1.3 Objectifs de qualité pour l'architecture
 
 | Objectif de qualité | Scénario concret | Motivation |
 |---------------------|------------------|------------|
-| Sécurité | Un utilisateur ne peut accéder qu’à ses propres données et toutes les transactions sont chiffrées | Protection des données sensibles et conformité réglementaire |
-| Performance | Le système doit répondre à une requête d’ordre en moins de 250 ms (P95) et traiter au moins 800 ordres/s | Expérience utilisateur, compétitivité, passage à l’échelle microservices |
-| Disponibilité | Le service doit être disponible 95,5% du temps, même en cas de panne d’un composant | Continuité de service, fiabilité accrue par la résilience des microservices |
-| Résilience | En cas d’incident, le système doit pouvoir récupérer et restaurer les opérations sans perte de données | Robustesse et gestion proactive des erreurs |
+| Sécurité | Un utilisateur ne peut accéder qu'à ses propres données et toutes les transactions sont chiffrées | Protection des données sensibles et conformité réglementaire |
+| Performance | Le système doit répondre à une requête d'ordre en moins de 100 ms (P95) et traiter au moins 1200 ordres/s | Expérience utilisateur optimale, compétitivité accrue avec l'architecture événementielle |
+| Disponibilité | Le service doit être disponible 99,9% du temps, même en cas de panne d'un composant | Continuité de service critique, haute fiabilité grâce aux microservices et WebSockets |
+| Résilience | En cas d'incident, le système doit pouvoir récupérer et restaurer les opérations sans perte de données | Robustesse et gestion proactive des erreurs avec patterns Saga et Outbox |
 | Maintenabilité | Les évolutions fonctionnelles doivent pouvoir être réalisées rapidement et sans régression | Réduction des coûts de maintenance et adaptation aux besoins métier |
-| Scalabilité | Supporter la croissance du nombre d’utilisateurs et la montée en charge | Pérennité et adaptation à la demande |
+| Scalabilité | Supporter la croissance du nombre d'utilisateurs et la montée en charge | Pérennité et adaptation à la demande avec architecture événementielle |
 | Traçabilité & auditabilité | Toutes les opérations sont journalisées et traçables | Conformité et sécurité |
-| Observabilité | Logs structurés et métriques (Golden Signals) accessibles pour le monitoring et l’optimisation | Pilotage de la performance et détection proactive des incidents |
+| Observabilité | Logs structurés et métriques (Golden Signals) accessibles pour le monitoring et l'optimisation | Pilotage de la performance et détection proactive des incidents |
 | Conformité | Respect des standards du secteur (tokens, MFA, KYC) | Obligations réglementaires |
 
 ## 1.4 Parties prenantes
 
 | Partie prenante                  | Rôle                                   | Attente principale |
 |----------------------------------|----------------------------------------|--------------------|
-| Clients                         | Utilisateurs via interface web/mobile  | Expérience fluide, sécurité des transactions, accès rapide aux cotations et exécution des ordres |
-| Opérations Back-Office          | Gestion des règlements, supervision     | Outils de gestion efficaces, visibilité sur les opérations, fiabilité des processus |
-| Conformité / Risque             | Surveillance pré- et post-trade         | Accès aux journaux d’audit, alertes en cas d’anomalie, conformité réglementaire garantie |
+| Clients                         | Utilisateurs via interface web/mobile  | Expérience fluide, sécurité des transactions, données de marché en temps réel, notifications instantanées, modification/annulation d'ordres |
+| Opérations Back-Office          | Gestion des règlements, supervision     | Outils de gestion efficaces, visibilité sur les opérations, fiabilité des processus, observabilité avancée avec métriques Golden Signals |
+| Conformité / Risque             | Surveillance pré- et post-trade         | Accès aux journaux d'audit, alertes en temps réel, conformité réglementaire garantie, traçabilité complète des opérations |
+| Équipe DevOps                   | Déploiement et monitoring               | Architecture microservices scalable, métriques de performance, logs structurés, déploiement automatisé |
+| Développeurs                    | Maintenance et évolution                | Architecture événementielle, patterns Saga/Outbox, tests automatisés, documentation API complète |
 
 Cette section synthétise les besoins métier, techniques et réglementaires qui orientent toutes les décisions architecturales.
 
@@ -1825,7 +1830,7 @@ Le load balancer NGINX répartira le trafic entre les instances.
 ![Swagger](docs/swagger.png)
 - **Prometheus** pour le monitoring des métriques : [http://localhost:8090](http://localhost:8090)
 ![Prometheus](docs/prometheus.png)
-- **Grafana** pour visualiser les dashboards : [http://localhost:3001](http://localhost:3001)  
+- **Grafana** pour visualiser les dashboards : [http://localhost:3001](http://localhost:3001)
   - Identifiants par défaut : `admin` / `admin`. Veuillez entrez ces informations, puis cliquer sur Skip lorsque l'on vous demande de changer le mot de passe.
   - Puis, cliquez sur `Dashboards`, puis sur `BrokerX - 4 Golden Signals Dashboard`. Ce dashboard est le principal qui contient toues les informations voulues.
 ![Grafana](docs/grafana.png)
@@ -1869,12 +1874,12 @@ docker-compose down -v
 
 ## 13. Pour utiliser le script de déploiement (Optionnel)
 
-Le script `deploy.sh` permet d’automatiser le déploiement de l’ensemble de la solution conteneurisée.  
+Le script `deploy.sh` permet d’automatiser le déploiement de l’ensemble de la solution conteneurisée.
 Ce script utilise **Docker Compose** pour lancer tous les services du projet : les microservices applicatifs, la base de données, le *gateway*, ainsi que les services de monitoring (Prometheus et Grafana).
 
-> **Important :**  
-> Ce script déploie **une seule instance de chaque microservice**.  
-> Il ne s’agit donc pas d’un déploiement distribué ni d’un équilibrage de charge (*scaling*).  
+> **Important :**
+> Ce script déploie **une seule instance de chaque microservice**.
+> Il ne s’agit donc pas d’un déploiement distribué ni d’un équilibrage de charge (*scaling*).
 > L’objectif est d’offrir un déploiement reproductible et fonctionnel de l’environnement complet sur une machine locale.
 
 Ce script :
@@ -1906,7 +1911,7 @@ Sous Windows, il est recommandé d’utiliser **Git Bash** (installé avec Git p
 4. Lancez le script avec :
    ```bash
    ./deploy.sh
-   ``` 
+   ```
 5. Pour effectuer un rollback vers la dernière version stable, faites :
     ```bash
     ./deploy.sh rollback
