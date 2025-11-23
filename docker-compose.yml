@@ -320,7 +320,9 @@ services:
           { "name": "Auth Service", "url": "http://localhost:8078/swagger/auth/v3/api-docs" },
           { "name": "Order Service", "url": "http://localhost:8078/swagger/order/v3/api-docs" },
           { "name": "Wallet Service", "url": "http://localhost:8078/swagger/wallet/v3/api-docs" },
-          { "name": "Matching Service", "url": "http://localhost:8078/swagger/matching/v3/api-docs" }
+          { "name": "Matching Service", "url": "http://localhost:8078/swagger/matching/v3/api-docs" },
+          { "name": "Notification Service", "url": "http://localhost:8078/swagger/notification/v3/api-docs" },
+          { "name": "Market Data Service", "url": "http://localhost:8078/swagger/marketdata/v3/api-docs" }
         ]
     networks:
       - brokerx-network
@@ -330,6 +332,7 @@ services:
       - wallet-service
       - matching-service
       - notification-service
+      - market-data-service
 
   # ===========================================
   # MONITORING - PROMETHEUS & GRAFANA
