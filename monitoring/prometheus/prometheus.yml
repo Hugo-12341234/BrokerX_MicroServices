@@ -55,6 +55,14 @@ scrape_configs:
     scrape_interval: 15s
     scrape_timeout: 10s
 
+  # Market Data Service
+  - job_name: 'market-data-service'
+    static_configs:
+      - targets: ['market-data-service:8087']
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
   # Prometheus self-monitoring
   - job_name: 'prometheus'
     static_configs:
