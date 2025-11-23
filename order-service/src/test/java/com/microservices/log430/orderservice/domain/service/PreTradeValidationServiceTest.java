@@ -1,8 +1,8 @@
 package com.microservices.log430.orderservice.domain.service;
 
-import com.microservices.log430.orderservice.adapters.external.wallet.StockRule;
+import com.microservices.log430.orderservice.adapters.external.marketdata.StockRule;
+import com.microservices.log430.orderservice.adapters.external.marketdata.MarketDataClient;
 import com.microservices.log430.orderservice.adapters.external.wallet.Wallet;
-import com.microservices.log430.orderservice.adapters.external.wallet.WalletClient;
 import com.microservices.log430.orderservice.domain.model.entities.Order;
 import com.microservices.log430.orderservice.domain.port.in.PreTradeValidationPort;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,7 +21,7 @@ import static org.mockito.Mockito.*;
 class PreTradeValidationServiceTest {
 
     @Mock
-    private WalletClient walletClient;
+    private MarketDataClient marketDataClient;
 
     @InjectMocks
     private PreTradeValidationService preTradeValidationService;
@@ -41,13 +41,14 @@ class PreTradeValidationServiceTest {
         mockStockRule.setTickSize(BigDecimal.valueOf(0.01));
         mockStockRule.setMinBand(BigDecimal.valueOf(100));
         mockStockRule.setMaxBand(BigDecimal.valueOf(200));
+        mockStockRule.setPrice(BigDecimal.valueOf(150.00)); // Prix actuel du stock
 
         validationRequest = new PreTradeValidationPort.ValidationRequest(
             "AAPL",
             Order.Side.ACHAT,
             Order.OrderType.LIMITE,
             100,
-            150.00, // Double au lieu de BigDecimal
+            150.00,
             mockWallet
         );
     }
@@ -55,7 +56,7 @@ class PreTradeValidationServiceTest {
     @Test
     void validateOrder_HappyPath_ShouldReturnValid() {
         // Given
-        when(walletClient.getStockBySymbol("AAPL")).thenReturn(mockStockRule);
+        when(marketDataClient.getStockBySymbol("AAPL")).thenReturn(mockStockRule);
 
         // When
         PreTradeValidationPort.ValidationResult result = preTradeValidationService.validateOrder(validationRequest);
@@ -68,7 +69,7 @@ class PreTradeValidationServiceTest {
     @Test
     void validateOrder_InvalidSymbol_ShouldReturnInvalid() {
         // Given
-        when(walletClient.getStockBySymbol("INVALID")).thenReturn(null);
+        when(marketDataClient.getStockBySymbol("INVALID")).thenReturn(null);
         validationRequest = new PreTradeValidationPort.ValidationRequest(
             "INVALID", Order.Side.ACHAT, Order.OrderType.LIMITE, 100, 150.00, mockWallet
         );
@@ -84,7 +85,7 @@ class PreTradeValidationServiceTest {
     @Test
     void validateOrder_PriceOutOfRange_ShouldReturnInvalid() {
         // Given
-        when(walletClient.getStockBySymbol("AAPL")).thenReturn(mockStockRule);
+        when(marketDataClient.getStockBySymbol("AAPL")).thenReturn(mockStockRule);
         validationRequest = new PreTradeValidationPort.ValidationRequest(
             "AAPL", Order.Side.ACHAT, Order.OrderType.LIMITE, 100, 250.00, mockWallet
         );
@@ -94,12 +95,13 @@ class PreTradeValidationServiceTest {
 
         // Then
         assertFalse(result.isValid());
+        assertTrue(result.getRejectReason().contains("bande"));
     }
 
     @Test
     void validateOrder_InvalidTickSize_ShouldReturnInvalid() {
         // Given
-        when(walletClient.getStockBySymbol("AAPL")).thenReturn(mockStockRule);
+        when(marketDataClient.getStockBySymbol("AAPL")).thenReturn(mockStockRule);
         validationRequest = new PreTradeValidationPort.ValidationRequest(
             "AAPL", Order.Side.ACHAT, Order.OrderType.LIMITE, 100, 150.005, mockWallet
         );

@@ -11,7 +11,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
-import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -19,74 +18,94 @@ import static org.junit.jupiter.api.Assertions.*;
 class JwtTokenUtilTest {
 
     private JwtTokenUtil jwtTokenUtil;
-    private SecretKey testSecretKey;
-    private String testSecret;
-    private String validToken;
+    private final String testSecret = "mySecretKeyForTestingPurposesOnly1234567890";
 
     @BeforeEach
     void setUp() {
-        // Generate a secure Base64 secret string that's long enough for HS512 (at least 64 bytes)
-        SecretKey tempKey = Keys.secretKeyFor(SignatureAlgorithm.HS512);
-        testSecret = Base64.getEncoder().encodeToString(tempKey.getEncoded());
-
-        // This will create the same SecretKey as JwtTokenUtil does
-        testSecretKey = Keys.hmacShaKeyFor(testSecret.getBytes());
-
         jwtTokenUtil = new JwtTokenUtil(testSecret);
-
-        // Create a valid token for testing using the same key generation method
-        validToken = Jwts.builder()
-            .setSubject("1")
-            .setIssuedAt(new Date())
-            .setExpiration(new Date(System.currentTimeMillis() + 86400000))
-            .signWith(testSecretKey)
-            .compact();
     }
 
     @Test
-    void getUserIdFromToken_ValidToken_ShouldReturnUserId() {
-        // When
-        String userId = String.valueOf(jwtTokenUtil.getUserId(validToken));
+    void validateToken_shouldReturnTrueForValidToken() {
+        // Arrange
+        String userId = "123";
+        String token = createTestToken(userId);
 
-        // Then
-        assertEquals("1", userId);
-    }
+        // Act
+        boolean isValid = jwtTokenUtil.validateToken(token);
 
-    @Test
-    void validateToken_ValidToken_ShouldReturnTrue() {
-        // When
-        boolean isValid = jwtTokenUtil.validateToken(validToken);
-
-        // Then
+        // Assert
         assertTrue(isValid);
     }
 
     @Test
-    void validateToken_ExpiredToken_ShouldReturnFalse() {
-        // Given
-        String expiredToken = Jwts.builder()
-            .setSubject("1")
-            .setIssuedAt(new Date(System.currentTimeMillis() - 86400000 * 2)) // 2 days ago
-            .setExpiration(new Date(System.currentTimeMillis() - 86400000)) // 1 day ago
-            .signWith(testSecretKey)
-            .compact();
+    void validateToken_shouldReturnFalseForInvalidToken() {
+        // Arrange
+        String invalidToken = "invalid.token.here";
 
-        // When
-        boolean isValid = jwtTokenUtil.validateToken(expiredToken);
+        // Act
+        boolean isValid = jwtTokenUtil.validateToken(invalidToken);
 
-        // Then
+        // Assert
         assertFalse(isValid);
     }
 
     @Test
-    void validateToken_InvalidToken_ShouldReturnFalse() {
-        // Given
-        String invalidToken = "invalid.jwt.token";
+    void getUserId_shouldReturnCorrectUserId() {
+        // Arrange
+        String userId = "123";
+        String token = createTestToken(userId);
 
-        // When
-        boolean isValid = jwtTokenUtil.validateToken(invalidToken);
+        // Act
+        Long extractedUserId = jwtTokenUtil.getUserId(token);
 
-        // Then
+        // Assert
+        assertEquals(Long.valueOf(userId), extractedUserId);
+    }
+
+    @Test
+    void getClaims_shouldReturnCorrectClaims() {
+        // Arrange
+        String userId = "123";
+        String token = createTestToken(userId);
+
+        // Act
+        Claims claims = jwtTokenUtil.getClaims(token);
+
+        // Assert
+        assertNotNull(claims);
+        assertEquals(userId, claims.getSubject());
+    }
+
+    @Test
+    void validateToken_shouldReturnFalseForExpiredToken() {
+        // Arrange
+        String expiredToken = createExpiredToken("123");
+
+        // Act
+        boolean isValid = jwtTokenUtil.validateToken(expiredToken);
+
+        // Assert
         assertFalse(isValid);
+    }
+
+    private String createTestToken(String userId) {
+        SecretKey key = Keys.hmacShaKeyFor(testSecret.getBytes());
+        return Jwts.builder()
+                .setSubject(userId)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60)) // 1 hour
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    private String createExpiredToken(String userId) {
+        SecretKey key = Keys.hmacShaKeyFor(testSecret.getBytes());
+        return Jwts.builder()
+                .setSubject(userId)
+                .setIssuedAt(new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 2)) // 2 hours ago
+                .setExpiration(new Date(System.currentTimeMillis() - 1000 * 60 * 60)) // 1 hour ago (expired)
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
     }
 }
