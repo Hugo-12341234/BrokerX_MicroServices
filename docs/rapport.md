@@ -249,16 +249,18 @@ BrokerX est une plateforme de courtage en ligne, désormais migrée vers une arc
 
 Cette section synthétise les besoins métier, techniques et réglementaires qui orientent toutes les décisions architecturales.
 
-## 1.5 Vue d’ensemble des exigences fonctionnelles
+## 1.5 Vue d'ensemble des exigences fonctionnelles
 
-| Cas d’utilisation | Description | Référence |
+| Cas d'utilisation | Description | Référence |
 |-------------------|-------------|-----------|
-| Inscription & vérification d’identité | Permet à un utilisateur de créer un compte et de valider son identité via un processus KYC | UC01.md |
-| Authentification & MFA | Permet à un utilisateur de s’authentifier avec mot de passe et code MFA | UC02.md |
+| Inscription & vérification d'identité | Permet à un utilisateur de créer un compte et de valider son identité via un processus KYC | UC01.md |
+| Authentification & MFA | Permet à un utilisateur de s'authentifier avec mot de passe et code MFA | UC02.md |
 | Dépôt dans le portefeuille | Permet à un utilisateur de déposer des fonds dans son portefeuille virtuel | UC03.md |
-| Placement d’un ordre | Permet à un utilisateur de placer un ordre d’achat ou de vente sur un actif | UC05.md |
-| Appariement interne & Exécution (matching) | Assure l’exécution automatique des ordres selon la priorité prix/temps, rapproche acheteurs et vendeurs, génère les transactions | UC07.md |
-| Consultation du portefeuille et des ordres | Permet à un utilisateur de consulter ses positions, ordres et historiques | UC07.md |
+| Abonnement aux données de marché | Permet à un utilisateur de recevoir des données de marché en temps réel via WebSockets | UC04.md |
+| Placement d'un ordre | Permet à un utilisateur de placer un ordre d'achat ou de vente sur un actif | UC05.md |
+| Modification / Annulation d'un ordre | Permet à un utilisateur de modifier ou annuler ses ordres existants | UC06.md |
+| Appariement interne & Exécution (matching) | Assure l'exécution automatique des ordres selon la priorité prix/temps avec architecture événementielle (patterns Saga et Outbox) | UC07.md |
+| Notifications push | Permet à un utilisateur de recevoir des notifications en temps réel sur les événements critiques | UC08.md |
 
 ## 1.6 Priorisation MoSCoW des cas d’utilisation (DDD)
 
@@ -266,14 +268,14 @@ Cette section synthétise les besoins métier, techniques et réglementaires qui
 
 | Cas d'utilisation                                      | Priorité MoSCoW | Justification                                                                                   |
 |--------------------------------------------------------|-----------------|-----------------------------------------------------------------------------------------------------------|
-| UC-01 — Inscription & Vérification d’identité          | Must            | Sans inscription et vérification, aucun utilisateur ne peut accéder à la plateforme ni respecter les exigences réglementaires (KYC/AML). C'est la base de toute relation de confiance et de conformité légale.|
-| UC-03 — Approvisionnement du portefeuille (dépôt virtuel)| Must            | Les utilisateurs doivent pouvoir disposer de liquidités pour effectuer des opérations : sans dépôt, aucune transaction n'est possible, ce qui bloque toute activité sur la plateforme. |
-| UC-05 — Placement d’un ordre (marché/limite) avec contrôles pré-trade | Must            | Le placement d'ordre est le cœur du métier : sans cette fonctionnalité, la plateforme ne répond à aucun besoin de courtage et perd toute valeur pour les clients.  |
-| UC-02 — Authentification & MFA                         | Must            | La sécurité des accès est indispensable pour la conformité et la confiance : une authentification forte est requise pour garantir la sécurité des comptes et la conformité réglementaire. |
-| UC-07 — Appariement interne & Exécution (matching)     | Must            | L'appariement automatique est essentiel pour assurer l'exécution des ordres selon les règles de priorité prix/temps : sans cette mécanique, la plateforme ne peut traiter les transactions de manière fiable et conforme aux standards du secteur. |
-| UC-04 — Abonnement aux données de marché               | Should          | Permet aux utilisateurs de prendre des décisions informées, mais la plateforme peut fonctionner sans cette fonctionnalité, en mode minimal ou pour des tests.|
-| UC-06 — Modification / Annulation d’un ordre           | Could           | Offre de la flexibilité et réduit les erreurs, mais un MVP peut fonctionner sans cette capacité, en imposant plus de rigueur à l'utilisateur.|
-| UC-08 — Confirmation d’exécution & Notifications       | Won't Have      | Utile pour la transparence et l'information client, mais sera exclu de la première version pour se concentrer sur les fonctionnalités essentielles et réduire la complexité technique.|
+| UC-01 — Inscription & Vérification d'identité          | Must            | Sans inscription et vérification, aucun utilisateur ne peut accéder à la plateforme ni respecter les exigences réglementaires (KYC/AML). C'est la base de toute relation de confiance et de conformité légale.|
+| UC-03 — Approvisionnement du portefeuille (dépôt virtuel)| Must            | Les utilisateurs doivent pouvoir disposer de liquidités pour effectuer des opérations : sans dépôt, aucune transaction n'est possible, ce qui bloque toute activité sur la plateforme. |
+| UC-05 — Placement d'un ordre (marché/limite) avec contrôles pré-trade | Must            | Le placement d'ordre est le cœur du métier : sans cette fonctionnalité, la plateforme ne répond à aucun besoin de courtage et perd toute valeur pour les clients.  |
+| UC-02 — Authentification & MFA                         | Must            | La sécurité des accès est indispensable pour la conformité et la confiance : une authentification forte est requise pour garantir la sécurité des comptes et la conformité réglementaire. |
+| UC-07 — Appariement interne & Exécution (matching)     | Must            | L'appariement automatique est essentiel pour assurer l'exécution des ordres selon les règles de priorité prix/temps : sans cette mécanique, la plateforme ne peut traiter les transactions de manière fiable et conforme aux standards du secteur. |
+| UC-04 — Abonnement aux données de marché               | Must            | Les données de marché en temps réel sont essentielles pour permettre aux utilisateurs de prendre des décisions éclairées et pour assurer la compétitivité de la plateforme face aux autres courtiers. |
+| UC-06 — Modification / Annulation d'un ordre           | Must            | La capacité de modifier ou annuler des ordres est indispensable pour la gestion des risques et l'expérience utilisateur : elle évite les pertes dues aux erreurs et répond aux standards du secteur. |
+| UC-08 — Notifications push                             | Must            | Les notifications en temps réel sont critiques pour informer les utilisateurs des événements importants (exécutions, rejets) et garantir la transparence et la réactivité requises dans le trading. |
 
 > Cette priorisation MoSCoW garantit que les fonctionnalités critiques (Must) sont livrées en priorité pour assurer la valeur métier, la conformité et la sécurité, tandis que les autres (Should/Could) enrichissent l'expérience ou optimisent le service. Les éléments en Won't Have sont explicitement exclus pour permettre une livraison rapide et maîtrisée du périmètre minimal.
 
@@ -395,6 +397,39 @@ Alternatifs / Exceptions:
 Critère d’acceptation
 Un client saisit un montant valide, la transaction est acceptée, le portefeuille est crédité, et la transaction est journalisée avec succès.
 
+### UC-04 — Abonnement aux données de marché
+
+Objectif:
+Offrir aux clients un accès en temps réel aux cotations et carnets d’ordres pour les
+instruments suivis. Ce cas permet aux investisseurs de prendre des décisions éclairées grâce à
+des données actualisées.
+
+Acteur principal : Client
+
+Secondaires : Fournisseur de données de marché simulé
+
+Déclencheur : Le Client ouvre la vue Marché ou s’abonne à des symboles.
+
+Préconditions : Session valide.
+
+Postconditions (succès) : 
+- Flux temps réel établi (WebSocket/Server-Sent Events (SSE)),
+latence < 200 ms.
+
+Postconditions (échec) : 
+- Aucun flux établi.
+
+Flux principal
+1. Le Client demande l’abonnement à une liste de symboles.
+2. Le Système autorise (quotas, rate-limit).
+3. Le Système ouvre un canal (WS/SSE) et pousse cotations/ordre book snapshots + diff.
+4. Le Client reçoit updates (top of book, OHLC, trades).
+
+Critère d'acceptation :
+Un utilisateur connecté s’abonne au symbole boursier AAPL.
+Résultat attendu : le système transmet en temps réel les cotations et le carnet d’ordres du titre
+AAPL.
+
 ### UC-05 — Placement d’un ordre (marché/limite) avec contrôles pré-trade
 
 Objectif:
@@ -443,6 +478,41 @@ Alternatifs / Exceptions:
 Critère d’acceptation:
 Un client soumet un ordre valide pour le stock "TEST", tous les contrôles pré-trade sont passés, l’ordre est accepté et enregistré dans le carnet interne.
 
+### UC-06 — Modification / Annulation d’un ordre
+
+Objectif:
+Offrir la possibilité de modifier ou d’annuler un ordre actif dans le carnet tant qu’il n’est pas
+totalement exécuté. Ce cas donne de la flexibilité aux clients pour gérer leurs stratégies de
+trading.
+
+Acteur principal : Client
+
+Secondaires : Moteur d’appariement, Portefeuilles
+
+Déclencheur : Le Client modifie ou annule un ordre Working.
+
+Préconditions : Ordre existant, non entièrement exécuté, modifiable.
+
+Postconditions (succès) : Ordre mis à jour ou annulé; journal d’audit.
+
+Postconditions (échec) : Aucune modification.
+
+Flux principal
+1. Le Client envoie Cancel ou Replace (nouvelles valeurs : quantité, prix).
+2. Le Système verrouille l’ordre (optimisme/pessimisme), vérifie état.
+3. Si Replace, repasse contrôles pré-trade; si Cancel, retire du carnet.
+4. Retourne Cancel/Replace ACK.
+
+Alternatifs / Exceptions :
+- A1. Exécution concurrente partielle : seules quantités restantes modifiables.
+- E1. Ordre déjà exécuté/annulé : Reject (avec dernier état).
+
+Critère d'acceptation :
+L’utilisateur modifie un ordre limite d’achat de 10 actions AAPL à 100 $ en ajustant le prix à 101
+$.
+Résultat attendu : l’ordre est mis à jour dans le carnet et le système émet un accusé de
+modification (Replace ACK).
+
 ### UC-07 — Appariement interne & Exécution (matching)
 
 Objectif:
@@ -479,20 +549,55 @@ Alternatifs / Exceptions:
 Critère d’acceptation:
 Un ordre d’achat de 10 actions AAPL à 100 $ rencontre un ordre de vente identique. Résultat attendu : une transaction est générée, les quantités sont ajustées et un rapport d’exécution (Execution Report) est publié.
 
+### UC-08 — Confirmation d’exécution & Notifications
+
+Objectif:
+Notifier les clients de l’état final de leurs ordres (exécuté partiellement ou totalement, rejeté), en
+fournissant des informations précises et traçables. Ce cas garantit la transparence et la
+confiance dans les transactions.
+
+Acteur principal : Système
+
+Secondaires : Client, Back-Office
+
+Déclencheur : Réception d’un ExecutionReport.
+
+Préconditions : Ordre existant.
+
+Postconditions (succès) : Client notifié (UI push/email), état ordre mis à jour.
+
+Postconditions (échec) : Notification peut échouer mais l'exécution reste valide.
+
+Flux principal
+1. Le Système met à jour l’état de l’ordre (Partial/Filled).
+2. Crée un enregistrement d’exécution (prix, qty, frais).
+3. Notifie le Client (temps réel).
+4. Journalise l’audit (horodatage, source).
+
+Alternatifs / Exceptions :
+- E1. Échec de push : retry, puis fallback email.
+
+Critère d'acceptation :
+Une fois l’ordre exécuté, le système envoie une notification à l’utilisateur.
+Résultat attendu : l’utilisateur reçoit une confirmation indiquant que l’ordre a été entièrement
+exécuté dans l’application.
+
 ## 2. Contraintes d’architecture
 
 ### 2.1 Contraintes techniques
 
 | Contrainte | Explication |
 |------------|------------|
-| Monolithe Java/Spring Boot | L’application doit être développée en Java avec le framework Spring Boot, sous forme de monolithe. |
-| Base de données PostgreSQL | Toutes les données persistantes doivent être stockées dans une base PostgreSQL. |
-| Authentification MFA | L’authentification multi-facteurs est obligatoire pour tous les accès utilisateurs. |
-| Docker & Docker Compose | Le déploiement doit se faire via des conteneurs Docker, orchestrés avec Docker Compose. |
-| API REST | Les interfaces externes doivent être exposées sous forme d’API REST. |
-| Journalisation et audit | Toutes les opérations critiques, y compris les événements d’exécution (fills, partial fills, ExecutionReport), doivent être journalisées pour audit et traçabilité. |
-| Caching | Un mécanisme de cache (local ou distribué) doit être utilisé pour optimiser la consultation du carnet d’ordres, du top-of-book et la diffusion des données de marché, afin d’améliorer la performance et limiter la charge sur la base de données. |
-| Observabilité | Le système doit fournir des logs structurés, des métriques (Golden Signals) et des traces pour le moteur d’appariement et l’exécution des ordres, afin d’assurer le suivi, la détection des anomalies et la conformité. |
+| Architecture microservices Java/Spring Boot | L'application est développée en Java avec le framework Spring Boot, organisée en microservices indépendants avec API Gateway. |
+| Base de données PostgreSQL | Toutes les données persistantes doivent être stockées dans une base PostgreSQL. Chaque microservice dispose de sa propre base de données pour respecter l'isolation des données. |
+| Architecture événementielle | Le système utilise une architecture événementielle avec les patterns Saga et Outbox pour gérer la cohérence des données entre microservices lors des transactions distribuées. |
+| Authentification MFA | L'authentification multi-facteurs est obligatoire pour tous les accès utilisateurs. |
+| Docker & Docker Compose | Le déploiement doit se faire via des conteneurs Docker, orchestrés avec Docker Compose. Chaque microservice est conteneurisé indépendamment. |
+| API REST & Communication inter-services | Les interfaces externes doivent être exposées sous forme d'API REST. La communication entre microservices utilise des appels HTTP synchrones et des événements asynchrones. |
+| Load Balancing | NGINX est utilisé comme load balancer pour distribuer le trafic entre les instances des microservices et assurer la haute disponibilité. |
+| Journalisation et audit | Toutes les opérations critiques, y compris les événements d'exécution (fills, partial fills, ExecutionReport), doivent être journalisées pour audit et traçabilité. |
+| Caching | Un mécanisme de cache (local ou distribué) doit être utilisé pour optimiser la consultation du carnet d'ordres, du top-of-book et la diffusion des données de marché, afin d'améliorer la performance et limiter la charge sur la base de données. |
+| Observabilité | Le système doit fournir des logs structurés, des métriques (Golden Signals) et des traces pour le moteur d'appariement et l'exécution des ordres, afin d'assurer le suivi, la détection des anomalies et la conformité. Prometheus et Grafana sont utilisés pour le monitoring. |
 
 ### 2.2 Contraintes réglementaires et de conformité
 
