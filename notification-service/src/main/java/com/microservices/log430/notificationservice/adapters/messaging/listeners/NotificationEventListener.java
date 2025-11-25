@@ -2,6 +2,7 @@ package com.microservices.log430.notificationservice.adapters.messaging.listener
 
 import com.microservices.log430.notificationservice.adapters.messaging.events.NotificationEvent;
 import com.microservices.log430.notificationservice.adapters.web.dto.NotificationLogDTO;
+import com.microservices.log430.notificationservice.domain.port.in.NotificationPort;
 import com.microservices.log430.notificationservice.domain.service.NotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,11 +19,11 @@ public class NotificationEventListener {
 
     private static final Logger logger = LoggerFactory.getLogger(NotificationEventListener.class);
 
-    private final NotificationService notificationService;
+    private final NotificationPort notificationPort;
 
     @Autowired
-    public NotificationEventListener(NotificationService notificationService) {
-        this.notificationService = notificationService;
+    public NotificationEventListener(NotificationPort notificationPort) {
+        this.notificationPort = notificationPort;
     }
 
     /**
@@ -44,7 +45,7 @@ public class NotificationEventListener {
             notificationDTO.setEmail(notificationEvent.getEmail());
 
             // Utiliser la même logique que le controller
-            notificationService.sendNotification(notificationDTO);
+            notificationPort.sendNotification(notificationDTO);
 
             logger.info("Notification traitée avec succès via RabbitMQ pour userId={}",
                        notificationEvent.getUserId());
