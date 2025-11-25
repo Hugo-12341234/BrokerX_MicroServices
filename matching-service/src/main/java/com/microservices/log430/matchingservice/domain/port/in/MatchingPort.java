@@ -4,6 +4,7 @@ import com.microservices.log430.matchingservice.adapters.web.dto.LastPriceDTO;
 import com.microservices.log430.matchingservice.adapters.web.dto.OrderBookDTO;
 import com.microservices.log430.matchingservice.domain.model.entities.OrderBook;
 import com.microservices.log430.matchingservice.adapters.web.dto.MatchingResult;
+import com.microservices.log430.matchingservice.adapters.messaging.events.OrderPlacedEvent;
 
 public interface MatchingPort {
     MatchingResult matchOrder(OrderBook orderBook);
@@ -11,4 +12,5 @@ public interface MatchingPort {
     OrderBook cancelOrder(Long orderId);
     LastPriceDTO getLastPriceBySymbol(String symbol);
     OrderBookDTO getOrderBookBySymbol(String symbol);
+    void processOrderPlacedEvent(OrderPlacedEvent event);
 }

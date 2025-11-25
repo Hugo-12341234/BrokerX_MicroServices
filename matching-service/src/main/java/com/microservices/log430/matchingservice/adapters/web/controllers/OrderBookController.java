@@ -21,34 +21,6 @@ public class OrderBookController {
 
     public OrderBookController(MatchingPort matchingPort) {this.matchingPort = matchingPort;}
 
-    @PostMapping
-    public ResponseEntity<?> matchOrder(@RequestBody OrderDTO orderDto, HttpServletRequest httpRequest) {
-        String path = httpRequest.getRequestURI();
-        String requestId = httpRequest.getHeader("X-Request-Id");
-        try {
-            logger.info("Réception d'un nouvel ordre à apparier : clientOrderId={}, symbol={}, side={}, quantity={}, price={}, version={}",
-                    orderDto.clientOrderId, orderDto.symbol, orderDto.side, orderDto.quantity, orderDto.price, orderDto.version);
-            OrderBook orderBook = OrderToOrderBookMapper.toOrderBook(orderDto);
-            logger.info("OrderBook : clientOrderId={}, symbol={}, side={}, quantity={}, price={}, version={}",
-                    orderBook.getClientOrderId(), orderBook.getSymbol(), orderBook.getSide(), orderBook.getQuantity(), orderBook.getPrice(), orderBook.getVersion());
-            MatchingResult result = matchingPort.matchOrder(orderBook);
-            logger.info("Matching terminé pour clientOrderId={}, statut={}, executions={}",
-                    result.updatedOrder.getClientOrderId(), result.updatedOrder.getStatus(), result.executions.size());
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            logger.error("Erreur lors du matching de l'ordre clientOrderId={}: {}", orderDto.clientOrderId, e.getMessage(), e);
-            ErrorResponse err = new ErrorResponse(
-                Instant.now(),
-                path,
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "Internal Server Error",
-                "Erreur lors du matching de l'ordre : " + e.getMessage(),
-                requestId != null ? requestId : ""
-            );
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
-        }
-    }
-
     @PutMapping("/{clientOrderId}")
     public ResponseEntity<?> modifyOrder(@PathVariable String clientOrderId, @RequestBody OrderDTO orderDto, HttpServletRequest httpRequest) {
         String path = httpRequest.getRequestURI();
