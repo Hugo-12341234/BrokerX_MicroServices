@@ -2,6 +2,7 @@ package com.microservices.log430.orderservice.domain.service;
 
 import com.microservices.log430.orderservice.adapters.external.marketdata.MarketDataClient;
 import com.microservices.log430.orderservice.adapters.external.marketdata.MarketDataUpdateDTO;
+import com.microservices.log430.orderservice.adapters.external.matching.dto.OrderBookDTO;
 import com.microservices.log430.orderservice.adapters.web.dto.OrderRequest;
 import com.microservices.log430.orderservice.adapters.web.dto.OrderResponse;
 import com.microservices.log430.orderservice.domain.model.entities.Order;
@@ -49,7 +50,7 @@ public class OrderService implements OrderPlacementPort {
         this.marketDataClient = marketDataClient;
         this.outboxService = outboxService;
     }
-    
+
     @Override
     public OrderPlacementResult placeOrder(OrderPlacementRequest request, String clientOrderId) {
         logger.info("Placement d'ordre demandé. userId={}, clientOrderId={}, symbol={}, side={}, type={}, quantité={}, prix={}, durée={}",
@@ -171,6 +172,47 @@ public class OrderService implements OrderPlacementPort {
                 // L'ordre est déjà sauvé, mais l'événement n'a pas pu être publié
                 return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé, mais événement non publié : " + e.getMessage());
             }
+
+            /*
+            ==================================================================================
+            ANCIEN CODE SYNCHRONE - CONSERVÉ POUR RÉFÉRENCE (à utiliser dans les listeners)
+            ==================================================================================
+            // Appel au matching-service
+            OrderDTO orderDTO = new OrderDTO(
+                savedOrder.getId(),
+                savedOrder.getClientOrderId(),
+                savedOrder.getUserId(),
+                savedOrder.getSymbol(),
+                savedOrder.getSide().name(),
+                savedOrder.getType().name(),
+                savedOrder.getQuantity(),
+                savedOrder.getPrice(),
+                savedOrder.getDuration().name(),
+                savedOrder.getTimestamp(),
+                savedOrder.getStatus().name(),
+                savedOrder.getRejectReason(),
+                savedOrder.getVersion()
+            );
+            logger.info("orderDTO version : {}", orderDTO.version);
+            MatchingResult matchingResult = null;
+            try {
+                matchingResult = matchingClient.matchOrder(orderDTO);
+            } catch (Exception e) {
+                logger.error("Erreur lors de l'appel au matching-service : {}", e.getMessage(), e);
+                return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé, mais matching non effectué : " + e.getMessage());
+            }
+            // Notification market-data avec le dernier prix et l'ordre book mis à jour
+            notifyMarketData(
+                orderRequest.getSymbol(),
+                matchingResult != null && matchingResult.executions != null && !matchingResult.executions.isEmpty()
+                    ? matchingResult.executions.get(matchingResult.executions.size() - 1).getFillPrice()
+                    : null,
+                matchingResult != null ? matchingResult.updatedOrder : null
+            );
+            ==================================================================================
+            FIN ANCIEN CODE SYNCHRONE
+            ==================================================================================
+            */
 
             // L'ordre est maintenant accepté et l'événement est dans l'outbox
             // Le matching sera traité de façon asynchrone par le matching-service
@@ -305,9 +347,20 @@ public class OrderService implements OrderPlacementPort {
         if (event.getExecutions() != null && !event.getExecutions().isEmpty()) {
             List<String> deals = processExecutions(event.getExecutions());
             logger.info("Exécutions traitées pour ordre {}: {}", event.getClientOrderId(), deals);
-            // Notification market-data avec le dernier prix
-            notifyMarketData(event.getSymbol(), event.getExecutions());
         }
+
+        // Notification market-data : qu'il y ait eu des exécutions ou non, on notifie toujours
+        Double lastPrice = (event.getExecutions() != null && !event.getExecutions().isEmpty()) ?
+            event.getExecutions().get(event.getExecutions().size() - 1).getFillPrice() : null;
+
+        // Construction de l'OrderBookDTO à partir de l'événement OrderMatchedEvent
+        OrderBookDTO orderBookDTO = toOrderBookDTO(event);
+
+        notifyMarketData(
+            event.getSymbol(),
+            lastPrice,
+            orderBookDTO
+        );
     }
 
     @Override
@@ -401,13 +454,34 @@ public class OrderService implements OrderPlacementPort {
         return deals;
     }
 
-    private void notifyMarketData(String symbol, List<OrderMatchedEvent.ExecutionDetails> executions) {
+    // Conversion OrderMatchedEvent -> OrderBookDTO
+    private OrderBookDTO toOrderBookDTO(OrderMatchedEvent event) {
+        OrderBookDTO dto = new OrderBookDTO();
+        dto.setOrderId(event.getOrderId());
+        dto.setClientOrderId(event.getClientOrderId());
+        dto.setUserId(event.getUserId());
+        dto.setSymbol(event.getSymbol());
+        dto.setSide(event.getSide());
+        dto.setType(event.getType());
+        dto.setQuantity(event.getQuantity());
+        dto.setPrice(event.getPrice());
+        dto.setDuration(event.getDuration());
+        dto.setStatus(event.getStatus());
+        dto.setRejectReason(event.getRejectReason());
+        // Calculer la quantityRemaining si disponible dans l'event, sinon utiliser quantity
         try {
-            Double lastPrice = null;
-            if (executions != null && !executions.isEmpty()) {
-                lastPrice = executions.get(executions.size() - 1).getFillPrice();
-            }
-            MarketDataUpdateDTO dto = new MarketDataUpdateDTO(lastPrice, null);
+            java.lang.reflect.Method getQuantityRemainingMethod = event.getClass().getMethod("getQuantityRemaining");
+            Integer quantityRemaining = (Integer) getQuantityRemainingMethod.invoke(event);
+            dto.setQuantityRemaining(quantityRemaining != null ? quantityRemaining : event.getQuantity());
+        } catch (Exception ignore) {
+            dto.setQuantityRemaining(event.getQuantity()); // fallback
+        }
+        return dto;
+    }
+
+    private void notifyMarketData(String symbol, Double lastPrice, Object orderBook) {
+        MarketDataUpdateDTO dto = new MarketDataUpdateDTO(lastPrice, orderBook);
+        try {
             marketDataClient.streamMarketData(symbol, dto);
             logger.info("Market data notification envoyée pour symbol {}", symbol);
         } catch (Exception e) {
