@@ -65,7 +65,7 @@ function MarketPage() {
       }
     })
       .then(res => res.json())
-      .then(data => setOrderBooks(prev => ({ ...prev, [symbol]: data.orders ? data.orders.slice(-10) : [] })))
+      .then(data => setOrderBooks(prev => ({ ...prev, [symbol]: data.orders ? data.orders.slice(0, 10) : [] })))
       .catch(() => setOrderBooks(prev => ({ ...prev, [symbol]: [] })));
     // Fetch initial last price
     fetch(`${API_URL}/market-data/last-price?symbol=${symbol}`, {
@@ -97,7 +97,7 @@ function MarketPage() {
         const data = JSON.parse(event.data);
         // Filtrer les messages pour le symbol courant
         if (data.symbol === symbol) {
-          if (data.orderBook) setOrderBooks(prev => ({ ...prev, [symbol]: data.orderBook.slice(-10) }));
+          if (data.orderBook) setOrderBooks(prev => ({ ...prev, [symbol]: data.orderBook.slice(0, 10) }));
           if (data.lastPrice !== undefined) setLastPrices(prev => ({ ...prev, [symbol]: data.lastPrice }));
         }
       } catch (e) {
@@ -128,7 +128,7 @@ function MarketPage() {
           }
         })
           .then(res => res.json())
-          .then(data => setOrderBooks(prev => ({ ...prev, [symbol]: data.orders ? data.orders.slice(-10) : [] })))
+          .then(data => setOrderBooks(prev => ({ ...prev, [symbol]: data.orders ? data.orders.slice(0, 10) : [] })))
           .catch(() => setOrderBooks(prev => ({ ...prev, [symbol]: [] })));
         // Fetch initial last price
         fetch(`${API_URL}/market-data/last-price?symbol=${symbol}`, {
@@ -154,7 +154,7 @@ function MarketPage() {
             const data = JSON.parse(event.data);
             // Filtrer les messages pour le symbol courant
             if (data.symbol === symbol) {
-              if (data.orderBook) setOrderBooks(prev => ({ ...prev, [symbol]: data.orderBook.slice(-10) }));
+              if (data.orderBook) setOrderBooks(prev => ({ ...prev, [symbol]: data.orderBook.slice(0, 10) }));
               if (data.lastPrice !== undefined) setLastPrices(prev => ({ ...prev, [symbol]: data.lastPrice }));
             }
           } catch (e) {

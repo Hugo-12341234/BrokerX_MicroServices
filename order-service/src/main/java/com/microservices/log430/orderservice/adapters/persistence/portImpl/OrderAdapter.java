@@ -40,7 +40,7 @@ public class OrderAdapter implements OrderPort {
 
     @Override
     public List<Order> findByUserId(Long userId) {
-        return orderRepository.findByUserId(userId)
+        return orderRepository.findByUserIdOrderByTimestampDesc(userId)
                 .stream()
                 .map(OrderMapper::toDomain)
                 .collect(Collectors.toList());

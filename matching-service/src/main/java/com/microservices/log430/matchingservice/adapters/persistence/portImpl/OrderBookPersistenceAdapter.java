@@ -67,7 +67,11 @@ public class OrderBookPersistenceAdapter implements OrderBookPort {
 
     @Override
     public OrderBookDTO getOrderBookSnapshot(String symbol) {
-        List<OrderBook> orders = repository.findAllBySymbol(symbol).stream().map(OrderBookMapper::toDomain).collect(Collectors.toList());
+        List<OrderBook> orders = repository.findAllBySymbolOrderByTimestampDesc(symbol)
+                .stream()
+                .limit(10) // Limiter aux 10 ordres les plus récents
+                .map(OrderBookMapper::toDomain)
+                .collect(Collectors.toList());
         return new OrderBookDTO(symbol, orders);
     }
 }

@@ -11,5 +11,6 @@ import java.util.Optional;
 public interface OrderBookRepository extends JpaRepository<OrderBookEntity, Long> {
     Optional<OrderBookEntity> findByClientOrderId(String clientOrderId);
     List<OrderBookEntity> findAllBySymbol(String symbol);
+    List<OrderBookEntity> findAllBySymbolOrderByTimestampDesc(String symbol);
 }
 

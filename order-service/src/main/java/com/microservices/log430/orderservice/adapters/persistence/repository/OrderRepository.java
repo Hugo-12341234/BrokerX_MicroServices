@@ -14,6 +14,7 @@ import java.util.Optional;
 public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
     Optional<OrderEntity> findByClientOrderId(String clientOrderId);
     List<OrderEntity> findByUserId(Long userId);
+    List<OrderEntity> findByUserIdOrderByTimestampDesc(Long userId);
 
     @Modifying
     @Transactional
