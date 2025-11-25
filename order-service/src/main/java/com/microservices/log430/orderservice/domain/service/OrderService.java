@@ -3,6 +3,7 @@ package com.microservices.log430.orderservice.domain.service;
 import com.microservices.log430.orderservice.adapters.external.marketdata.MarketDataClient;
 import com.microservices.log430.orderservice.adapters.external.marketdata.MarketDataUpdateDTO;
 import com.microservices.log430.orderservice.adapters.web.dto.OrderRequest;
+import com.microservices.log430.orderservice.adapters.web.dto.OrderResponse;
 import com.microservices.log430.orderservice.domain.model.entities.Order;
 import com.microservices.log430.orderservice.domain.port.in.OrderPlacementPort;
 import com.microservices.log430.orderservice.domain.port.in.PreTradeValidationPort;
@@ -13,17 +14,11 @@ import com.microservices.log430.orderservice.adapters.external.wallet.Wallet;
 import com.microservices.log430.orderservice.adapters.external.wallet.WalletUpdateRequest;
 import com.microservices.log430.orderservice.adapters.external.matching.MatchingClient;
 import com.microservices.log430.orderservice.adapters.external.matching.dto.OrderDTO;
-import com.microservices.log430.orderservice.adapters.external.matching.dto.MatchingResult;
-import com.microservices.log430.orderservice.adapters.external.matching.dto.ExecutionReportDTO;
-import com.microservices.log430.orderservice.adapters.external.matching.dto.OrderBookDTO;
-import com.microservices.log430.orderservice.adapters.web.dto.OrderResponse;
-import com.microservices.log430.orderservice.adapters.external.notification.NotificationClient;
-import com.microservices.log430.orderservice.adapters.external.notification.dto.NotificationLogDTO;
-import com.microservices.log430.orderservice.adapters.external.auth.UserInfoClient;
-import com.microservices.log430.orderservice.adapters.external.auth.dto.UserDTO;
 import com.microservices.log430.orderservice.adapters.messaging.outbox.OutboxService;
 import com.microservices.log430.orderservice.adapters.messaging.events.OrderPlacedEvent;
 import com.microservices.log430.orderservice.adapters.messaging.events.NotificationEvent;
+import com.microservices.log430.orderservice.adapters.messaging.events.OrderMatchedEvent;
+import com.microservices.log430.orderservice.adapters.messaging.events.OrderRejectedEvent;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -41,35 +36,20 @@ public class OrderService implements OrderPlacementPort {
     private final PreTradeValidationPort preTradeValidationPort;
     private final WalletClient walletClient;
     private final MatchingClient matchingClient;
-    private final NotificationClient notificationClient;
-    private final UserInfoClient userInfoClient;
     private final MarketDataClient marketDataClient;
     private final OutboxService outboxService;
 
     @Autowired
     public OrderService(OrderPort orderPort, PreTradeValidationPort preTradeValidationPort, WalletClient walletClient,
-                        MatchingClient matchingClient, NotificationClient notificationClient, UserInfoClient userInfoClient,
-                        MarketDataClient marketDataClient, OutboxService outboxService) {
+                        MatchingClient matchingClient, MarketDataClient marketDataClient, OutboxService outboxService) {
         this.orderPort = orderPort;
         this.preTradeValidationPort = preTradeValidationPort;
         this.walletClient = walletClient;
         this.matchingClient = matchingClient;
-        this.notificationClient = notificationClient;
-        this.userInfoClient = userInfoClient;
         this.marketDataClient = marketDataClient;
         this.outboxService = outboxService;
     }
-
-    private void notifyMarketData(String symbol, Double lastPrice, Object orderBook) {
-        MarketDataUpdateDTO dto = new MarketDataUpdateDTO(lastPrice, orderBook);
-        try {
-            marketDataClient.streamMarketData(symbol, dto);
-            logger.info("Market data notification envoyée pour symbol {}", symbol);
-        } catch (Exception e) {
-            logger.error("Erreur lors de l'envoi de la notification market data pour symbol {}", symbol, e);
-        }
-    }
-
+    
     @Override
     public OrderPlacementResult placeOrder(OrderPlacementRequest request, String clientOrderId) {
         logger.info("Placement d'ordre demandé. userId={}, clientOrderId={}, symbol={}, side={}, type={}, quantité={}, prix={}, durée={}",
@@ -195,212 +175,6 @@ public class OrderService implements OrderPlacementPort {
             // L'ordre est maintenant accepté et l'événement est dans l'outbox
             // Le matching sera traité de façon asynchrone par le matching-service
             return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé avec succès. Le matching sera traité sous peu.");
-
-            /*
-            ==================================================================================
-            ANCIEN CODE SYNCHRONE - CONSERVÉ POUR RÉFÉRENCE (à utiliser dans les listeners)
-            ==================================================================================
-
-            // Appel au matching-service
-            OrderDTO orderDTO = new OrderDTO(
-                savedOrder.getId(),
-                savedOrder.getClientOrderId(),
-                savedOrder.getUserId(),
-                savedOrder.getSymbol(),
-                savedOrder.getSide().name(),
-                savedOrder.getType().name(),
-                savedOrder.getQuantity(),
-                savedOrder.getPrice(),
-                savedOrder.getDuration().name(),
-                savedOrder.getTimestamp(),
-                savedOrder.getStatus().name(),
-                savedOrder.getRejectReason(),
-                savedOrder.getVersion()
-            );
-            logger.info("orderDTO version : {}", orderDTO.version);
-            MatchingResult matchingResult = null;
-            try {
-                matchingResult = matchingClient.matchOrder(orderDTO);
-            } catch (Exception e) {
-                logger.error("Erreur lors de l'appel au matching-service : {}", e.getMessage(), e);
-                return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé, mais matching non effectué : " + e.getMessage());
-            }
-
-            // Notification market-data avec le dernier prix et l'ordre book mis à jour
-            notifyMarketData(orderRequest.getSymbol(), matchingResult != null && matchingResult.executions != null && !matchingResult.executions.isEmpty() ?
-                matchingResult.executions.get(matchingResult.executions.size() - 1).getFillPrice() : null,
-                matchingResult != null ? matchingResult.updatedOrder : null);
-
-            // Mise à jour du statut du Order selon le résultat du matching-service
-            if (matchingResult != null && matchingResult.updatedOrder != null) {
-                OrderBookDTO ob = matchingResult.updatedOrder;
-                savedOrder.setStatus(Order.OrderStatus.fromString(ob.getStatus()));
-                savedOrder.setRejectReason(ob.getRejectReason());
-                // Si applicable, mettre à jour la quantité restante ou autres champs
-                // savedOrder.setQuantityRemaining(ob.getQuantityRemaining()); // si champ présent dans Order
-                orderPort.save(savedOrder);
-            }
-
-            // Synchronisation des ordres candidats modifiés
-            if (matchingResult != null && matchingResult.modifiedCandidates != null && !matchingResult.modifiedCandidates.isEmpty()) {
-                logger.info("Synchronisation de {} ordres candidats modifiés", matchingResult.modifiedCandidates.size());
-                for (OrderBookDTO modifiedCandidate : matchingResult.modifiedCandidates) {
-                    try {
-                        // Trouver l'ordre correspondant dans order-service par clientOrderId
-                        Optional<Order> candidateOrder = orderPort.findByClientOrderId(modifiedCandidate.getClientOrderId());
-                        if (candidateOrder.isPresent()) {
-                            Order candidateOrderEntity = candidateOrder.get();
-                            Order.OrderStatus oldStatus = candidateOrderEntity.getStatus();
-                            candidateOrderEntity.setStatus(Order.OrderStatus.fromString(modifiedCandidate.getStatus()));
-                            orderPort.save(candidateOrderEntity);
-                            logger.info("Ordre candidat synchronisé : clientOrderId={}, userId={}, {} -> {}",
-                                       candidateOrderEntity.getClientOrderId(), candidateOrderEntity.getUserId(), oldStatus, candidateOrderEntity.getStatus());
-                        } else {
-                            logger.warn("Ordre candidat modifié non trouvé dans order-service : clientOrderId={}",
-                                       modifiedCandidate.getClientOrderId());
-                        }
-                    } catch (Exception e) {
-                        logger.error("Erreur lors de la synchronisation de l'ordre candidat clientOrderId={} : {}",
-                                   modifiedCandidate.getClientOrderId(), e.getMessage(), e);
-                    }
-                }
-            }
-
-            // Mise à jour des portefeuilles pour chaque deal
-            List<String> deals = new ArrayList<>();
-            if (matchingResult != null && matchingResult.executions != null) {
-                for (ExecutionReportDTO exec : matchingResult.executions) {
-                    try {
-                        // Skip update si userId == 9999 (seed)
-                        if (exec.getBuyerUserId() != null && exec.getBuyerUserId() == 9999L) {
-                            logger.info("Skip update portefeuille pour l'acheteur userId=9999 (seed)");
-                        } else {
-                            WalletUpdateRequest buyerUpdate = new WalletUpdateRequest(
-                                exec.getBuyerUserId(),
-                                exec.getSymbol(),
-                                exec.getFillQuantity(),
-                                -exec.getFillPrice() * exec.getFillQuantity()
-                            );
-                            logger.info("Nous allons mettre à jour le portefeuille de l'acheteur");
-                            walletClient.updateWallet(buyerUpdate);
-                            logger.info("Portefeuille mis à jour pour l'acheteur userId={} : +{} {} et -{} en cash",
-                                exec.getBuyerUserId(), exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice() * exec.getFillQuantity());
-                        }
-                        // Skip update si userId == 9999 (seed)
-                        if (exec.getSellerUserId() != null && exec.getSellerUserId() == 9999L) {
-                            logger.info("Skip update portefeuille pour le vendeur userId=9999 (seed)");
-                        } else {
-                            WalletUpdateRequest sellerUpdate = new WalletUpdateRequest(
-                                exec.getSellerUserId(),
-                                exec.getSymbol(),
-                                -exec.getFillQuantity(),
-                                exec.getFillPrice() * exec.getFillQuantity()
-                            );
-                            logger.info("Nous allons mettre à jour le portefeuille du vendeur");
-                            walletClient.updateWallet(sellerUpdate);
-                            logger.info("Portefeuille mis à jour pour le vendeur userId={} : -{} {} et +{} en cash",
-                                exec.getSellerUserId(), exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice() * exec.getFillQuantity());
-                        }
-                        // Notification buyer
-                        String buyerEmail = null;
-                        if (exec.getBuyerUserId() != null && exec.getBuyerUserId() != 9999L) {
-                            try {
-                                UserDTO buyerInfo = userInfoClient.getUserInfo(exec.getBuyerUserId());
-                                buyerEmail = buyerInfo != null ? buyerInfo.getEmail() : null;
-                            } catch (Exception e) {
-                                logger.warn("Impossible d'obtenir l'email de l'acheteur userId={}", exec.getBuyerUserId());
-                            }
-                            String buyerMsg = String.format("Exécution d'ordre ACHAT : %d %s @ %.2f. OrderId: %s. ExecutionReportId: %s. Date: %s.",
-                                exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice(), exec.getOrderId(), exec.getId(), Instant.now());
-                            NotificationLogDTO buyerNotif = new NotificationLogDTO(
-                                exec.getBuyerUserId(), buyerMsg, Instant.now(), "WEBSOCKET", buyerEmail);
-                            notificationClient.sendNotification(buyerNotif);
-                        }
-                        // Notification seller
-                        String sellerEmail = null;
-                        if (exec.getSellerUserId() != null && exec.getSellerUserId() != 9999L) {
-                            try {
-                                UserDTO sellerInfo = userInfoClient.getUserInfo(exec.getSellerUserId());
-                                sellerEmail = sellerInfo != null ? sellerInfo.getEmail() : null;
-                            } catch (Exception e) {
-                                logger.warn("Impossible d'obtenir l'email du vendeur userId={}", exec.getSellerUserId());
-                            }
-                            String sellerMsg = String.format("Exécution d'ordre VENTE : %d %s @ %.2f. OrderId: %s. ExecutionReportId: %s. Date: %s.",
-                                exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice(), exec.getOrderId(), exec.getId(), Instant.now());
-                            NotificationLogDTO sellerNotif = new NotificationLogDTO(
-                                exec.getSellerUserId(), sellerMsg, Instant.now(), "WEBSOCKET", sellerEmail);
-                            notificationClient.sendNotification(sellerNotif);
-                        }
-                        deals.add(String.format("Deal: %d %s @ %.2f entre acheteur %d et vendeur %d", exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice(), exec.getBuyerUserId(), exec.getSellerUserId()));
-                    } catch (Exception ex) {
-                        logger.error("Erreur lors de la mise à jour du portefeuille ou de la notification pour le deal : {}", ex.getMessage(), ex);
-                    }
-                }
-            }
-            // Gestion des annulations
-            String annulationInfo = "";
-            if (matchingResult != null && matchingResult.updatedOrder != null) {
-                OrderBookDTO ob = matchingResult.updatedOrder;
-                if ("REJETE".equals(ob.getStatus()) || (ob.getQuantityRemaining() > 0 && ob.getQuantityRemaining() < savedOrder.getQuantity())) {
-                    annulationInfo = ob.getRejectReason() != null ? ob.getRejectReason() : "Ordre partiellement ou totalement annulé.";
-                }
-            }
-            // Construction du message pour le frontend
-            StringBuilder message = new StringBuilder();
-            if (matchingResult != null && matchingResult.updatedOrder != null) {
-                OrderBookDTO ob = matchingResult.updatedOrder;
-                int qtyInitial = savedOrder.getQuantity();
-                int qtyFilled = qtyInitial - ob.getQuantityRemaining();
-                int qtyCancelled = ob.getQuantityRemaining();
-                String type = savedOrder.getDuration().name();
-                if ("FOK".equalsIgnoreCase(type)) {
-                    if (qtyFilled == 0) {
-                        message.append("Ordre FOK annulé : la quantité totale n'était pas disponible, aucune exécution.");
-                    } else {
-                        message.append("Ordre FOK exécuté : ").append(qtyFilled).append(" fulfilled.");
-                    }
-                } else if ("IOC".equalsIgnoreCase(type)) {
-                    if (qtyFilled == 0) {
-                        message.append("Ordre IOC annulé : aucune exécution possible.");
-                    } else {
-                        message.append("Ordre IOC partiellement exécuté : ")
-                               .append(qtyFilled).append(" fulfilled, ")
-                               .append(qtyCancelled).append(" annulés.");
-                    }
-                } else if ("DAY".equalsIgnoreCase(type)) {
-                    if (qtyFilled == 0) {
-                        message.append("Ordre DAY ouvert : aucune exécution pour l'instant, reste ouvert 24h.");
-                    } else if (qtyCancelled > 0) {
-                        message.append("Ordre DAY partiellement exécuté : ")
-                               .append(qtyFilled).append(" fulfilled, reste ouvert pour ")
-                               .append(qtyCancelled).append(" jusqu'à expiration (24h).");
-                    } else {
-                        message.append("Ordre DAY entièrement exécuté : ").append(qtyFilled).append(" fulfilled.");
-                    }
-                } else {
-                    message.append("Ordre placé avec succès.");
-                }
-                if (!deals.isEmpty()) {
-                    message.append(" Exécutions: ").append(String.join(", ", deals));
-                }
-                if (ob.getRejectReason() != null && !ob.getRejectReason().isEmpty()) {
-                    message.append(" Raison: ").append(ob.getRejectReason());
-                }
-            } else {
-                message.append("Ordre placé avec succès.");
-                if (!deals.isEmpty()) {
-                    message.append(" Exécutions: ").append(String.join(", ", deals));
-                }
-                if (!annulationInfo.isEmpty()) {
-                    message.append(" Annulation: ").append(annulationInfo);
-                }
-            }
-            return OrderPlacementResult.success(savedOrder.getId(), message.toString());
-
-            ==================================================================================
-            FIN ANCIEN CODE SYNCHRONE
-            ==================================================================================
-            */
         }
     }
 
@@ -515,6 +289,130 @@ public class OrderService implements OrderPlacementPort {
     @Override
     public List<Order> findOrdersByUserId(Long userId) {
         return orderPort.findByUserId(userId);
+    }
+
+    @Override
+    public void processOrderMatched(OrderMatchedEvent event) {
+        logger.info("Traitement ORDER_MATCHED: orderId={}, clientOrderId={}, status={}",
+                event.getOrderId(), event.getClientOrderId(), event.getStatus());
+        // Mise à jour du statut de l'ordre principal
+        updateOrderStatus(event.getOrderId(), event.getStatus(), event.getRejectReason());
+        // Synchronisation des ordres candidats modifiés
+        if (event.getModifiedCandidateIds() != null && !event.getModifiedCandidateIds().isEmpty()) {
+            synchronizeModifiedCandidates(event.getModifiedCandidateIds());
+        }
+        // Mise à jour des portefeuilles pour chaque exécution
+        if (event.getExecutions() != null && !event.getExecutions().isEmpty()) {
+            List<String> deals = processExecutions(event.getExecutions());
+            logger.info("Exécutions traitées pour ordre {}: {}", event.getClientOrderId(), deals);
+            // Notification market-data avec le dernier prix
+            notifyMarketData(event.getSymbol(), event.getExecutions());
+        }
+    }
+
+    @Override
+    public void processOrderRejected(OrderRejectedEvent event) {
+        logger.info("Traitement ORDER_REJECTED: orderId={}, clientOrderId={}, raison={}",
+                event.getOrderId(), event.getClientOrderId(), event.getRejectReason());
+        updateOrderStatus(event.getOrderId(), event.getStatus(), event.getRejectReason());
+    }
+
+    // --- Logique extraite du listener ---
+    private void updateOrderStatus(Long orderId, String status, String rejectReason) {
+        Optional<Order> orderOpt = orderPort.findById(orderId);
+        if (orderOpt.isPresent()) {
+            Order order = orderOpt.get();
+            Order.OrderStatus oldStatus = order.getStatus();
+            order.setStatus(Order.OrderStatus.fromString(status));
+            order.setRejectReason(rejectReason);
+            orderPort.save(order);
+            logger.info("Statut ordre mis à jour: orderId={}, clientOrderId={}, {} -> {}",
+                    orderId, order.getClientOrderId(), oldStatus, order.getStatus());
+        } else {
+            logger.warn("Ordre non trouvé pour mise à jour: orderId={}", orderId);
+        }
+    }
+
+    private void synchronizeModifiedCandidates(List<String> modifiedCandidateIds) {
+        logger.info("Synchronisation de {} ordres candidats modifiés", modifiedCandidateIds.size());
+        for (String clientOrderId : modifiedCandidateIds) {
+            try {
+                Optional<Order> candidateOrder = orderPort.findByClientOrderId(clientOrderId);
+                if (candidateOrder.isPresent()) {
+                    Order candidateOrderEntity = candidateOrder.get();
+                    Order.OrderStatus oldStatus = candidateOrderEntity.getStatus();
+                    candidateOrderEntity.setStatus(Order.OrderStatus.PARTIALLYFILLED);
+                    orderPort.save(candidateOrderEntity);
+                    logger.info("Ordre candidat synchronisé: clientOrderId={}, userId={}, {} -> {}",
+                            candidateOrderEntity.getClientOrderId(), candidateOrderEntity.getUserId(),
+                            oldStatus, candidateOrderEntity.getStatus());
+                } else {
+                    logger.warn("Ordre candidat modifié non trouvé dans order-service: clientOrderId={}",
+                            clientOrderId);
+                }
+            } catch (Exception e) {
+                logger.error("Erreur lors de la synchronisation de l'ordre candidat clientOrderId={}: {}",
+                        clientOrderId, e.getMessage(), e);
+            }
+        }
+    }
+
+    private List<String> processExecutions(List<OrderMatchedEvent.ExecutionDetails> executions) {
+        List<String> deals = new ArrayList<>();
+        for (OrderMatchedEvent.ExecutionDetails exec : executions) {
+            try {
+                if (exec.getBuyerUserId() != null && exec.getBuyerUserId() != 9999L) {
+                    WalletUpdateRequest buyerUpdate = new WalletUpdateRequest(
+                            exec.getBuyerUserId(),
+                            exec.getSymbol(),
+                            exec.getFillQuantity(),
+                            -exec.getFillPrice() * exec.getFillQuantity()
+                    );
+                    logger.info("Mise à jour du portefeuille de l'acheteur");
+                    walletClient.updateWallet(buyerUpdate);
+                    logger.info("Portefeuille mis à jour pour l'acheteur userId={}: +{} {} et -{} en cash",
+                            exec.getBuyerUserId(), exec.getFillQuantity(), exec.getSymbol(),
+                            exec.getFillPrice() * exec.getFillQuantity());
+                } else {
+                    logger.info("Skip update portefeuille pour l'acheteur userId=9999 (seed)");
+                }
+                if (exec.getSellerUserId() != null && exec.getSellerUserId() != 9999L) {
+                    WalletUpdateRequest sellerUpdate = new WalletUpdateRequest(
+                            exec.getSellerUserId(),
+                            exec.getSymbol(),
+                            -exec.getFillQuantity(),
+                            exec.getFillPrice() * exec.getFillQuantity()
+                    );
+                    logger.info("Mise à jour du portefeuille du vendeur");
+                    walletClient.updateWallet(sellerUpdate);
+                    logger.info("Portefeuille mis à jour pour le vendeur userId={}: -{} {} et +{} en cash",
+                            exec.getSellerUserId(), exec.getFillQuantity(), exec.getSymbol(),
+                            exec.getFillPrice() * exec.getFillQuantity());
+                } else {
+                    logger.info("Skip update portefeuille pour le vendeur userId=9999 (seed)");
+                }
+                deals.add(String.format("Deal: %d %s @ %.2f entre acheteur %d et vendeur %d",
+                        exec.getFillQuantity(), exec.getSymbol(), exec.getFillPrice(),
+                        exec.getBuyerUserId(), exec.getSellerUserId()));
+            } catch (Exception ex) {
+                logger.error("Erreur lors de la mise à jour du portefeuille pour le deal: {}", ex.getMessage(), ex);
+            }
+        }
+        return deals;
+    }
+
+    private void notifyMarketData(String symbol, List<OrderMatchedEvent.ExecutionDetails> executions) {
+        try {
+            Double lastPrice = null;
+            if (executions != null && !executions.isEmpty()) {
+                lastPrice = executions.get(executions.size() - 1).getFillPrice();
+            }
+            MarketDataUpdateDTO dto = new MarketDataUpdateDTO(lastPrice, null);
+            marketDataClient.streamMarketData(symbol, dto);
+            logger.info("Market data notification envoyée pour symbol {}", symbol);
+        } catch (Exception e) {
+            logger.error("Erreur lors de l'envoi de la notification market data pour symbol {}", symbol, e);
+        }
     }
 
     private boolean isOrderExpired(Order order) {

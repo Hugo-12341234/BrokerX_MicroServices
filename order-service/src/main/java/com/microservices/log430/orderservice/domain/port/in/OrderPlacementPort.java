@@ -1,5 +1,7 @@
 package com.microservices.log430.orderservice.domain.port.in;
 
+import com.microservices.log430.orderservice.adapters.messaging.events.OrderMatchedEvent;
+import com.microservices.log430.orderservice.adapters.messaging.events.OrderRejectedEvent;
 import com.microservices.log430.orderservice.adapters.web.dto.OrderRequest;
 import com.microservices.log430.orderservice.adapters.web.dto.OrderResponse;
 import com.microservices.log430.orderservice.domain.model.entities.Order;
@@ -11,6 +13,8 @@ public interface OrderPlacementPort {
     OrderResponse modifyOrder(Long orderId, OrderRequest orderRequest, Long userId);
     OrderResponse cancelOrder(Long orderId);
     List<Order> findOrdersByUserId(Long userId);
+    void processOrderMatched(OrderMatchedEvent event);
+    void processOrderRejected(OrderRejectedEvent event);
 
     class OrderPlacementRequest {
         private final OrderRequest orderRequest;
