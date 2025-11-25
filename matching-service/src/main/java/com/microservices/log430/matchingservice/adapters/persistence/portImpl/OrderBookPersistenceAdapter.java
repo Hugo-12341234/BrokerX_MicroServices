@@ -67,7 +67,9 @@ public class OrderBookPersistenceAdapter implements OrderBookPort {
 
     @Override
     public OrderBookDTO getOrderBookSnapshot(String symbol) {
-        List<OrderBook> orders = repository.findAllBySymbolOrderByTimestampDesc(symbol)
+        // Filtrer seulement les ordres actifs (Working ou PartiallyFilled)
+        List<String> activeStatuses = List.of("Working", "PartiallyFilled");
+        List<OrderBook> orders = repository.findAllBySymbolAndStatusInOrderByTimestampDesc(symbol, activeStatuses)
                 .stream()
                 .limit(10) // Limiter aux 10 ordres les plus récents
                 .map(OrderBookMapper::toDomain)
