@@ -6,18 +6,19 @@ package "Utilisateur & Sécurité" {
   rectangle "MfaChallenge"
   rectangle "SessionToken"
   rectangle "Registration"
+  rectangle "Notifications"
 
   User -down-> SessionToken
   User -down-> MfaChallenge: "Valide"
   User -down-> Registration: "Effectue"
   MfaChallenge -down-> SessionToken: "Possède"
+  User -down-> Notifications: "Reçoit"
 }
 
 package "Portefeuille" {
   rectangle "Wallet"
   rectangle "Transaction"
   rectangle "Positions"
-  rectangle "Stocks"
   rectangle "SimulatedPayment"
   rectangle "Solde"
 
@@ -25,7 +26,6 @@ package "Portefeuille" {
   Transaction -down-> SimulatedPayment: "Est confirmée par"
   Transaction -down-> Solde: "Modifie"
   Wallet -down-> Positions: "Contient"
-  Positions -down-> Stocks: "Inclut"
 }
 
 package "Ordres" {
@@ -44,11 +44,20 @@ package "Matching" {
   MatchEngine -down-> ExecutionReport: "Déclenche un rapport d'exécution"
 }
 
+package "Données de Marché" {
+  rectangle "Stocks"
+  rectangle "StockPrice"
+
+  Stocks -down-> StockPrice: "A un prix associé"
+}
+
 ' Liaisons inter-contextes principales
 User -right-> Wallet: "Possède"
-User -right-> Order: "Place"
+User -right-> Order: "Place, Modifie, Annule"
+Notifications -right-> ExecutionReport: "sont reçues de"
 Wallet -down-> Order: "Est affecté par"
 Order -down-> OrderBook: "Est ajouté au carnet"
 Order -> Stocks: "Est placé sur"
+Positions -down-> Stocks: "Inclut"
 
 @enduml

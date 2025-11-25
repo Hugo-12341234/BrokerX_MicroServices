@@ -41,6 +41,12 @@ node "Hôte (VM/Serveur)" as Host {
       node "Conteneur: matching-service\n(Spring Boot)\nport 8084" as MatchingC {
         artifact "matching-service.jar"
       }
+      node "Conteneur: market-data-service\n(Spring Boot)\nport 8087" as MarketDataC {
+        artifact "market-data-service.jar"
+      }
+      node "Conteneur: notification-service\n(Spring Boot)\nport 8088" as NotificationC {
+        artifact "notification-service.jar"
+      }
       node "Conteneur: swagger-ui\n(port 8085)" as SwaggerC {
         artifact "swagger-ui"
       }
@@ -54,6 +60,8 @@ node "Hôte (VM/Serveur)" as Host {
       database "PostgreSQL Order\nport 5434" as DBOrder
       database "PostgreSQL Wallet\nport 5435" as DBWallet
       database "PostgreSQL Matching\nport 5436" as DBMatching
+      database "PostgreSQL MarketData\nport 5437" as DBMarketData
+      database "PostgreSQL Notification\nport 5438" as DBNotification
       frame "Volumes: persistance" as Volumes
     }
   }
@@ -62,20 +70,27 @@ node "Hôte (VM/Serveur)" as Host {
 ' Connexions principales (simplifiées)
 User --> Browser : Utilise
 Browser --> FrontendC : HTTP 3000
+Browser --> MarketDataC : "WebSocket 8087\n(données marché temps réel)"
+Browser --> NotificationC : "WebSocket 8088\n(notifications push)"
 FrontendC --> GatewayC : API REST
 GatewayC --> NginxC : Proxy interne
 NginxC --> AuthC : Microservice
 NginxC --> OrderC : Microservice
 NginxC --> WalletC : Microservice
 NginxC --> MatchingC : Microservice
+NginxC --> MarketDataC : Microservice
+NginxC --> NotificationC : Microservice
 AuthC --> DBAuth
 OrderC --> DBOrder
 WalletC --> DBWallet
 MatchingC --> DBMatching
+MarketDataC --> DBMarketData
+NotificationC --> DBNotification
 GatewayC --> SwaggerC : Docs
 PrometheusC --> GatewayC : Récolte des données
 GrafanaC --> PrometheusC
-GatewayC -right-> SMTP
+AuthC -right-> SMTP : "Envoi d'emails\n(vérification, MFA)"
+NotificationC -right-> SMTP : "Envoi d'emails\n(notifs)"
 
 legend right
 Utilisateur : Personne qui utilise la plateforme BrokerX
