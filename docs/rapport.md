@@ -795,25 +795,24 @@ Le code de chacun des microservices est structuré selon une approche hexagonale
 ## 6. Vue d’ensemble des scénarios
 
 ### Diagramme
-- ![Diagramme de cas d’utilisation](docs/architecture/4+1/scenarios/useCaseDiagram.png)
+![Diagramme de cas d’utilisation](docs/architecture/4+1/scenarios/useCaseDiagram.png)
 
 ### Contexte
-La vue scénarios expose les principaux cas d’utilisation du système BrokerX, tels qu’ils sont vécus par les utilisateurs et les systèmes externes. Elle permet de visualiser les interactions entre le client et l’application, ainsi que les dépendances fonctionnelles entre les différents UC.
+La vue scénarios expose les principaux cas d'utilisation du système BrokerX, tels qu'ils sont vécus par les utilisateurs et les systèmes externes. Elle permet de visualiser les interactions entre le client et l'application, ainsi que les dépendances fonctionnelles entre les différents UC.
 
 ### Éléments
-- Acteurs externes : Client (utilisateur principal), Service Paiement Simulé (pour le dépôt), Moteur d’appariement interne (matching), Données de Marché
-- Cas d’utilisation : Inscription & vérification d’identité, Authentification & MFA, Dépôt dans le portefeuille, Placement d’un ordre, Appariement interne & Exécution (matching)
+- Acteurs externes : Client (utilisateur principal), Service Paiement Simulé (pour le dépôt), Moteur d'appariement interne (matching), Données de Marché, Fournisseur des données de marché simulé
+- Cas d'utilisation : Inscription & vérification d'identité, Authentification & MFA, Dépôt dans le portefeuille, Abonnement aux données de marché, Placement d'un ordre, Modification / Annulation d'un ordre, Appariement interne & Exécution (matching), Réception de notifications
 
 ### Relations
-- Le client peut initier chacun des cas d’utilisation principaux, sauf l'appariement interne qui est enclenché par le moteur d’appariement interne
+- Le client peut initier chacun des cas d'utilisation principaux, sauf l'appariement interne qui est déclenché automatiquement par le moteur d'appariement interne et les notifications qui sont générées par les autres cas d'utilisation
 - Le dépôt utilise le service de paiement simulé
-- Le placement d’un ordre dépend du solde du portefeuille
-- Le placement d’un ordre déclenche le cas d’utilisation d’appariement interne & exécution
-- L’appariement interne & exécution est réalisé par le moteur d’appariement et utilise les données de marché
+- Le placement d'un ordre dépend du solde du portefeuille
+- Le placement d'un ordre déclenche le cas d'utilisation d'appariement interne & exécution
+- L'appariement interne génère des notifications pour informer le client
 
 ### Rationnel
-Cette vue permet de relier les besoins métier aux fonctionnalités du système, de valider la couverture fonctionnelle et d’illustrer les interactions principales, y compris le nouveau processus d’appariement et d’exécution des ordres. L’ajout du cas UC-07 assure que la mécanique centrale de traitement des transactions (matching) est bien couverte, avec la gestion des priorités prix/temps, la génération des transactions et la mise à jour des états d’ordre et des portefeuilles. Les acteurs externes (moteur d’appariement, données de marché, portefeuilles) sont explicitement intégrés pour refléter la réalité technique et métier de la plateforme BrokerX. Cette vue garantit que l’architecture répond bien aux attentes des utilisateurs et des parties prenantes, tout en facilitant la communication entre les équipes métier et technique et en identifiant les scénarios critiques à tester, notamment ceux liés à l’exécution automatique des ordres.
-
+Cette vue permet de relier les besoins métier aux fonctionnalités du système, de valider la couverture fonctionnelle et d'illustrer les interactions principales, y compris le processus complet d'appariement et d'exécution des ordres avec notifications. L'architecture événementielle garantit que tous les événements critiques (exécutions, rejets, mises à jour de portefeuille) génèrent des notifications appropriées vers les clients, assurant transparence et traçabilité des opérations de trading.
 
 ## 7. Vue de déploiement
 
