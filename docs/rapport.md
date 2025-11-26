@@ -663,21 +663,27 @@ Chaque interface technique est sécurisée par chiffrement TLS et, selon le cas,
 
 ## 4. Stratégie de solution
 
-L’architecture de BrokerX repose désormais sur une approche microservices, chaque domaine métier étant isolé dans un service indépendant (auth-service, api-gateway, matching-service, order-service, wallet-service, etc.). Cette stratégie permet une évolutivité, une résilience et une flexibilité accrues, tout en facilitant la maintenance et le déploiement.
+L'architecture de BrokerX repose désormais sur une approche microservices événementielle, chaque domaine métier étant isolé dans un service indépendant (auth-service, api-gateway, matching-service, order-service, wallet-service, market-data-service, notification-service). Cette stratégie permet une évolutivité, une résilience et une flexibilité accrues, tout en facilitant la maintenance et le déploiement.
 
-Chaque microservice est développé principalement en Java avec Spring Boot, et expose ses fonctionnalités via des API REST sécurisées (HTTPS/JSON). L’api-gateway centralise l’accès aux services, gère le routage, l’authentification et la sécurité des échanges. Un load balancer avec NGINX est installé entre le gateway et les microservices, afin de pouvoir créer plusieurs instances de certains microservices. Ceci permet une bonne scalabilité et une tolérance aux pannes. Les communications inter-services se font principalement par API REST, mais peuvent évoluer vers des solutions de messaging (ex : Kafka, RabbitMQ) pour les besoins d’asynchronisme ou de scalabilité.
+**Architecture événementielle et messaging :** Le système utilise désormais RabbitMQ comme message broker pour implémenter une architecture événementielle avec les patterns Saga chorégraphiée et Outbox. Cette approche garantit la cohérence des données entre microservices lors des transactions distribuées (ex: matching d'ordres, envoi de notifications) tout en maintenant leur indépendance.
 
-La persistance des données est gérée de façon indépendante : chaque microservice possède sa propre base de données (PostgreSQL), ce qui garantit l’isolation des données, la conformité aux principes DDD et la robustesse des transactions critiques. Cette séparation permet d’éviter les dépendances fortes et facilite l’évolution de chaque service.
+**Communication hybride :** Les communications inter-services combinent des appels HTTP synchrones pour les opérations simples et des événements asynchrones via RabbitMQ pour les workflows complexes nécessitant une coordination entre plusieurs services. Le pattern Outbox garantit la fiabilité de la publication d'événements.
 
-La sécurité est centralisée via l’auth-service, qui gère l’authentification forte (MFA), la gestion des rôles et la journalisation des actions critiques. Les exigences réglementaires (KYC, RGPD) sont respectées grâce à une gestion fine des accès et à la traçabilité des opérations sensibles.
+Chaque microservice est développé principalement en Java avec Spring Boot, et expose ses fonctionnalités via des API REST sécurisées (HTTPS/JSON). L'api-gateway centralise l'accès aux services, gère le routage, l'authentification et la sécurité des échanges. Un load balancer avec NGINX distribue le trafic entre les instances des microservices.
 
-Le déploiement et l’orchestration des services sont assurés par Docker et Docker Compose, permettant de gérer facilement les environnements, la scalabilité et la portabilité. Chaque service peut être déployé, mis à jour ou redémarré indépendamment, ce qui réduit les risques et accélère les cycles de livraison.
+La persistance des données est gérée de façon indépendante : chaque microservice possède sa propre base de données (PostgreSQL), avec des tables outbox pour les services participants aux workflows événementiels. Cette séparation permet d'éviter les dépendances fortes et facilite l'évolution de chaque service.
+
+**Observabilité renforcée :** Le système fournit des logs structurés, des métriques (Golden Signals) et des traces spécifiquement adaptées aux workflows événementiels. Prometheus et Grafana permettent de monitorer les performances du message broker, les temps de traitement des événements et la santé globale des Sagas.
+
+La sécurité est centralisée via l'auth-service, qui gère l'authentification forte (MFA), la gestion des rôles et la journalisation des actions critiques. Les exigences réglementaires (KYC, RGPD) sont respectées grâce à une gestion fine des accès et à la traçabilité des opérations sensibles.
+
+Le déploiement et l'orchestration des services sont assurés par Docker et Docker Compose, permettant de gérer facilement les environnements, la scalabilité et la portabilité. Un pipeline CI/CD adapté aux microservices automatise les tests et les livraisons, garantissant la qualité et la rapidité des mises en production.
 
 Un pipeline CI/CD adapté aux microservices automatise les tests (unitaires, d’intégration, E2E) et les livraisons pour chaque service, garantissant la qualité et la rapidité des mises en production. Les tests sont systématisés pour détecter rapidement les régressions et assurer la fiabilité du système global.
 
-La documentation des API et des services est produite en continu, facilitant l’intégration de nouveaux membres et l’évolution du système. L’utilisation de standards ouverts (OpenAPI/Swagger) permet de garder une trace claire des interfaces et des contrats entre services.
+La documentation des API et des services est produite en continu, facilitant l’intégration de nouveaux membres et l’évolution du système. L’utilisation de standards ouverts (Swagger) permet de garder une trace claire des interfaces et des contrats entre services.
 
-Ce choix d’architecture microservices, associé à des technologies éprouvées et à des processus automatisés, permet de répondre efficacement aux objectifs de sécurité, performance, disponibilité et conformité, tout en gardant la solution évolutive pour de futurs besoins. Cette stratégie assure un socle solide pour BrokerX et prépare l’ouverture vers des intégrations ou des évolutions plus complexes.
+Ce choix d'architecture microservices événementielle, associé à des technologies éprouvées et à des processus automatisés, permet de répondre efficacement aux objectifs de sécurité, performance, disponibilité et conformité, tout en gardant la solution évolutive pour de futurs besoins.
 
 ## 5. Vue des blocs de construction
 

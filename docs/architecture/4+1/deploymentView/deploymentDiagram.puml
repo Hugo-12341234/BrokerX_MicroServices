@@ -56,6 +56,9 @@ node "Hôte (VM/Serveur)" as Host {
       node "Conteneur: grafana\n(port 3001)" as GrafanaC {
         artifact "dashboard.json"
       }
+      node "Conteneur: rabbitmq\n(RabbitMQ)\nport 5672, 15672" as RabbitMQC {
+        artifact "rabbitmq-definitions.json"
+      }
       database "PostgreSQL Auth\nport 5433" as DBAuth
       database "PostgreSQL Order\nport 5434" as DBOrder
       database "PostgreSQL Wallet\nport 5435" as DBWallet
@@ -91,6 +94,10 @@ PrometheusC --> GatewayC : Récolte des données
 GrafanaC --> PrometheusC
 AuthC -right-> SMTP : "Envoi d'emails\n(vérification, MFA)"
 NotificationC -right-> SMTP : "Envoi d'emails\n(notifs)"
+' Connexions événementielles
+OrderC --> RabbitMQC : "Publie et\nconsomme événements"
+MatchingC --> RabbitMQC : "Publie et\nconsomme événements"
+NotificationC --> RabbitMQC : "Consomme événements"
 
 legend right
 Utilisateur : Personne qui utilise la plateforme BrokerX
@@ -102,13 +109,17 @@ auth-service : Microservice d'authentification et gestion des utilisateurs
 order-service : Microservice de gestion des ordres de trading
 wallet-service : Microservice de gestion des portefeuilles et soldes
 matching-service : Microservice de matching et exécution des transactions
+market-data-service : Microservice de diffusion des données de marché en temps réel
+notification-service : Microservice de notifications et alertes utilisateur
 swagger-ui : Documentation centralisée des APIs
 prometheus : Collecte des métriques pour le monitoring.
 **Prometheus est réellement connecté à chacun des microservices pour récolter les données à afficher pour l'observabilité,
 mais pour des besoins de clarté, j'ai juste mis le lien avec le gateway.
 grafana : Visualisation des métriques et dashboards
-PostgreSQL Auth/Order/Wallet/Matching : Bases de données dédiées à chaque microservice
+PostgreSQL Auth/Order/Wallet/Matching/Market-data/Notification : Bases de données dédiées à chaque microservice
 SMTP Provider : Service externe pour l'envoi d'e-mails
+rabbitmq : Message broker pour l'architecture événementielle et Saga chorégraphiée (avec définitions des queues)
+PostgreSQL Order/Wallet/Matching : Bases de données avec tables outbox pour garantir la cohérence
 end legend
 
 @enduml
