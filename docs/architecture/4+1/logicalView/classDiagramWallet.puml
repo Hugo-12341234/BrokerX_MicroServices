@@ -33,7 +33,7 @@ class WalletAudit {
 }
 
 class StockPosition {
-  -id : Long
+  -id : UUID
   -symbol : String
   -quantity : int
   -averagePrice : BigDecimal
@@ -41,17 +41,7 @@ class StockPosition {
   -updatedAt : LocalDateTime
 }
 
-class StockRule {
-  -id : Long
-  -symbol : String
-  -minQuantity : int
-  -maxQuantity : int
-  -ruleType : String
-  -description : String
-}
-
 Wallet "1" -- "*" Transaction
 Wallet "1" -- "*" WalletAudit
 Wallet "1" -- "*" StockPosition
-StockPosition "*" -- "1" StockRule
 @enduml

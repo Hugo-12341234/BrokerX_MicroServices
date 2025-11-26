@@ -1,0 +1,13 @@
+@startuml
+title Diagramme de classes - Market-Data-Service
+
+class StockRule {
+  -symbol : String
+  -tickSize : BigDecimal
+  -minBand : BigDecimal
+  -maxBand : BigDecimal
+  -price : BigDecimal
+  -updatedAt : LocalDateTime
+}
+
+@enduml

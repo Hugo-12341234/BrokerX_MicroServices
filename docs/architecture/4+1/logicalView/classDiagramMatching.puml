@@ -16,6 +16,7 @@ class OrderBook {
   -rejectReason : String
   -quantityRemaining : Integer
   -orderId : Long
+  -version : Long
 }
 
 class ExecutionReport {
@@ -28,6 +29,25 @@ class ExecutionReport {
   -buyerUserId : Long
   -sellerUserId : Long
   -symbol : String
+}
+
+class OutboxEvent {
+    -id : Long
+    -eventID : UUID
+    -eventType : String
+    -aggregateId : String
+    -payload : String
+    -createdAt : Instant
+    -processedAt : Instant
+    -retryCount : Integer
+    -maxRetries : Integer
+    -nextRetryAt : Instant
+    -errorMessage : String
+    +isProcessed() : boolean
+    +canRetry() : boolean
+    +incrementRetryCount() : void
+    +markAsProcessed() : void
+    +markAsFailed(errorMessage : String) : void
 }
 
 OrderBook "1" -- "*" ExecutionReport

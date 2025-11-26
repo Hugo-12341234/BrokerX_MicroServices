@@ -1,0 +1,12 @@
+@startuml
+title Diagramme de classes - Notification-Service
+
+class NotificationLog {
+    -id : Long
+    -userId : Long
+    -message : String
+    -timestamp : Instant
+    -channel : String
+}
+
+@enduml
