@@ -820,29 +820,39 @@ Le diagramme ci-dessous illustre l’infrastructure technique et la distribution
 
 ![Diagramme de déploiement BrokerX](docs/architecture/4+1/deploymentView/deploymentDiagram.png)
 
-| Nœud / Composant                      | Type / Technologie         | Canal / Protocole      | Sécurité / Persistance         | Explication technique                                                                 |
-|---------------------------------------|----------------------------|------------------------|-------------------------------|--------------------------------------------------------------------------------------|
-| Utilisateur                          | Acteur externe             | -                      | -                             | Interagit via le navigateur web                                                      |
-| Frontend (React)                     | Application web            | HTTPS/HTTP 8090        | TLS                           | Interface utilisateur, communique avec l’API Gateway                                 |
-| API Gateway                          | Microservice Java/Spring   | HTTPS/HTTP 8080        | TLS, routage                  | Point d’entrée unique, centralise la sécurité et le routage vers les microservices   |
-| Load Balancer (NGINX)                | Proxy/Routage              | Interne Docker         | TLS, config nginx.conf         | Répartit la charge entre les microservices, assure la haute disponibilité            |
-| auth-service                         | Microservice Java/Spring   | Interne Docker         | TLS, MFA, DB dédiée           | Gère l’authentification, MFA, gestion des rôles, journalisation                      |
-| order-service                        | Microservice Java/Spring   | Interne Docker         | TLS, DB dédiée                | Gestion des ordres de trading, validation pré-trade, traçabilité                     |
-| wallet-service                       | Microservice Java/Spring   | Interne Docker         | TLS, DB dédiée                | Gestion du portefeuille virtuel, dépôts, solde, transactions                         |
-| matching-service                     | Microservice Java/Spring   | Interne Docker         | TLS, DB dédiée                | Appariement des ordres, gestion du carnet d’ordres                                   |
-| DB Auth                              | PostgreSQL                 | JDBC 5432              | Authentification, persistance | Stocke les données d’authentification, MFA, rôles                                    |
-| DB Order                             | PostgreSQL                 | JDBC 5432              | Persistance                    | Stocke les ordres, statuts, logs d’exécution                                         |
-| DB Wallet                            | PostgreSQL                 | JDBC 5432              | Persistance                    | Stocke les portefeuilles, transactions, historiques                                  |
-| DB Matching                          | PostgreSQL                 | JDBC 5432              | Persistance                    | Stocke les données d’appariement, carnet d’ordres                                    |
-| Volume: postgres_data                | Volume Docker              | Interne Docker         | Persistance                    | Persistance des données PostgreSQL                                                    |
-| SMTP Provider (Gmail, Outlook...)    | Service externe (SMTP)     | SMTP 587               | TLS, authentification         | Envoi d’e-mails (notifications, vérification, récupération)                          |
+| Nœud / Composant                  | Type / Technologie         | Canal / Protocole      | Sécurité / Persistance         | Explication technique                                                              |
+|-----------------------------------|----------------------------|------------------------|-------------------------------|------------------------------------------------------------------------------------|
+| Utilisateur                       | Acteur externe             | -                      | -                             | Interagit via le navigateur web                                                    |
+| Frontend (React)                  | Application web            | HTTPS/HTTP 8090        | TLS                           | Interface utilisateur, communique avec l’API Gateway                               |
+| API Gateway                       | Microservice Java/Spring   | HTTPS/HTTP 8080        | TLS, routage                  | Point d’entrée unique, centralise la sécurité et le routage vers les microservices |
+| Load Balancer (NGINX)             | Proxy/Routage              | Interne Docker         | TLS, config nginx.conf         | Répartit la charge entre les microservices, assure la haute disponibilité          |
+| auth-service                      | Microservice Java/Spring   | Interne Docker         | TLS, MFA, DB dédiée           | Gère l’authentification, MFA, gestion des rôles, journalisation                    |
+| order-service                     | Microservice Java/Spring   | Interne Docker         | TLS, DB dédiée                | Gestion des ordres de trading, validation pré-trade, traçabilité                   |
+| wallet-service                    | Microservice Java/Spring   | Interne Docker         | TLS, DB dédiée                | Gestion du portefeuille virtuel, dépôts, solde, transactions                       |
+| matching-service                  | Microservice Java/Spring   | Interne Docker         | TLS, DB dédiée                | Appariement des ordres, gestion du carnet d’ordres                                 |
+| market-data-service               | Microservice Java/Spring   | Interne Docker         | TLS, DB dédiée                | Données du marché en temps réel, cotations et orderbooks de chaque stock.          |
+| notification-service              | Microservice Java/Spring   | Interne Docker         | TLS, DB dédiée                | Notifications envoyées à l'utilisateur en temps réel quand un ordre est placé      |
+| DB Auth                           | PostgreSQL                 | JDBC 5432              | Authentification, persistance | Stocke les données d’authentification, MFA, rôles                                  |
+| DB Order                          | PostgreSQL                 | JDBC 5432              | Persistance                    | Stocke les ordres, statuts, logs d’exécution                                       |
+| DB Wallet                         | PostgreSQL                 | JDBC 5432              | Persistance                    | Stocke les portefeuilles, transactions, historiques                                |
+| DB Matching                       | PostgreSQL                 | JDBC 5432              | Persistance                    | Stocke les données d’appariement, carnet d’ordres                                  |
+| DB Notification                   | PostgreSQL                 | JDBC 5432              | Persistance                   | Stocke les notifications envoyées, historique des alertes                          |
+| DB Market Data                    | PostgreSQL                 | JDBC 5432              | Persistance                   | Stocke les données de marché temps réel, cotations, historiques                    |
+| Volume: postgres_data             | Volume Docker              | Interne Docker         | Persistance                    | Persistance des données PostgreSQL                                                 |
+| RabbitMQ                          | Message Broker             | AMQP 5672              | Authentification              | Hub événementiel, patterns Saga et Outbox pour cohérence distribuée                |
+| Swagger UI                        | Documentation              | HTTP 8081              | -                             | Documentation centralisée des APIs des microservices                               |
+| Prometheus                        | Monitoring                 | HTTP 9090              | -                             | Collecte des métriques pour observabilité et monitoring                            |
+| Grafana                           | Visualisation              | HTTP 3001              | -                             | Dashboards et visualisation des métriques Prometheus                               |
+| SMTP Provider (Gmail, Outlook...) | Service externe (SMTP)     | SMTP 587               | TLS, authentification         | Envoi d’e-mails (notifications, vérification, récupération)                        |
 
 ### Contexte
-La vue déploiement décrit l’architecture physique du système : chaque microservice est déployé dans son propre conteneur Docker, tous connectés au même réseau Docker interne (brokerx-network). Le frontend (React) communique avec l’API Gateway, qui centralise la sécurité et le routage. L’API Gateway transmet les requêtes au load balancer (NGINX), qui répartit la charge vers les microservices métier (auth, order, wallet, matching). Chaque microservice possède sa propre base PostgreSQL pour garantir l’isolation des données et la robustesse des transactions. Les volumes Docker assurent la persistance des données, même lors des mises à jour ou redémarrages. Le service SMTP externe gère l’envoi des notifications et des codes MFA. Cette architecture permet une scalabilité horizontale, une haute disponibilité et une maintenance facilitée, chaque service pouvant être mis à jour ou redémarré indépendamment.
+La vue déploiement décrit l’architecture physique du système : chaque microservice est déployé dans son propre conteneur Docker, tous connectés au même réseau Docker interne (brokerx-network). Le frontend (React) communique avec l’API Gateway, qui centralise la sécurité et le routage. L’API Gateway transmet les requêtes au load balancer (NGINX), qui répartit la charge vers les microservices métier (auth, order, wallet, matching, market-data, notification). Chaque microservice possède sa propre base PostgreSQL pour garantir l’isolation des données et la robustesse des transactions. Les volumes Docker assurent la persistance des données, même lors des mises à jour ou redémarrages. Le message broker RabbitMQ est lié à certains microservices afin de gérer le placement d'ordre de façon événementielle. Le service SMTP externe gère l’envoi des notifications et des codes MFA. Cette architecture permet une scalabilité horizontale, une haute disponibilité et une maintenance facilitée, chaque service pouvant être mis à jour ou redémarré indépendamment.
 
 ### Éléments
-- Conteneurs Docker pour chaque microservice (auth-service, order-service, wallet-service, matching-service, api-gateway, frontend)
+- Conteneurs Docker pour chaque microservice (auth-service, order-service, wallet-service, matching-service, market-data-service, notification-service, api-gateway, frontend)
 - Load Balancer (NGINX) pour la répartition de charge
+- Message Broker (RabbitMQ) pour l’architecture événementielle
+- Prometheus, Grafana et Swagger pour le monitoring et l’observabilité
 - Réseau Docker interne (brokerx-network) pour la communication sécurisée
 - Bases PostgreSQL dédiées pour chaque microservice
 - Volume Docker pour la persistance des données
@@ -853,11 +863,12 @@ La vue déploiement décrit l’architecture physique du système : chaque mic
 - L’API Gateway transmet les requêtes au load balancer NGINX
 - NGINX répartit la charge vers les microservices métier
 - Chaque microservice accède à sa propre base PostgreSQL
+- RabbitMQ est utilisé pour la communication asynchrone entre certains microservices
 - Les volumes Docker assurent la persistance des données
 - Les microservices communiquent avec le service SMTP pour l’envoi d’e-mails
 
 ### Rationnel
-Cette vue permet de comprendre la topologie du système BrokerX dans une architecture microservices : chaque service est isolé, scalable et maintenable indépendamment. Le réseau Docker interne garantit la sécurité et la rapidité des communications. La séparation des bases de données assure la conformité, la robustesse et la traçabilité des opérations. Le load balancer et l’API Gateway centralisent le routage et la sécurité, tandis que le service SMTP gère les notifications critiques. Cette organisation facilite la supervision, la gestion des incidents et l’évolution de l’architecture technique.
+Cette vue permet de comprendre la topologie du système BrokerX dans une architecture microservices et événementielle : chaque service est isolé, scalable et maintenable indépendamment. Le réseau Docker interne garantit la sécurité et la rapidité des communications. La séparation des bases de données assure la conformité, la robustesse et la traçabilité des opérations. Le load balancer et l’API Gateway centralisent le routage et la sécurité, tandis que le service SMTP gère les notifications critiques. Cette organisation facilite la supervision, la gestion des incidents et l’évolution de l’architecture technique.
 
 ## 8. Vue Logique
 

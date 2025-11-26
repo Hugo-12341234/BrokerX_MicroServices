@@ -4,100 +4,164 @@ skinparam backgroundColor #FFFFFF
 skinparam linetype ortho
 skinparam shadowing false
 skinparam artifactStyle rectangle
+skinparam packageStyle rectangle
+skinparam ArrowThickness 2
+skinparam defaultTextAlignment center
 
-'title et contexte
-' ----------------------------------------------------------------------
 title "BrokerX — Diagramme de Déploiement (Microservices)"
 
-actor "Utilisateur" as User
-
-node "Navigateur Web\n(Chrome, Firefox, Safari)" as Browser {
-  [Interface utilisateur\n(HTML/CSS/JS, React)]
+' ========== USER LAYER (TOP) ==========
+together {
+  actor "Utilisateur" as User
+  node "Navigateur Web\n(Chrome, Firefox, Safari)" as Browser {
+    [Interface utilisateur\n(HTML/CSS/JS, React)]
+  }
 }
 
-cloud "SMTP Provider\n(Gmail, Outlook...)\nport 587" as SMTP
+node "Docker Host" as Docker {
+  package "brokerx-network" as Network {
 
-node "Hôte (VM/Serveur)" as Host {
-  node "Docker Engine" as Docker {
-    node "Réseau bridge: brokerx-network" as Net {
-      node "Conteneur: frontend\n(React, Node.js)\nport 3000" as FrontendC {
-        artifact "frontend app"
+    ' ========== MONITORING & OBSERVABILITY LAYER ==========
+    package "Monitoring & Observability" as MonitoringLayer #LightYellow {
+      together {
+        node "Conteneur: prometheus" as PrometheusC {
+          artifact "prometheus.yml"
+        }
+        node "Conteneur: grafana" as GrafanaC {
+          artifact "dashboard.json"
+        }
+        node "Conteneur: swagger-ui" as SwaggerC {
+          artifact "springdoc-openapi-ui"
+        }
       }
-      node "Conteneur: nginx-load-balancer\n(NGINX)\nport 8078" as NginxC {
-        artifact "nginx.conf"
+    }
+
+    ' ========== ENTRY POINT LAYER ==========
+    package "Points d'Entrée" as EntryLayer #LightBlue {
+      node "Conteneur: frontend\n(React, Node.js)" as FrontendC {
+        artifact "React app"
       }
-      node "Conteneur: api-gateway\n(Spring Boot)\nport 8079" as GatewayC {
+
+      node "Conteneur: api-gateway\n(Spring Boot)" as GatewayC {
         artifact "api-gateway.jar"
       }
-      node "Conteneur: auth-service\n(Spring Boot)\nport 8081" as AuthC {
-        artifact "auth-service.jar"
+
+      node "Conteneur: nginx-load-balancer\n(NGINX)" as NginxC {
+        artifact "nginx.conf"
       }
-      node "Conteneur: order-service\n(Spring Boot)\nport 8082" as OrderC {
-        artifact "order-service.jar"
+    }
+
+    ' ========== SERVICE LAYER ==========
+    package "Services Applicatifs" as ServiceLayer #LightGreen {
+      together {
+        node "Conteneur: auth-service\n(Spring Boot)" as AuthC {
+          artifact "auth-service.jar"
+        }
+
+        node "Conteneur: order-service\n(Spring Boot)" as OrderC {
+          artifact "order-service.jar"
+        }
+
+        node "Conteneur: wallet-service\n(Spring Boot)" as WalletC {
+          artifact "wallet-service.jar"
+        }
       }
-      node "Conteneur: wallet-service\n(Spring Boot)\nport 8083" as WalletC {
-        artifact "wallet-service.jar"
+
+      together {
+        node "Conteneur: matching-service\n(Spring Boot)" as MatchingC {
+          artifact "matching-service.jar"
+        }
+
+        node "Conteneur: market-data-service\n(Spring Boot)" as MarketDataC {
+          artifact "market-data-service.jar"
+        }
+
+        node "Conteneur: notification-service\n(Spring Boot)" as NotificationC {
+          artifact "notification-service.jar"
+        }
       }
-      node "Conteneur: matching-service\n(Spring Boot)\nport 8084" as MatchingC {
-        artifact "matching-service.jar"
-      }
-      node "Conteneur: market-data-service\n(Spring Boot)\nport 8087" as MarketDataC {
-        artifact "market-data-service.jar"
-      }
-      node "Conteneur: notification-service\n(Spring Boot)\nport 8088" as NotificationC {
-        artifact "notification-service.jar"
-      }
-      node "Conteneur: swagger-ui\n(port 8085)" as SwaggerC {
-        artifact "swagger-ui"
-      }
-      node "Conteneur: prometheus\n(port 8090)" as PrometheusC {
-        artifact "prometheus.yml"
-      }
-      node "Conteneur: grafana\n(port 3001)" as GrafanaC {
-        artifact "dashboard.json"
-      }
-      node "Conteneur: rabbitmq\n(RabbitMQ)\nport 5672, 15672" as RabbitMQC {
+    }
+
+    ' ========== MESSAGE BROKER LAYER ==========
+    package "Message Broker" as MessagingLayer #LightCoral {
+      node "Conteneur: rabbitmq\n(RabbitMQ)" as RabbitMQC {
         artifact "rabbitmq-definitions.json"
       }
-      database "PostgreSQL Auth\nport 5433" as DBAuth
-      database "PostgreSQL Order\nport 5434" as DBOrder
-      database "PostgreSQL Wallet\nport 5435" as DBWallet
-      database "PostgreSQL Matching\nport 5436" as DBMatching
-      database "PostgreSQL MarketData\nport 5437" as DBMarketData
-      database "PostgreSQL Notification\nport 5438" as DBNotification
+    }
+
+    ' ========== DATA LAYER ==========
+    package "Persistance des Données" as DataLayer #LightCyan {
+      together {
+        database "PostgreSQL Auth" as DBAuth
+        database "PostgreSQL Order" as DBOrder
+        database "PostgreSQL Wallet" as DBWallet
+      }
+
+      together {
+        database "PostgreSQL Matching" as DBMatching
+        database "PostgreSQL MarketData" as DBMarketData
+        database "PostgreSQL Notification" as DBNotification
+      }
+
       frame "Volumes: persistance" as Volumes
     }
   }
 }
 
-' Connexions principales (simplifiées)
+' ========== EXTERNAL SERVICES POSITIONED CLEANLY ==========
+cloud "SMTP Provider\n(Gmail, Outlook...)\nport 587" as SMTP
+
+' ========== POSITIONING HINTS ==========
+User -[hidden]down-> Docker
+Browser -[hidden]down-> Docker
+DataLayer -[hidden]right-> SMTP
+
+' ========== USER FLOW ==========
 User --> Browser : Utilise
 Browser --> FrontendC : HTTP 3000
-Browser --> MarketDataC : "WebSocket 8087\n(données marché temps réel)"
-Browser --> NotificationC : "WebSocket 8088\n(notifications push)"
+Browser -right-> MarketDataC : "WebSocket 8087"
+Browser --> NotificationC : "WebSocket 8088"
+
+' ========== ENTRY POINT ROUTING ==========
 FrontendC --> GatewayC : API REST
 GatewayC --> NginxC : Proxy interne
+GatewayC --> SwaggerC : Docs
+
+' ========== SERVICE ROUTING ==========
 NginxC --> AuthC : Microservice
 NginxC --> OrderC : Microservice
 NginxC --> WalletC : Microservice
 NginxC --> MatchingC : Microservice
 NginxC --> MarketDataC : Microservice
 NginxC --> NotificationC : Microservice
-AuthC --> DBAuth
-OrderC --> DBOrder
-WalletC --> DBWallet
-MatchingC --> DBMatching
-MarketDataC --> DBMarketData
-NotificationC --> DBNotification
-GatewayC --> SwaggerC : Docs
+
+' ========== DATABASE CONNECTIONS ==========
+AuthC --> DBAuth : JDBC
+OrderC --> DBOrder : JDBC
+WalletC --> DBWallet : JDBC
+MatchingC --> DBMatching : JDBC
+MarketDataC --> DBMarketData : JDBC
+NotificationC --> DBNotification : JDBC
+
+' ========== MESSAGE BROKER CONNECTIONS ==========
+OrderC --> RabbitMQC : AMQP
+MatchingC --> RabbitMQC : AMQP
+NotificationC --> RabbitMQC : AMQP
+
+' ========== MONITORING CONNECTIONS ==========
 PrometheusC --> GatewayC : Récolte des données
-GrafanaC --> PrometheusC
-AuthC -right-> SMTP : "Envoi d'emails\n(vérification, MFA)"
-NotificationC -right-> SMTP : "Envoi d'emails\n(notifs)"
-' Connexions événementielles
-OrderC --> RabbitMQC : "Publie et\nconsomme événements"
-MatchingC --> RabbitMQC : "Publie et\nconsomme événements"
-NotificationC --> RabbitMQC : "Consomme événements"
+PrometheusC --> ServiceLayer : Récole des données
+GrafanaC --> PrometheusC : Affichage des métriques
+
+' ========== EXTERNAL SERVICES (CLEAN CONNECTIONS) ==========
+AuthC ..> SMTP : "Envoi d'emails\n(vérification, MFA)"
+NotificationC ..> SMTP : "Envoi d'emails\n(notifs)"
+
+' ========== LAYOUT HINTS ==========
+MonitoringLayer -[hidden]down-> EntryLayer
+EntryLayer -[hidden]down-> ServiceLayer
+ServiceLayer -[hidden]down-> MessagingLayer
+MessagingLayer -[hidden]down-> DataLayer
 
 legend right
 Utilisateur : Personne qui utilise la plateforme BrokerX
