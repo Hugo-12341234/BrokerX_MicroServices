@@ -33,12 +33,17 @@ cloud "Système Email (SMTP)" as EmailCloud
 component "API Gateway" as APIGW #B3C6E7
 component "Load Balancer\n(NGINX / Traefik)" as LB #B3C6E7
 
+' === Message Broker ===
+component "RabbitMQ\n(Message Broker)" as RabbitMQ #FFE4B5
+
 ' === Microservices ===
 rectangle "Microservices BrokerX" as Microservices {
   component "auth-service" as Auth #B3C6E7
   component "matching-service" as Matching #B3C6E7
   component "order-service" as Order #B3C6E7
   component "wallet-service" as Wallet #B3C6E7
+  component "notification-service" as Notification #B3C6E7
+  component "market-data-service" as MarketData #B3C6E7
 }
 
 ' === Bases de données ===
@@ -46,20 +51,37 @@ database "DB Auth\n(PostgreSQL)" as DBAuth #F7DFA3
 database "DB Matching\n(PostgreSQL)" as DBMatching #F7DFA3
 database "DB Order\n(PostgreSQL)" as DBOrder #F7DFA3
 database "DB Wallet\n(PostgreSQL)" as DBWallet #F7DFA3
+database "DB Notification\n(PostgreSQL)" as DBNotification #F7DFA3
+database "DB Market Data\n(PostgreSQL)" as DBMarketData #F7DFA3
 
-' === Connexions ===
+' === Connexions HTTP synchrones ===
 User --> APIGW : "Accès web/API"
 APIGW --> LB : "Routage des requêtes"
 LB --> Auth : "Requêtes Authentification/MFA"
 LB --> Matching : "Requêtes Matching"
 LB --> Order : "Requêtes Ordres"
 LB --> Wallet : "Requêtes Portefeuille"
+LB --> Notification : "Requêtes Notifications"
+LB --> MarketData : "Requêtes Market Data"
+
+' === Connexions aux bases de données ===
 Auth --> DBAuth : "Lecture/écriture données Auth"
 Matching --> DBMatching : "Lecture/écriture données Matching"
 Order --> DBOrder : "Lecture/écriture données Ordres"
 Wallet --> DBWallet : "Lecture/écriture données Wallet"
+Notification --> DBNotification : "Stockage notifications"
+MarketData --> DBMarketData : "Données de marché temps réel"
+
+' === Connexions événementielles (asynchrones) ===
+Order ..> RabbitMQ : "Publier et consommer événements\n(OrderCreated, OrderMatched, NotifSent)"
+Matching ..> RabbitMQ : "Publier et consommer événements\n(OrderCreated, OrderMatched, NotifSent)"
+RabbitMQ <.. Notification : "Consommer événements\n(NotifSent)"
+
+' === Connexions externes ===
 Auth --> EmailCloud : "Envoi de codes MFA par SMTP"
 EmailCloud --> User : "Réception d'e-mails de vérification et de codes"
+MarketData --> User : "WebSocket\n(données temps réel)"
+Notification --> User : "WebSocket\n(notifications push)"
 
 ' === Notes ===
 note right of APIGW
@@ -68,17 +90,9 @@ end note
 note right of LB
 Répartition de charge, haute disponibilité
 end note
-note right of Auth
-Gestion des utilisateurs, MFA, rôles
-end note
-note right of Matching
-Appariement des ordres
-end note
-note right of Order
-Gestion des ordres de trading
-end note
-note right of Wallet
-Gestion du portefeuille et des dépôts
+note right of RabbitMQ
+Architecture événementielle
+Patterns Saga et Outbox
 end note
 
 @enduml

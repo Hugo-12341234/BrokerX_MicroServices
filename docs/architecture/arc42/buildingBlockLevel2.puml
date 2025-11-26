@@ -17,6 +17,9 @@ component "Frontend (React)" as Frontend #B3C6E7
 component "API Gateway" as APIGW #B3C6E7
 component "Load Balancer (NGINX)\n[nginx.conf]" as LB #B3C6E7
 
+' === Message Broker ===
+component "RabbitMQ\n(Message Broker)" as RabbitMQ #FFB6C1
+
 rectangle "auth-service" as AuthService {
   rectangle "Contrôleurs" as AuthControllers {
     component "AuthController" as AuthC #B3C6E7
@@ -36,7 +39,10 @@ rectangle "order-service" as OrderService {
   rectangle "Services Métier" as OrderServices {
     component "OrderService" as OrderS #F7DFA3
     component "PreTradeValidationService" as PreTradeS #F7DFA3
-    component "StockService" as StockS #F7DFA3
+  }
+  rectangle "Messaging" as OrderMessaging {
+    component "EventPublisher" #FFE4B5
+    component "MatchingEventListener" #FFE4B5
   }
   database "DB Order (PostgreSQL)" as DBOrder #D6C6F3
 }
@@ -58,12 +64,39 @@ rectangle "matching-service" as MatchingService {
   rectangle "Services Métier" as MatchingServices {
     component "MatchingService" as MatchingS #F7DFA3
   }
+  rectangle "Messaging" as MatchingMessaging {
+    component "MatchingEventPublisher" #FFE4B5
+    component "OrderPlacedEventListener" #FFE4B5
+  }
   database "DB Matching (PostgreSQL)" as DBMatching #D6C6F3
+}
+
+rectangle "notification-service" as NotificationService {
+  rectangle "Contrôleurs" as NotificationControllers {
+    component "NotificationController" as NotificationC #B3C6E7
+  }
+  rectangle "Services Métier" as NotificationServices {
+    component "NotificationService" as NotificationS #F7DFA3
+  }
+  rectangle "Messaging" as NotificationMessaging {
+    component "NotificationEventListener" #FFE4B5
+  }
+  database "DB Notification (PostgreSQL)" as DBNotification #D6C6F3
+}
+
+rectangle "market-data-service" as MarketDataService {
+  rectangle "Contrôleurs" as MarketDataControllers {
+    component "MarketDataController" as MarketDataC #B3C6E7
+  }
+  rectangle "Services Métier" as MarketDataServices {
+    component "MarketDataService" as MarketDataS #F7DFA3
+  }
+  database "DB Market Data (PostgreSQL)" as DBMarketData #D6C6F3
 }
 
 cloud "Système Email (SMTP)" as EmailCloud #D6C6F3
 
-' === Connexions ===
+' === Connexions HTTP ===
 User --> Frontend : "Navigation, opérations"
 Frontend --> APIGW : "Requêtes HTTP (REST)"
 APIGW --> LB : "Proxy/Routage"
@@ -71,7 +104,17 @@ LB --> AuthService : "Routage Auth, Inscription, Vérification"
 LB --> OrderService : "Routage Ordres, Validation, Actifs"
 LB --> WalletService : "Routage Portefeuille, Dépôts"
 LB --> MatchingService : "Routage Matching"
+LB --> NotificationService : "Routage Notifications"
+LB --> MarketDataService : "Routage Market Data"
 
+' === Connexions Événementielles (pointillés) ===
+EventPublisher -.-> RabbitMQ : "Événements d'ordres"
+MatchingEventPublisher -.-> RabbitMQ : "Événements de matching"
+RabbitMQ -.-> NotificationEventListener : "Événements à traiter"
+RabbitMQ -.-> OrderPlacedEventListener : "Ordres à traiter"
+RabbitMQ -.-> MatchingEventListener : "Résultats de matching"
+
+' === Connexions internes Auth Service ===
 AuthC --> AuthS : "Authentification, MFA"
 UserVerifC --> RegS : "Vérification d'identité"
 AuthS --> DBAuth : "Lecture/écriture utilisateur, tokens"
@@ -79,19 +122,28 @@ RegS --> DBAuth : "Lecture/écriture utilisateur"
 RegS --> EmailCloud : "Envoi de liens de vérification"
 AuthS --> EmailCloud : "Envoi de codes MFA"
 
+' === Connexions internes Order Service ===
 OrderC --> OrderS : "Gestion des ordres"
 OrderC --> PreTradeS : "Validation pré-trade"
-OrderC --> StockS : "Consultation actifs"
 OrderS --> DBOrder : "Lecture/écriture ordres"
 PreTradeS --> DBOrder : "Lecture ordres, validation"
-StockS --> DBOrder : "Lecture actifs"
 
+' === Connexions internes Wallet Service ===
 WalletC --> WalletS : "Dépôt portefeuille"
 WalletS --> DBWallet : "Lecture/écriture utilisateur"
-WalletS --> EmailCloud : "Notifications dépôt"
 
+' === Connexions internes Matching Service ===
 MatchingC --> MatchingS : "Matching d'ordres"
 MatchingS --> DBMatching : "Lecture/écriture matching"
+
+' === Connexions internes Notification Service ===
+NotificationC --> NotificationS : "Gestion notifications"
+NotificationS --> DBNotification : "Lecture/écriture notifications"
+NotificationS --> EmailCloud : "Envoi notifications"
+
+' === Connexions internes Market Data Service ===
+MarketDataC --> MarketDataS : "Gestion données marché"
+MarketDataS --> DBMarketData : "Lecture/écriture données marché"
 
 EmailCloud --> User : "Réception d'e-mails de vérification et de codes"
 

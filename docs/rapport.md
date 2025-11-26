@@ -694,24 +694,30 @@ Cette section présente la structure statique de BrokerX selon deux niveaux de p
 ![Diagramme high level](docs/architecture/arc42/BB_1.png)
 Le diagramme ci-dessus illustre les principaux éléments et interactions du système BrokerX :
 
-| Élément                       | Type / Technologie                       | Rôle / Description                                                                                                                        |
-|-------------------------------|------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| Utilisateur                   | Acteur externe                           | Interagit avec BrokerX via l’interface web : navigation, formulaires, requêtes REST, réception d’e-mails                                  |
-| API Gateway                   | Service dédié (Spring Cloud Gateway, etc.)| Point d’entrée unique : centralise l’accès, la sécurité et le routage des requêtes vers le load balancer                                  |
-| Load Balancer                 | NGINX / Traefik                          | Répartit la charge entre les instances des microservices, assure la haute disponibilité et la résilience du système                       |
-| auth-service                  | Microservice Java/Spring Boot             | Gère l’authentification, MFA, gestion des rôles, journalisation des actions critiques                                                     |
-| matching-service              | Microservice Java/Spring Boot             | Appariement des ordres selon les règles métier, gestion du carnet d’ordres                                                                |
-| order-service                 | Microservice Java/Spring Boot             | Gestion des ordres de trading, validation pré-trade, traçabilité des opérations                                                           |
-| wallet-service                | Microservice Java/Spring Boot             | Gestion du portefeuille virtuel, dépôts, solde, transactions                                                                             |
-| DB Auth                       | PostgreSQL                               | Stocke les données d’authentification, MFA, rôles                                                                                        |
-| DB Matching                   | PostgreSQL                               | Stocke les données d’appariement, carnet d’ordres                                                                                        |
-| DB Order                      | PostgreSQL                               | Stocke les ordres, statuts, logs d’exécution                                                                                             |
-| DB Wallet                     | PostgreSQL                               | Stocke les portefeuilles, transactions, historiques                                                                                      |
-| Système Email (SMTP)          | Service externe                          | Reçoit les demandes d’envoi d’e-mails (liens de vérification, codes MFA) et transmet les courriels à l’utilisateur                       |
+| Élément                       | Type / Technologie                         | Rôle / Description                                                                                                                        |
+|-------------------------------|--------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| Utilisateur                   | Acteur externe                             | Interagit avec BrokerX via l'interface web : navigation, formulaires, requêtes REST, réception d'e-mails, WebSocket pour données temps réel |
+| API Gateway                   | Service dédié (Spring Cloud Gateway, etc.) | Point d'entrée unique : centralise l'accès, la sécurité et le routage des requêtes vers le load balancer                                  |
+| Load Balancer                 | NGINX                                      | Répartit la charge entre les instances des microservices, assure la haute disponibilité et la résilience du système                       |
+| RabbitMQ                      | Message Broker                             | Hub central événementiel, implémente les patterns Saga et Outbox pour la cohérence des transactions distribuées                          |
+| auth-service                  | Microservice Java/Spring Boot              | Gère l'authentification, MFA, gestion des rôles, journalisation des actions critiques                                                     |
+| matching-service              | Microservice Java/Spring Boot              | Appariement des ordres selon les règles métier, gestion du carnet d'ordres, publication d'événements de matching                         |
+| order-service                 | Microservice Java/Spring Boot              | Gestion des ordres de trading, validation pré-trade, traçabilité des opérations, publication d'événements d'ordres                       |
+| wallet-service                | Microservice Java/Spring Boot              | Gestion du portefeuille virtuel, dépôts, solde, transactions, consommation d'événements pour mises à jour                               |
+| notification-service          | Microservice Java/Spring Boot              | Envoi de notifications temps réel, consommation d'événements des autres services                                                         |
+| market-data-service           | Microservice Java/Spring Boot              | Diffusion des cotations et carnets d'ordres via WebSocket, données de marché temps réel                                                  |
+| DB Auth                       | PostgreSQL                                 | Stocke les données d'authentification, MFA, rôles                                                                                        |
+| DB Matching                   | PostgreSQL                                 | Stocke les données d'appariement, carnet d'ordres                                                                                        |
+| DB Order                      | PostgreSQL                                 | Stocke les ordres, statuts, logs d'exécution                                                                                             |
+| DB Wallet                     | PostgreSQL                                 | Stocke les portefeuilles, transactions, historiques                                                                                      |
+| DB Notification               | PostgreSQL                                 | Stocke les notifications envoyées, historique des alertes                                                                                |
+| DB Market Data                | PostgreSQL                                 | Stocke les données de marché temps réel, cotations, historiques des prix                                                                 |
+| Système Email (SMTP)          | Service externe                            | Reçoit les demandes d'envoi d'e-mails (liens de vérification, codes MFA) et transmet les courriels à l'utilisateur                       |
 
 **Principales interactions :**
 - L’utilisateur accède à BrokerX via l’API Gateway, qui centralise l’accès, la sécurité et le routage des requêtes
 - L’API Gateway route les requêtes vers le load balancer, qui répartit la charge vers les microservices
+- RabbitMQ orchestre les transactions distribuées avec les patterns Saga et Outbox (matching d'ordres, notifications, mises à jour de portefeuille)
 - Chaque microservice gère un domaine métier spécifique et possède sa propre base PostgreSQL
 - Les microservices communiquent avec le système email (SMTP) pour l’envoi de codes MFA et de notifications
 - Le système email transmet les e-mails de vérification et de codes à l’utilisateur
@@ -721,6 +727,8 @@ Le diagramme ci-dessus illustre les principaux éléments et interactions du sys
 - Matching-service : carnet d’ordres, appariements
 - Order-service : ordres, statuts, logs d’exécution
 - Wallet-service : portefeuilles, transactions
+- Notification-service : notifications envoyées, historique des alertes, préférences utilisateur
+- Market-data-service : cotations temps réel, carnets d'ordres, historiques des prix, snapshots
 
 Cette vue permet de comprendre la structure globale du système, les principaux composants et leurs interactions, ainsi que la répartition des responsabilités entre les microservices.
 
@@ -731,38 +739,58 @@ Le diagramme ci-dessus détaille l’architecture interne du système BrokerX, o
 
 | Composant                      | Type / Rôle                                      | Description                                                                 |
 |--------------------------------|--------------------------------------------------|-----------------------------------------------------------------------------|
-| Utilisateur (Frontend React)   | Acteur externe                                   | Accède à l’application web pour toutes les opérations de courtage           |
-| API Gateway                    | Proxy/Routage                                    | Point d’entrée unique, route les requêtes vers les microservices            |
+| Utilisateur (Frontend React)   | Acteur externe                                   | Accède à l'application web pour toutes les opérations de courtage           |
+| API Gateway                    | Proxy/Routage                                    | Point d'entrée unique, route les requêtes vers les microservices            |
 | Load Balancer (NGINX)          | Répartition de charge / proxy                    | Distribue les requêtes vers les instances des microservices, config nginx.conf|
-| AuthController                 | Contrôleur (auth-service)                        | Gère l’authentification et la vérification MFA                              |
-| UserVerificationController     | Contrôleur (auth-service)                        | Gère la vérification d’identité (KYC)                                       |
+| RabbitMQ                       | Message Broker                                   | Hub central événementiel, orchestre les patterns Saga et Outbox             |
+| AuthController                 | Contrôleur (auth-service)                        | Gère l'authentification et la vérification MFA                              |
+| UserVerificationController     | Contrôleur (auth-service)                        | Gère la vérification d'identité (KYC)                                       |
 | OrderController                | Contrôleur (order-service)                       | Permet de passer et consulter des ordres de trading                         |
 | WalletController               | Contrôleur (wallet-service)                      | Gère le portefeuille et les dépôts                                          |
 | MatchingController             | Contrôleur (matching-service)                    | Gère le matching des ordres                                                 |
-| AuthenticationService          | Service métier (auth-service)                    | Logique d’authentification et MFA                                           |
-| RegistrationService            | Service métier (auth-service)                    | Gère l’inscription et la vérification utilisateur                           |
+| NotificationController         | Contrôleur (notification-service)                | Gère l'envoi de notifications                                               |
+| MarketDataController           | Contrôleur (market-data-service)                 | Gère les données de marché                                                  |
+| WebSocketController            | Contrôleur (market-data-service)                 | Diffuse les données de marché en temps réel via WebSocket                  |
+| AuthenticationService          | Service métier (auth-service)                    | Logique d'authentification et MFA                                           |
+| RegistrationService            | Service métier (auth-service)                    | Gère l'inscription et la vérification utilisateur                           |
 | OrderService                   | Service métier (order-service)                   | Logique métier pour la gestion des ordres                                   |
 | PreTradeValidationService      | Service métier (order-service)                   | Valide les ordres avant exécution                                           |
 | StockService                   | Service métier (order-service)                   | Gestion des actifs financiers et cotations                                   |
 | WalletDepositService           | Service métier (wallet-service)                  | Gère les dépôts dans le portefeuille                                        |
-| MatchingService                | Service métier (matching-service)                | Logique de matching d’ordres                                                |
-| DB Auth (PostgreSQL)           | Base de données dédiée                           | Stocke les données d’authentification et utilisateurs                       |
+| MatchingService                | Service métier (matching-service)                | Logique de matching d'ordres                                                |
+| NotificationService            | Service métier (notification-service)            | Logique d'envoi de notifications                                            |
+| MarketDataService              | Service métier (market-data-service)             | Logique des données de marché                                               |
+| EventPublisher                 | Composant messaging (order-service)              | Publie les événements d'ordres vers RabbitMQ                               |
+| MatchingEventListener          | Composant messaging (order-service)              | Écoute les événements de matching depuis RabbitMQ                          |
+| MatchingEventPublisher         | Composant messaging (matching-service)           | Publie les événements de matching vers RabbitMQ                            |
+| OrderPlacedEventListener       | Composant messaging (matching-service)           | Écoute les événements d'ordres placés depuis RabbitMQ                      |
+| NotificationEventListener      | Composant messaging (notification-service)       | Écoute tous types d'événements pour générer des notifications              |
+| DB Auth (PostgreSQL)           | Base de données dédiée                           | Stocke les données d'authentification et utilisateurs                       |
 | DB Order (PostgreSQL)          | Base de données dédiée                           | Stocke les ordres et historiques de trading                                 |
 | DB Wallet (PostgreSQL)         | Base de données dédiée                           | Stocke les informations de portefeuille                                     |
 | DB Matching (PostgreSQL)       | Base de données dédiée                           | Stocke les données de matching                                              |
+| DB Notification (PostgreSQL)   | Base de données dédiée                           | Stocke les notifications envoyées et historiques                            |
+| DB Market Data (PostgreSQL)    | Base de données dédiée                           | Stocke les données de marché temps réel et historiques                     |
 | Système Email (SMTP)           | Service externe                                  | Envoie les notifications et codes MFA aux utilisateurs                      |
 
-**Principales interactions :**
-- L’utilisateur interagit avec le Frontend React, qui transmet les requêtes à l’API Gateway.
-- L’API Gateway centralise et sécurise l’accès, puis transmet les requêtes au Load Balancer (NGINX).
-- Le Load Balancer distribue les requêtes vers les microservices appropriés (auth-service, order-service, wallet-service, matching-service).
-- Chaque microservice possède ses propres contrôleurs et services métier, ainsi qu’une base de données dédiée.
-- Les services d’inscription et d’authentification envoient des e-mails (liens de vérification, codes MFA) au système SMTP, qui transmet ces messages à l’utilisateur.
+**Principales interactions :**
+- L'utilisateur interagit avec le Frontend React, qui transmet les requêtes à l'API Gateway
+- L'API Gateway centralise et sécurise l'accès, puis transmet les requêtes au Load Balancer (NGINX)
+- Le Load Balancer distribue les requêtes vers les microservices appropriés selon la configuration de routage
+- **Architecture événementielle :** RabbitMQ orchestre les workflows complexes via les patterns Saga et Outbox :
+    - Order-service publie des événements d'ordres placés via EventPublisher
+    - Matching-service écoute ces événements via OrderPlacedEventListener et traite les appariements
+    - MatchingEventPublisher diffuse les résultats de matching vers RabbitMQ
+    - Order-service consomme les événements de matching via MatchingEventListener pour mettre à jour les statuts
+    - Notification-service écoute tous types d'événements via NotificationEventListener pour générer des notifications
+- Chaque microservice possède ses propres contrôleurs et services métier, ainsi qu'une base de données dédiée
+- Les services d'inscription et d'authentification envoient des e-mails (liens de vérification, codes MFA) au système SMTP, qui transmet ces messages à l'utilisateur
+- Le market-data-service diffuse les données temps réel via WebSocket pour les cotations et carnets d'ordres
 
-Cette vue permet de comprendre la répartition des responsabilités, les flux d’information et la collaboration entre les composants, tout en respectant l’architecture microservices et le routage via API Gateway et NGINX.
+Cette vue permet de comprendre la répartition des responsabilités, les flux d'information synchrones et asynchrones, ainsi que la collaboration entre les composants dans une architecture microservices événementielle. L'utilisation de RabbitMQ avec les patterns Saga et Outbox garantit la cohérence des données distribuées tout en maintenant l'indépendance des services, permettant une meilleure résilience et scalabilité du système global.
 
 ### 5.4 Organisation du code et conventions
-Le code de chacun des microservices est structuré selon une approche hexagonale : les "adapters" gèrent les interactions externes (web, persistence), le "domain" regroupe la logique métier et les modèles, et "infrastructure" contient la configuration technique. Les conventions de nommage (camelCase) et de structure facilitent l’extension et la maintenance du projet. Les tests automatisés couvrent les fonctionnalités critiques, et la documentation est maintenue à jour pour chaque évolution majeure.
+Le code de chacun des microservices est structuré selon une approche hexagonale : les "adapters" gèrent les interactions externes (web, persistence, messaging), le "domain" regroupe la logique métier et les modèles, et "infrastructure" contient la configuration technique. Les conventions de nommage (camelCase) et de structure facilitent l’extension et la maintenance du projet. Les tests automatisés couvrent les fonctionnalités critiques, et la documentation est maintenue à jour pour chaque évolution majeure.
 
 ## 6. Vue d’ensemble des scénarios
 
