@@ -18,31 +18,13 @@ participant "Adapters (StockRule)" as Adapters
 participant "Persistence (JPA Repos)" as Persistence
 participant "MatchingClient" as MatchingAPI
 participant "SimpMessagingTemplate" as WebSocket
+participant "Order Microservice" as OrderMS
 
 note over WebSocket
 WebSocket avec STOMP pour streaming temps réel
 end note
 
 == Phase 1 : Récupération données initiales ==
-Client -> APIGateway: GET localhost:8079/api/v1/market-data/stock?symbol={symbol}
-APIGateway -> MarketDataController: GET /api/v1/market-data/stock?symbol={symbol}
-MarketDataController -> MarketDataService: getStockRuleBySymbol(symbol)
-
-MarketDataService -> Adapters: findBySymbol(symbol)
-Adapters -> Persistence: findBySymbol(symbol)
-Persistence --> Adapters: Optional<StockRule>
-Adapters --> MarketDataService: Optional<StockRule>
-
-alt symbol introuvable ou invalide
-    MarketDataService --> MarketDataController: Optional.empty()
-    MarketDataController --> APIGateway: 404 ErrorResponse("StockRule introuvable pour ce symbole")
-    APIGateway --> Client: 404 ErrorResponse("StockRule introuvable pour ce symbole")
-else symbol trouvé
-    MarketDataService --> MarketDataController: Optional<StockRule>
-    MarketDataController --> APIGateway: 200 StockRule(symbol, tickSize, priceRange, etc.)
-    APIGateway --> Client: 200 StockRule(symbol, tickSize, priceRange, etc.)
-end
-
 Client -> APIGateway: GET localhost:8079/api/v1/market-data/orderbook?symbol={symbol}
 APIGateway -> MarketDataController: GET /api/v1/market-data/orderbook?symbol={symbol}
 MarketDataController -> MarketDataService: getOrderBookBySymbol(symbol)
@@ -87,7 +69,8 @@ loop Données de marché mises à jour (source externe)
     Source externe envoie des mises à jour
     end note
 
-    MarketDataController -> MarketDataController: POST /send-market-data/{symbol}\nMarketDataUpdateDTO(lastPrice, volume, timestamp)
+    OrderMS -> APIGateway: POST /send-market-data/{symbol}\nMarketDataUpdateDTO(lastPrice, volume, timestamp)
+    APIGateway -> MarketDataController: POST /send-market-data/{symbol}\nMarketDataUpdateDTO(lastPrice, volume, timestamp)
     MarketDataController -> MarketDataService: streamMarketData(symbol, marketDataUpdate)
 
     MarketDataService -> Adapters: findBySymbol(symbol)

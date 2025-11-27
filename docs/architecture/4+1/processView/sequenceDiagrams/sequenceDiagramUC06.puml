@@ -1,0 +1,153 @@
+@startuml
+' UC-06 — Modification et annulation d'ordres (BrokerX)
+
+title Sequence Diagram\nUC-06 — Modification et annulation d'ordres (microservices)
+
+skinparam ParticipantPadding 8
+skinparam BoxPadding 6
+skinparam Shadowing false
+skinparam ArrowColor #2c3e50
+skinparam ActorStyle awesome
+autonumber
+
+actor Client
+participant APIGateway
+participant OrderController
+participant OrderService
+participant PreTradeValidationService
+participant "Domain(Order)" as Domain
+participant "Adapters (Order)" as Adapters
+participant "Persistence (JPA Repos)" as Persistence
+participant "API Wallet" as WalletAPI
+participant "API Matching" as MatchingAPI
+
+note over Persistence
+Contrôles : expiration DAY, verrouillage optimiste, statuts valides
+end note
+
+== Flow 1 : Modification d'un ordre ==
+Client -> APIGateway: PUT localhost:8079/api/v1/orders/{orderId}\nOrderRequest(symbol, side, type, timeInForce, quantity, limitPrice)
+APIGateway -> OrderController: PUT /api/v1/orders/{orderId}\nOrderRequest + X-User-Id header
+OrderController -> OrderService: modifyOrder(orderId, orderRequest, userId)
+
+OrderService -> Adapters: findById(orderId)
+Adapters -> Persistence: findById(orderId)
+Persistence --> Adapters: Optional<Order>
+Adapters --> OrderService: Optional<Order>
+
+alt ordre non trouvé
+    OrderService --> OrderController: IllegalArgumentException("Ordre non trouvé")
+    OrderController --> APIGateway: 404 ErrorResponse("Ordre non trouvé")
+    APIGateway --> Client: 404 ErrorResponse("Ordre non trouvé")
+end
+
+OrderService -> OrderService: isOrderExpired(order)
+
+alt ordre expiré (DAY > 24h)
+    OrderService --> OrderController: IllegalStateException("Impossible de modifier un ordre expiré (DAY)")
+    OrderController --> APIGateway: 400 ErrorResponse("Impossible de modifier un ordre expiré (DAY)")
+    APIGateway --> Client: 400 ErrorResponse("Impossible de modifier un ordre expiré (DAY)")
+end
+
+OrderService -> OrderService: checkOrderStatus(order)
+
+alt ordre FILLED ou CANCELLED
+    OrderService --> OrderController: IllegalStateException("Impossible de modifier un ordre rempli ou annulé")
+    OrderController --> APIGateway: 400 ErrorResponse("Impossible de modifier un ordre rempli ou annulé")
+    APIGateway --> Client: 400 ErrorResponse("Impossible de modifier un ordre rempli ou annulé")
+end
+
+OrderService -> WalletAPI: GET /api/v1/wallet/{userId}
+WalletAPI --> OrderService: Wallet(userId, balance, stockPositions)
+
+OrderService -> PreTradeValidationService: validateOrder(symbol, side, type, quantity, price, wallet)
+
+alt validation échouée
+    PreTradeValidationService --> OrderService: ValidationError(raison)
+    OrderService -> Domain: setStatus(REJETE) + setRejectReason()
+    OrderService -> Adapters: save(order)
+    Adapters -> Persistence: save(order)
+    OrderService --> OrderController: IllegalStateException("Modification rejetée : " + raison)
+    OrderController --> APIGateway: 400 ErrorResponse("Modification rejetée : " + raison)
+    APIGateway --> Client: 400 ErrorResponse("Modification rejetée : " + raison)
+else validation réussie
+    PreTradeValidationService --> OrderService: ValidationSuccess
+
+    OrderService -> OrderService: versionBefore = order.getVersion()
+    OrderService -> Domain: updateOrder(quantity, price, type, duration, timestamp)
+    OrderService -> Adapters: save(order)
+    Adapters -> Persistence: save(order)
+    Persistence --> Adapters: Order(updated)
+    Adapters --> OrderService: Order(updated)
+
+    OrderService -> OrderService: checkOptimisticLock(versionBefore, updatedOrder.getVersion())
+
+    alt conflit de version
+        OrderService --> OrderController: RuntimeException("Conflit de version")
+        OrderController --> APIGateway: 500 ErrorResponse("Conflit de version")
+        APIGateway --> Client: 500 ErrorResponse("Conflit de version")
+    else version OK
+        OrderService -> MatchingAPI: PUT /api/v1/orders/{clientOrderId}\nOrderDTO(modifiedOrder)
+        MatchingAPI --> OrderService: OK
+
+        OrderService --> OrderController: OrderResponse(updatedOrder)
+        OrderController --> APIGateway: 200 OrderResponse(updatedOrder)
+        APIGateway --> Client: 200 OrderResponse(updatedOrder)
+    end
+end
+
+== Flow 2 : Annulation d'un ordre ==
+Client -> APIGateway: DELETE localhost:8079/api/v1/orders/{orderId}
+APIGateway -> OrderController: DELETE /api/v1/orders/{orderId} + X-User-Id header
+OrderController -> OrderService: cancelOrder(orderId)
+
+OrderService -> Adapters: findById(orderId)
+Adapters -> Persistence: findById(orderId)
+Persistence --> Adapters: Optional<Order>
+Adapters --> OrderService: Optional<Order>
+
+alt ordre non trouvé
+    OrderService --> OrderController: IllegalArgumentException("Ordre non trouvé")
+    OrderController --> APIGateway: 404 ErrorResponse("Ordre non trouvé")
+    APIGateway --> Client: 404 ErrorResponse("Ordre non trouvé")
+end
+
+OrderService -> OrderService: isOrderExpired(order)
+
+alt ordre expiré (DAY > 24h)
+    OrderService --> OrderController: IllegalStateException("Impossible d'annuler un ordre expiré (DAY)")
+    OrderController --> APIGateway: 400 ErrorResponse("Impossible d'annuler un ordre expiré (DAY)")
+    APIGateway --> Client: 400 ErrorResponse("Impossible d'annuler un ordre expiré (DAY)")
+end
+
+OrderService -> OrderService: checkOrderStatus(order)
+
+alt ordre FILLED ou déjà CANCELLED
+    OrderService --> OrderController: IllegalStateException("Impossible d'annuler un ordre rempli ou déjà annulé")
+    OrderController --> APIGateway: 400 ErrorResponse("Impossible d'annuler un ordre rempli ou déjà annulé")
+    APIGateway --> Client: 400 ErrorResponse("Impossible d'annuler un ordre rempli ou déjà annulé")
+else ordre annulable
+    OrderService -> OrderService: versionBefore = order.getVersion()
+    OrderService -> Domain: setStatus(CANCELLED) + setTimestamp()
+    OrderService -> Adapters: save(order)
+    Adapters -> Persistence: save(order)
+    Persistence --> Adapters: Order(cancelled)
+    Adapters --> OrderService: Order(cancelled)
+
+    OrderService -> OrderService: checkOptimisticLock(versionBefore, updatedOrder.getVersion())
+
+    alt conflit de version
+        OrderService --> OrderController: RuntimeException("Conflit de version")
+        OrderController --> APIGateway: 500 ErrorResponse("Conflit de version")
+        APIGateway --> Client: 500 ErrorResponse("Conflit de version")
+    else version OK
+        OrderService -> MatchingAPI: DELETE /api/v1/orders/{orderId}\nOrderDTO(cancelledOrder)
+        MatchingAPI --> OrderService: OK
+
+        OrderService --> OrderController: OrderResponse(cancelledOrder)
+        OrderController --> APIGateway: 200 OrderResponse(cancelledOrder)
+        APIGateway --> Client: 200 OrderResponse(cancelledOrder)
+    end
+end
+
+@enduml
