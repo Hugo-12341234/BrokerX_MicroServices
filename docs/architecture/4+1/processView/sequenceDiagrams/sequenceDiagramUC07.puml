@@ -17,6 +17,8 @@ participant "Domain(OrderBook, ExecutionReport)" as Domain
 participant "Adapters (OrderBook, Execution)" as Adapters
 participant "Persistence (JPA Repos)" as Persistence
 participant "OutboxService" as Outbox
+participant "OutboxScheduler" as Scheduler
+participant "EventPublisher" as Publisher
 
 note over Persistence
 Matching engine : nettoyage expirés, priorité prix/temps, gestion FOK/IOC/DAY
@@ -90,24 +92,23 @@ end
 alt matching réussi
     Service -> Service: publishOrderMatched(MatchingResult, OrderPlacedEvent)
     Service -> Outbox: saveEvent("ORDER_MATCHED", OrderMatchedEvent)
-    Outbox --> Service: ack
 
     Service -> Service: publishDetailedNotifications(MatchingResult, OrderPlacedEvent)
     Service -> Outbox: saveEvent("NOTIFICATION_SEND", NotificationEvent)
-    Outbox --> Service: ack
 
     loop pour chaque exécution
         Service -> Service: publishExecutionNotifications(ExecutionReport)
         Service -> Outbox: saveEvent("NOTIFICATION_SEND", NotificationEvent)
-        Outbox --> Service: ack
     end
 else matching échoué
     Service -> Service: publishOrderRejected(OrderPlacedEvent, rejectReason)
     Service -> Outbox: saveEvent("ORDER_REJECTED", OrderRejectedEvent)
-    Outbox --> Service: ack
 
     Service -> Outbox: saveEvent("NOTIFICATION_SEND", NotificationEvent)
-    Outbox --> Service: ack
 end
+
+Scheduler -> Publisher: processOutboxEvents()
+Publisher -> Publisher: publishEvent()
+Publisher --> Publisher: RabbitMQ publish
 
 @enduml

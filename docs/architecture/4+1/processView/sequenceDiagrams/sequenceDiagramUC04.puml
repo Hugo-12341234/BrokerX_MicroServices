@@ -1,0 +1,107 @@
+@startuml
+' UC-04 — Consultation de données de marché en temps réel (BrokerX)
+
+title Sequence Diagram\nUC-04 — Consultation de données de marché en temps réel
+
+skinparam ParticipantPadding 8
+skinparam BoxPadding 6
+skinparam Shadowing false
+skinparam ArrowColor #2c3e50
+skinparam ActorStyle awesome
+autonumber
+
+actor Client
+participant APIGateway
+participant MarketDataController
+participant MarketDataService
+participant "Adapters (StockRule)" as Adapters
+participant "Persistence (JPA Repos)" as Persistence
+participant "MatchingClient" as MatchingAPI
+participant "SimpMessagingTemplate" as WebSocket
+
+note over WebSocket
+WebSocket avec STOMP pour streaming temps réel
+end note
+
+== Phase 1 : Récupération données initiales ==
+Client -> APIGateway: GET localhost:8079/api/v1/market-data/stock?symbol={symbol}
+APIGateway -> MarketDataController: GET /api/v1/market-data/stock?symbol={symbol}
+MarketDataController -> MarketDataService: getStockRuleBySymbol(symbol)
+
+MarketDataService -> Adapters: findBySymbol(symbol)
+Adapters -> Persistence: findBySymbol(symbol)
+Persistence --> Adapters: Optional<StockRule>
+Adapters --> MarketDataService: Optional<StockRule>
+
+alt symbol introuvable ou invalide
+    MarketDataService --> MarketDataController: Optional.empty()
+    MarketDataController --> APIGateway: 404 ErrorResponse("StockRule introuvable pour ce symbole")
+    APIGateway --> Client: 404 ErrorResponse("StockRule introuvable pour ce symbole")
+else symbol trouvé
+    MarketDataService --> MarketDataController: Optional<StockRule>
+    MarketDataController --> APIGateway: 200 StockRule(symbol, tickSize, priceRange, etc.)
+    APIGateway --> Client: 200 StockRule(symbol, tickSize, priceRange, etc.)
+end
+
+Client -> APIGateway: GET localhost:8079/api/v1/market-data/orderbook?symbol={symbol}
+APIGateway -> MarketDataController: GET /api/v1/market-data/orderbook?symbol={symbol}
+MarketDataController -> MarketDataService: getOrderBookBySymbol(symbol)
+
+MarketDataService -> MatchingAPI: getOrderBookBySymbol(symbol)
+MatchingAPI --> MarketDataService: OrderBookDTO
+
+alt OrderBook introuvable
+    MarketDataService --> MarketDataController: Optional.empty()
+    MarketDataController --> APIGateway: 404 ErrorResponse("OrderBook introuvable pour ce symbole")
+    APIGateway --> Client: 404 ErrorResponse("OrderBook introuvable pour ce symbole")
+else OrderBook trouvé
+    MarketDataService --> MarketDataController: Optional<OrderBookDTO>
+    MarketDataController --> APIGateway: 200 OrderBookDTO(bids, asks, symbol)
+    APIGateway --> Client: 200 OrderBookDTO(bids, asks, symbol)
+end
+
+Client -> APIGateway: GET localhost:8079/api/v1/market-data/last-price?symbol={symbol}
+APIGateway -> MarketDataController: GET /api/v1/market-data/last-price?symbol={symbol}
+MarketDataController -> MarketDataService: getLastPriceBySymbol(symbol)
+
+MarketDataService -> MatchingAPI: getLastPriceBySymbol(symbol)
+MatchingAPI --> MarketDataService: LastPriceDTO
+
+alt LastPrice introuvable
+    MarketDataService --> MarketDataController: Optional.empty()
+    MarketDataController --> APIGateway: 404 ErrorResponse("Dernier prix introuvable pour ce symbole")
+    APIGateway --> Client: 404 ErrorResponse("Dernier prix introuvable pour ce symbole")
+else LastPrice trouvé
+    MarketDataService --> MarketDataController: Optional<LastPriceDTO>
+    MarketDataController --> APIGateway: 200 LastPriceDTO(symbol, price, timestamp)
+    APIGateway --> Client: 200 LastPriceDTO(symbol, price, timestamp)
+end
+
+== Phase 2 : Connexion WebSocket ==
+Client -> Client: Établir connexion WebSocket\n/ws endpoint
+Client -> Client: S'abonner à /topic/market-data/{symbol}
+
+== Phase 3 : Streaming temps réel (Multiples mises à jour) ==
+loop Données de marché mises à jour (source externe)
+    note over MarketDataController
+    Source externe envoie des mises à jour
+    end note
+
+    MarketDataController -> MarketDataController: POST /send-market-data/{symbol}\nMarketDataUpdateDTO(lastPrice, volume, timestamp)
+    MarketDataController -> MarketDataService: streamMarketData(symbol, marketDataUpdate)
+
+    MarketDataService -> Adapters: findBySymbol(symbol)
+    Adapters -> Persistence: findBySymbol(symbol)
+    Persistence --> Adapters: Optional<StockRule>
+    Adapters --> MarketDataService: Optional<StockRule>
+
+    alt symbol invalide
+        MarketDataService -> WebSocket: convertAndSend("/topic/market-data/" + symbol, ErrorResponse)
+        WebSocket --> Client: WebSocket ErrorResponse("Symbol not found")
+    else symbol valide
+        MarketDataService -> WebSocket: convertAndSend("/topic/market-data/" + symbol, marketDataUpdate)
+        WebSocket --> Client: WebSocket MarketDataUpdateDTO(lastPrice, volume, timestamp)
+    end
+end
+
+@enduml
