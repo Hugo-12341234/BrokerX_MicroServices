@@ -1,0 +1,52 @@
+@startuml "Notification Service - Component Diagram"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle uml2
+skinparam linetype ortho
+skinparam shadowing false
+skinparam ArrowColor #606060
+skinparam FontColor #404040
+skinparam nodesep 120
+skinparam ranksep 180
+left to right direction
+
+title "Notification Service - Component Diagram"
+
+actor "Other Services" as Services
+
+package "Services du domaine" #FFF3E0 {
+  [NotificationService] as NotificationSvc
+}
+
+package "Adapteurs" #E6F7FF {
+  [NotificationLogAdapter] as NotificationAdapter
+
+  package "Event Layer" #FFECB3 {
+    [NotificationEventListener] as OrderListener
+  }
+}
+
+package "Ports" #FFF9C4 {
+  interface "NotificationPort" as INotificationPort
+  interface "NotificationLogPort" as INotificationLogPort
+}
+
+package "Infrastructure" #E2FFCC {
+  database "PostgreSQL Notification" as DBNotification
+  component "RabbitMQ" as RabbitMQ
+}
+
+' --- Flèches principales ---
+Services ..> RabbitMQ : Publish Events
+
+RabbitMQ ..> OrderListener
+
+OrderListener ..> INotificationPort
+
+NotificationSvc --> INotificationPort
+NotificationSvc ..> INotificationLogPort
+NotificationAdapter --> INotificationLogPort
+
+"Adapteurs" ..> DBNotification : JDBC
+
+@enduml

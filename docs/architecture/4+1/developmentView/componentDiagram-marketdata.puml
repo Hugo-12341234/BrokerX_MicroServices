@@ -1,0 +1,56 @@
+@startuml "Market Data Service - Component Diagram"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle uml2
+skinparam linetype ortho
+skinparam shadowing false
+skinparam ArrowColor #606060
+skinparam FontColor #404040
+skinparam nodesep 120
+skinparam ranksep 180
+left to right direction
+
+title "Market Data Service - Component Diagram"
+
+actor "Client" as Client
+actor "Other Services" as Services
+
+package "Controllers" #FFECB3 {
+  [MarketDataController] as MarketCtrl
+}
+
+package "Services du domaine" #FFF3E0 {
+  [MarketDataService] as MarketSvc
+}
+
+package "Adapteurs" #E6F7FF {
+  [StockRuleAdapter] as StockRuleAdapter
+  [ExternalAdapter] as ExternalAdapter
+}
+
+package "Ports" #FFF9C4 {
+  interface "MarketDataServicePort" as IMarketDataPort
+  interface "StockRulePort" as IStockRulePort
+  interface "FeignClientPort" as IFeignClientPort
+}
+
+package "Infrastructure" #E2FFCC {
+  database "PostgreSQL MarketData" as DBMarketData
+}
+
+' --- Flèches principales ---
+Client ..> MarketCtrl : HTTP/REST
+Services ..> MarketCtrl : HTTP/REST
+
+MarketCtrl ..> MarketSvc
+
+MarketSvc --> IMarketDataPort
+MarketSvc ..> IStockRulePort
+MarketSvc ..> IFeignClientPort
+
+StockRuleAdapter --> IStockRulePort
+ExternalAdapter --> IFeignClientPort
+
+"Adapteurs" ..> DBMarketData : JDBC
+
+@enduml
