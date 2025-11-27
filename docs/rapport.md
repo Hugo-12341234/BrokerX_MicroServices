@@ -947,30 +947,36 @@ Cette vue permet de comprendre la logique métier profonde du système, d’assu
 ![UC07 - Activité](docs/architecture/4+1/processView/activityDiagrams/activityDiagramUC07.png)
 
 #### UC08 — Séquence
-![UC03 - Séquence](docs/architecture/4+1/processView/sequenceDiagrams/sequenceDiagramUC08.png)
+![UC08 - Séquence](docs/architecture/4+1/processView/sequenceDiagrams/sequenceDiagramUC08.png)
 
 #### UC08 — Activité
-![UC03 - Activité](docs/architecture/4+1/processView/activityDiagrams/activityDiagramUC08.png)
+![UC08 - Activité](docs/architecture/4+1/processView/activityDiagrams/activityDiagramUC08.png)
 
 ### Contexte
-La vue processus détaille le comportement dynamique du système lors de l’exécution des cas d’utilisation. Elle montre comment les composants collaborent pour réaliser les opérations métier, gérer les erreurs et orchestrer les interactions. L’ajout du UC07 (Appariement interne & Exécution) met en lumière la logique centrale du matching, la gestion des différents types d’ordres (DAY, IOC, FOK) et les alternatives métier, illustrant la complexité et la robustesse du moteur d’appariement.
+La vue processus détaille le comportement dynamique du système lors de l’exécution des cas d’utilisation. Elle montre comment les composants collaborent pour réaliser les opérations métier, gérer les erreurs et orchestrer les interactions.
 
 ### Éléments
-- Services applicatifs (RegistrationService, AuthService, WalletService, OrderService, MatchingService)
-- Contrôleurs web (UserController, AuthController, WalletController, OrderController, OrderBookController)
-- Moteur d’appariement interne (MatchingService)
-- Adapters (UserAdapter, TransactionAdapter, OrderBookAdapter, etc.)
-- Persistance (JPA Repos)
-- Acteurs externes (Client)
+- Services applicatifs (RegistrationService, AuthenticationService, WalletDepositService, OrderService, MatchingService, MarketDataService, NotificationService)
+- Contrôleurs web (UserVerificationController, AuthController, WalletController, OrderController, MatchingController, MarketDataController, NotificationController, WebSocketController)
+- Moteur d'appariement interne (MatchingService avec architecture événementielle)
+- Listeners événementiels (NotificationEventListener, MatchingEventListener, OrderPlacedEventListener)
+- Publishers événementiels (EventPublisher, MatchingEventPublisher)
+- Adapters (UserAdapter, TransactionAdapter, OrderAdapter, NotificationAdapter, etc.)
+- Persistance (JPA Repos avec tables outbox pour patterns Saga/Outbox)
+- Message Broker (RabbitMQ pour orchestration événementielle)
+- Acteurs externes (Client, Service Email SMTP)
 
 ### Relations
 - Les contrôleurs reçoivent les requêtes des clients et délèguent aux services
-- Les services orchestrent la logique métier et interagissent avec les adapters
-- Les adapters font le lien avec la persistance et les systèmes externes
-- Les diagrammes d’activité synthétisent les étapes clés et les alternatives
+- Les services orchestrent la logique métier et interagissent avec les adapters et publishers événementiels
+- Les listeners événementiels consomment les messages RabbitMQ et déclenchent les traitements appropriés
+- Les publishers événementiels publient les événements vers RabbitMQ via les patterns Saga et Outbox
+- Les adapters font le lien avec la persistance, les systèmes externes et les tables outbox
+- RabbitMQ orchestre les workflows distribués (matching d'ordres, notifications, mises à jour de portefeuille)
+- Les diagrammes d'activité synthétisent les étapes clés, les alternatives et les flux événementiels
 
 ### Rationnel
-Cette vue permet de visualiser le flow des opérations, la gestion des exceptions, l’idempotence et la coordination entre les modules. Elle est essentielle pour valider la robustesse, la sécurité et la performance du système lors des opérations critiques. Elle aide à identifier les points de synchronisation, les risques de concurrence, et à optimiser la répartition des responsabilités. Elle est aussi précieuse pour l’analyse des scénarios d’erreur, la traçabilité des actions et la préparation des tests d’intégration et de non-régression.
+Cette vue permet de visualiser le flow des opérations synchrones et asynchrones, la gestion des exceptions, l'idempotence et la coordination entre les modules dans une architecture événementielle. Elle est essentielle pour valider la robustesse, la sécurité et la performance du système lors des opérations critiques distribuées. Elle aide à identifier les points de synchronisation événementielle, les risques de concurrence dans les workflows Saga, et à optimiser la répartition des responsabilités entre microservices. Elle est aussi précieuse pour l'analyse des scénarios d'erreur dans les transactions distribuées, la traçabilité des événements et des actions, et la préparation des tests d'intégration événementielle et de non-régression des patterns Outbox.
 
 ## 10. Vue Développement
 
