@@ -1,0 +1,40 @@
+@startuml UC-08 Activity Diagram
+
+title Diagramme d'activité UC-08\nConfirmation d'exécution & Notifications
+
+|Système|
+start
+:Recevoir ExecutionReport;
+:Mettre à jour état de l'ordre\n(Partial/Filled);
+:Créer enregistrement d'exécution\n(prix, quantité, frais);
+
+:Notifier le Client\n(temps réel);
+
+if (Notification push réussie?) then (non)
+  :Retry notification push;
+
+  if (Retry réussi?) then (non)
+    :Fallback email;
+
+    if (Email envoyé?) then (oui)
+      |Client|
+      :Recevoir notification email;
+    else (non)
+      |Système|
+      :Logger échec notification;
+    endif
+  else (oui)
+    |Client|
+    :Recevoir notification temps réel;
+  endif
+else (oui)
+  |Client|
+  :Recevoir notification temps réel;
+endif
+
+|Système|
+:Journaliser audit\n(horodatage, source);
+
+stop
+
+@enduml

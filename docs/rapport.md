@@ -922,17 +922,35 @@ Cette vue permet de comprendre la logique métier profonde du système, d’assu
 #### UC03 — Activité
 ![UC03 - Activité](docs/architecture/4+1/processView/activityDiagrams/activityDiagramUC03.png)
 
+#### UC04 — Séquence
+![UC04 - Séquence](docs/architecture/4+1/processView/sequenceDiagrams/sequenceDiagramUC04.png)
+
+#### UC04 — Activité
+![UC04 - Activité](docs/architecture/4+1/processView/activityDiagrams/activityDiagramUC04.png)
+
 #### UC05 — Séquence
 ![UC05 - Séquence](docs/architecture/4+1/processView/sequenceDiagrams/sequenceDiagramUC05.png)
 
 #### UC05 — Activité
 ![UC05 - Activité](docs/architecture/4+1/processView/activityDiagrams/activityDiagramUC05.png)
 
+#### UC06 — Séquence
+![UC06 - Séquence](docs/architecture/4+1/processView/sequenceDiagrams/sequenceDiagramUC06.png)
+
+#### UC06 — Activité
+![UC06 - Activité](docs/architecture/4+1/processView/activityDiagrams/activityDiagramUC06.png)
+
 #### UC07 — Séquence
 ![UC07 - Séquence](docs/architecture/4+1/processView/sequenceDiagrams/sequenceDiagramUC07.png)
 
 #### UC07 — Activité
 ![UC07 - Activité](docs/architecture/4+1/processView/activityDiagrams/activityDiagramUC07.png)
+
+#### UC08 — Séquence
+![UC03 - Séquence](docs/architecture/4+1/processView/sequenceDiagrams/sequenceDiagramUC08.png)
+
+#### UC08 — Activité
+![UC03 - Activité](docs/architecture/4+1/processView/activityDiagrams/activityDiagramUC08.png)
 
 ### Contexte
 La vue processus détaille le comportement dynamique du système lors de l’exécution des cas d’utilisation. Elle montre comment les composants collaborent pour réaliser les opérations métier, gérer les erreurs et orchestrer les interactions. L’ajout du UC07 (Appariement interne & Exécution) met en lumière la logique centrale du matching, la gestion des différents types d’ordres (DAY, IOC, FOK) et les alternatives métier, illustrant la complexité et la robustesse du moteur d’appariement.

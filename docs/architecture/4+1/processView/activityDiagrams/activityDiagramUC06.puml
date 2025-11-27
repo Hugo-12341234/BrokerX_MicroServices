@@ -1,0 +1,59 @@
+@startuml UC-06 Activity Diagram
+
+title Diagramme d'activité UC-06\nModification / Annulation d'un ordre
+
+|Client|
+start
+:Envoyer Cancel ou Replace\n(nouvelles valeurs : quantité, prix);
+
+|Système|
+:Verrouiller l'ordre\n(optimisme/pessimisme);
+:Vérifier état de l'ordre;
+
+if (Ordre déjà exécuté/annulé?) then (oui)
+  :Rejeter demande\n(Reject avec dernier état);
+
+  |Client|
+  :Recevoir Reject;
+  stop
+else (non)
+  |Système|
+  if (Type de demande?) then (Cancel)
+    :Retirer ordre du carnet;
+    :Générer Cancel ACK;
+    :Enregistrer au journal d'audit;
+
+    |Client|
+    :Recevoir Cancel ACK;
+
+  else (Replace)
+    |Système|
+    :Repasser contrôles pré-trade\n(fonds, limites, règles);
+
+    if (Contrôles OK?) then (non)
+      :Rejeter modification\n(contrôles échoués);
+
+      |Client|
+      :Recevoir Reject;
+      stop
+    else (oui)
+      |Système|
+      if (Exécution concurrente partielle?) then (oui)
+        :Modifier seulement\nquantités restantes;
+      else (non)
+        :Modifier ordre complet;
+      endif
+
+      :Mettre à jour ordre\ndans le carnet;
+      :Générer Replace ACK;
+      :Enregistrer au journal d'audit;
+
+      |Client|
+      :Recevoir Replace ACK;
+    endif
+  endif
+endif
+
+stop
+
+@enduml

@@ -1,0 +1,57 @@
+@startuml UC-04 Activity Diagram
+
+title Diagramme d'activité UC-04\nAbonnement aux données de marché
+
+|Client|
+start
+:Demander abonnement à liste de symboles;
+
+|Système|
+:Vérifier session valide;
+
+if (Session valide?) then (oui)
+  :Vérifier quotas et rate-limits;
+
+  if (Quotas/Rate-limits OK?) then (oui)
+    :Ouvrir canal WebSocket;
+    :Récupérer snapshots carnet d'ordres;
+    :Envoyer données initiales;
+
+    |Client|
+    :Recevoir données initiales;
+
+    |Système|
+    repeat
+      :Calculer différentiels cotations;
+      :Pousser updates temps réel\n(top of book, OHLC, trades);
+
+      |Client|
+      :Recevoir updates temps réel;
+
+    repeat while (Canal ouvert?) is (oui)
+    ->non;
+
+  else (non)
+    :Rejeter demande\n(quotas dépassés);
+
+    |Client|
+    :Recevoir erreur quotas;
+    stop
+  endif
+
+else (non)
+  :Rejeter demande\n(session invalide);
+
+  |Client|
+  :Recevoir erreur session;
+  stop
+endif
+
+|Client|
+:Fermer canal ou timeout;
+
+|Système|
+:Nettoyer ressources canal;
+stop
+
+@enduml

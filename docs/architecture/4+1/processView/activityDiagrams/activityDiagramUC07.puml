@@ -1,4 +1,7 @@
 @startuml
+
+title Diagramme d'activité\nUC-07 — Appariement interne & Exécution (matching)
+
 start
 :Réception nouvel ordre;
 :Insérer ordre dans le carnet;
