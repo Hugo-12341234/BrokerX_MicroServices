@@ -875,17 +875,21 @@ Cette vue permet de comprendre la topologie du système BrokerX dans une archite
 ### Diagrammes de classes par microservice
 - Auth Service : ![Diagramme de classes Auth-Service](docs/architecture/4+1/logicalView/classDiagramAuth.png)
 - Matching Service : ![Diagramme de classes Matching-Service](docs/architecture/4+1/logicalView/classDiagramMatching.png)
+- Market-Data Service : ![Diagramme de classes Market-Data-Service](docs/architecture/4+1/logicalView/classDiagramMarketData.png)
+- Notification Service : ![Diagramme de classes Notification-Service](docs/architecture/4+1/logicalView/classDiagramNotification.png)
 - Order Service : ![Diagramme de classes Order-Service](docs/architecture/4+1/logicalView/classDiagramOrder.png)
 - Wallet Service : ![Diagramme de classes Wallet-Service](docs/architecture/4+1/logicalView/classDiagramWallet.png)
 
 ### Contexte
-La vue logique présente la structure interne du système, organisée autour de quatre microservices principaux : Auth-Service, Matching-Service, Order-Service et Wallet-Service. Chaque service possède son propre modèle métier, adapté à ses responsabilités fonctionnelles : gestion des utilisateurs et de l’authentification, appariement des ordres, gestion des transactions et des ordres, gestion des portefeuilles et des positions boursières.
+La vue logique présente la structure interne du système, organisée autour de 6 microservices principaux : Auth-Service, Matching-Service, Market-Data-Service, Notification-Service, Order-Service et Wallet-Service. Chaque service possède son propre modèle métier, adapté à ses responsabilités fonctionnelles : gestion des utilisateurs et de l’authentification, appariement des ordres, gestion des données de marché, gestion des notifications envoyées, gestion des transactions et des ordres, gestion des portefeuilles et des positions boursières.
 
 ### Éléments
 - **Auth-Service** : User, MfaChallenge, VerificationToken, UserAudit
-- **Matching-Service** : OrderBook, ExecutionReport
-- **Order-Service** : Order
-- **Wallet-Service** : Wallet, StockPosition, StockRule, Transaction, WalletAudit
+- **Matching-Service** : OrderBook, ExecutionReport, OutboxEvent
+- **Market-Data-Service** : StockRule
+- **Notification-Service** : NotificationLog
+- **Order-Service** : Order, OutboxEvent
+- **Wallet-Service** : Wallet, StockPosition, Transaction, WalletAudit
 - Enums et value objects spécifiques à chaque domaine
 
 ### Relations
