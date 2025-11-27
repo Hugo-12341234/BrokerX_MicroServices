@@ -1,0 +1,80 @@
+@startuml
+' UC-08 — Envoi de notifications en temps réel (BrokerX)
+
+title Sequence Diagram\nUC-08 — Envoi de notifications en temps réel (microservices)
+
+skinparam ParticipantPadding 8
+skinparam BoxPadding 6
+skinparam Shadowing false
+skinparam ArrowColor #2c3e50
+skinparam ActorStyle awesome
+autonumber
+
+participant "Event Bus" as EventBus
+participant "NotificationEventListener" as Listener
+participant "NotificationService" as Service
+participant "Domain (NotificationLog)" as Domain
+participant "Adapters (NotificationLog)" as Adapters
+participant "Persistence (JPA Repos)" as Persistence
+participant "SimpMessagingTemplate" as WebSocket
+participant "JavaMailSender" as EmailSender
+actor Client
+
+note over WebSocket
+WebSocket avec STOMP pour notifications temps réel
+Fallback email si WebSocket échoue
+end note
+
+== Réception événement NOTIFICATION_SEND ==
+EventBus -> Listener: handleNotificationSend(NotificationEvent)
+Listener -> Listener: convertEventToDTO(NotificationEvent)
+
+note over Listener
+Conversion: userId, message, timestamp, channel, email
+end note
+
+Listener -> Service: sendNotification(NotificationLogDTO)
+
+== Gestion timestamp automatique ==
+Service -> Service: addTimestamp(notificationLogDTO)
+
+alt timestamp non fourni
+    Service -> Service: setTimestamp(Instant.now())
+end
+
+== Tentative envoi WebSocket ==
+Service -> WebSocket: convertAndSend("/topic/notifications/" + userId, message)
+
+alt WebSocket réussi
+    WebSocket --> Client: WebSocket notification(message)
+    WebSocket --> Service: success
+    Service -> Service: websocketSent = true
+else WebSocket échoué (connexion fermée/erreur réseau)
+    WebSocket --> Service: Exception
+    Service -> Service: websocketSent = false
+    Service -> Service: log error WebSocket
+
+    == Fallback email ==
+    Service -> EmailSender: send(SimpleMailMessage)
+
+    alt email réussi
+        EmailSender --> Service: success
+        Service -> Service: log success email
+    else email échoué
+        EmailSender --> Service: Exception
+        Service -> Service: log error email
+    end
+end
+
+== Journalisation obligatoire ==
+Service -> Domain: new NotificationLog(userId, message, timestamp, channel)
+Domain --> Service: NotificationLog
+Service -> Adapters: save(NotificationLog)
+Adapters -> Persistence: save(NotificationLog)
+Persistence --> Adapters: NotificationLog(saved)
+Adapters --> Service: NotificationLog(saved)
+
+Service --> Listener: NotificationLog(saved)
+Listener -> Listener: log success
+
+@enduml
