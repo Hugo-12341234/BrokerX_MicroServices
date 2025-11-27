@@ -1081,16 +1081,16 @@ Chaque schéma ERD est adapté à la logique métier et à la séparation strict
 
 ### 11.2 Diagrammes de classes par microservice
 
-Chaque microservice possède son propre diagramme de classes, illustrant les entités métier et leurs relations :
+Chaque microservice possède son propre diagramme de classes, illustrant les entités métier et leurs relations :
 
 #### Auth-Service
 ![Diagramme de classes Auth-Service](docs/architecture/4+1/logicalView/classDiagramAuth.png)
 
 | Classe              | Rôle métier                                                                                              |
 |---------------------|---------------------------------------------------------------------------------------------------------|
-| User                | Représente un utilisateur, gère l’activation, le rejet, le crédit du solde, et les statuts de compte.    |
-| MfaChallenge        | Gère les défis MFA, leur validité, expiration, utilisation et verrouillage en cas d’échecs.              |
-| VerificationToken   | Gère les tokens de vérification pour l’activation de compte ou la récupération d’accès.                  |
+| User                | Représente un utilisateur, gère l'activation, le rejet, le crédit du solde, et les statuts de compte.    |
+| MfaChallenge        | Gère les défis MFA, leur validité, expiration, utilisation et verrouillage en cas d'échecs.              |
+| VerificationToken   | Gère les tokens de vérification pour l'activation de compte ou la récupération d'accès.                  |
 | UserAudit           | Permet de tracer toutes les actions importantes réalisées par un utilisateur.                            |
 
 #### Wallet-Service
@@ -1098,28 +1098,43 @@ Chaque microservice possède son propre diagramme de classes, illustrant les ent
 
 | Classe         | Rôle métier                                                                                                   |
 |---------------|---------------------------------------------------------------------------------------------------------------|
-| Wallet        | Portefeuille virtuel, gère le solde, les positions, les transactions et l’audit.                              |
+| Wallet        | Portefeuille virtuel, gère le solde, les positions, les transactions et l'audit.                              |
 | StockPosition | Position sur un actif financier détenue dans le portefeuille.                                                 |
-| StockRule     | Règle métier associée à une position (ex : limites, alertes, restrictions).                                   |
-| Transaction   | Mouvement de fonds : dépôt, retrait, achat, vente, avec gestion d’idempotence et de statut.                   |
-| WalletAudit   | Journalisation des actions sur le portefeuille : dépôt, retrait, modification, etc.                           |
+| Transaction   | Mouvement de fonds : dépôt, retrait, achat, vente, avec gestion d'idempotence et de statut.                   |
+| WalletAudit   | Journalisation des actions sur le portefeuille : dépôt, retrait, modification, etc.                           |
 
 #### Order-Service
 ![Diagramme de classes Order-Service](docs/architecture/4+1/logicalView/classDiagramOrder.png)
 
-| Classe   | Rôle métier                                                                                                         |
-|---------|---------------------------------------------------------------------------------------------------------------------|
-| Order   | Représente un ordre de trading, avec gestion du type, quantité, prix, durée, statut et raison de rejet.             |
+| Classe      | Rôle métier                                                                                                         |
+|------------|---------------------------------------------------------------------------------------------------------------------|
+| Order      | Représente un ordre de trading, avec gestion du type, quantité, prix, durée, statut et raison de rejet.             |
+| OutboxEvent | Événement à publier vers RabbitMQ, implémente le pattern Outbox pour garantir la cohérence événementielle.         |
 
 #### Matching-Service
 ![Diagramme de classes Matching-Service](docs/architecture/4+1/logicalView/classDiagramMatching.png)
 
 | Classe           | Rôle métier                                                                                                 |
 |------------------|-------------------------------------------------------------------------------------------------------------|
-| OrderBook        | Carnet d’ordres, gère la priorité prix/temps et la gestion des ordres.                                      |
-| ExecutionReport  | Rapport d’exécution : type, quantité, prix, timestamp, lié à un carnet d’ordres et à un ordre.              |
+| OrderBook        | Carnet d'ordres, gère la priorité prix/temps et la gestion des ordres.                                      |
+| ExecutionReport  | Rapport d'exécution : type, quantité, prix, timestamp, lié à un carnet d'ordres et à un ordre.              |
+| OutboxEvent      | Événement à publier vers RabbitMQ, implémente le pattern Outbox pour garantir la cohérence événementielle.  |
 
-Chaque diagramme de classes permet de visualiser la structure métier propre à chaque microservice, facilitant la compréhension, la maintenance et l’évolution du code.
+#### Market-Data-Service
+![Diagramme de classes Market-Data-Service](docs/architecture/4+1/logicalView/classDiagramMarketData.png)
+
+| Classe     | Rôle métier                                                                                                    |
+|-----------|----------------------------------------------------------------------------------------------------------------|
+| StockRule | Règles de cotation des actions : symbole, tick size, bandes min/max, prix actuel, timestamp de mise à jour.   |
+
+#### Notification-Service
+![Diagramme de classes Notification-Service](docs/architecture/4+1/logicalView/classDiagramNotification.png)
+
+| Classe           | Rôle métier                                                                                                |
+|-----------------|------------------------------------------------------------------------------------------------------------|
+| NotificationLog | Journal des notifications : utilisateur, message, timestamp, canal d'envoi (email, push, WebSocket).       |
+
+Chaque diagramme de classes permet de visualiser la structure métier propre à chaque microservice, facilitant la compréhension, la maintenance et l'évolution du code.
 
 #### Modèle de domaine
 
