@@ -1043,7 +1043,6 @@ Chaque microservice possède sa propre base de données, avec un schéma ERD dé
 |-----------------|-------------------------------------------------------------------------------------------------------------|
 | Wallet          | Portefeuille virtuel associé à un utilisateur, solde, statut.                                               |
 | StockPosition   | Position sur un actif financier détenue dans le portefeuille.                                               |
-| StockRule       | Règle métier associée à une position (ex : limites, alertes, restrictions).                                 |
 | Transaction     | Mouvement de fonds : dépôt, retrait, achat, vente, avec idempotence et statut.                              |
 | WalletAudit     | Journalisation des actions sur le portefeuille : dépôt, retrait, modification, etc.                         |
 
@@ -1053,6 +1052,7 @@ Chaque microservice possède sa propre base de données, avec un schéma ERD dé
 | Table   | Description                                                                                                         |
 |---------|---------------------------------------------------------------------------------------------------------------------|
 | Order   | Ordre de trading : symbole, côté (achat/vente), type, quantité, prix, durée, statut, raison de rejet, timestamp.    |
+| OutboxEvent | Événements à publier : type d'événement, payload JSON, statut de traitement, timestamp pour pattern Outbox.        |
 
 #### Matching-Service
 ![ERD Matching-Service](docs/persistance/schemas/schema_er_matching-service.png)
@@ -1061,6 +1061,21 @@ Chaque microservice possède sa propre base de données, avec un schéma ERD dé
 |------------------|-------------------------------------------------------------------------------------------------------------|
 | OrderBook        | Carnet d’ordres pour un symbole, date de création.                                                          |
 | ExecutionReport  | Rapport d’exécution : type, quantité, prix, timestamp, lié à un carnet d’ordres et à un ordre.              |
+| OutboxEvent      | Événements à publier : type d'événement, payload JSON, statut de traitement, timestamp pour pattern Outbox. |
+
+#### Market-Data-Service
+![ERD Market-Data-Service](docs/persistance/schemas/schema_er_marketdata-service.png)
+
+| Table      | Description                                                                                                    |
+|------------|----------------------------------------------------------------------------------------------------------------|
+| StockRule  | Règle métier associée à une position (ex : limites, alertes, restrictions).                                 |
+
+#### Notification-Service
+![ERD Notification-Service](docs/persistance/schemas/schema_er_notification-service.png)
+
+| Table           | Description                                                                                                |
+|-----------------|------------------------------------------------------------------------------------------------------------|
+| NotificationLog | Journal des notifications : utilisateur, message, timestamp, canal d'envoi (email, push, WebSocket).       |
 
 Chaque schéma ERD est adapté à la logique métier et à la séparation stricte des responsabilités de chaque microservice.
 

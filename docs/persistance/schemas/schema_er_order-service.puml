@@ -3,14 +3,30 @@
 entity "Order" as ord {
   id : BIGSERIAL [PK] NOT NULL
   client_order_id : VARCHAR(64)
+  user_id : BIGINT NOT NULL
   symbol : VARCHAR(16) NOT NULL
   side : VARCHAR(16) NOT NULL
   type : VARCHAR(16) NOT NULL
-  quantity : INT NOT NULL
+  quantity : INTEGER NOT NULL
   price : DOUBLE PRECISION
   duration : VARCHAR(16) NOT NULL
-  timestamp : TIMESTAMP(3) NOT NULL
+  timestamp : TIMESTAMP NOT NULL
   status : VARCHAR(16) NOT NULL
   reject_reason : VARCHAR(255)
+  version : BIGINT NOT NULL
+}
+
+entity "OutboxEvent" as oe {
+  id : BIGSERIAL [PK] NOT NULL
+  event_id : UUID NOT NULL
+  event_type : VARCHAR(64) NOT NULL
+  aggregate_id : VARCHAR(64) NOT NULL
+  payload : TEXT NOT NULL
+  created_at : TIMESTAMP NOT NULL
+  processed_at : TIMESTAMP
+  retry_count : INTEGER NOT NULL DEFAULT 0
+  max_retries : INTEGER NOT NULL DEFAULT 3
+  next_retry_at : TIMESTAMP
+  error_message : TEXT
 }
 @enduml

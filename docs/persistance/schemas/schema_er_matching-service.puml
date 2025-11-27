@@ -2,29 +2,47 @@
 ' ERD Matching-Service
 entity "OrderBook" as ob {
   id : BIGSERIAL [PK] NOT NULL
-  clientOrderId : VARCHAR(64)
-    side : VARCHAR(16) NOT NULL
+  client_order_id : VARCHAR(64)
+  user_id : BIGINT NOT NULL
   symbol : VARCHAR(16) NOT NULL
-    type : VARCHAR(16) NOT NULL
-    quantity : INT NOT NULL
-    price : DOUBLE PRECISION
-    duration : VARCHAR(16) NOT NULL
-    status : VARCHAR(16) NOT NULL
-    reject_reason : VARCHAR(255)
-    remaining_quantity : INT NOT NULL
-  created_at : TIMESTAMP NOT NULL
+  side : VARCHAR(16) NOT NULL
+  type : VARCHAR(16) NOT NULL
+  quantity : INTEGER NOT NULL
+  price : DOUBLE PRECISION
+  duration : VARCHAR(16) NOT NULL
+  timestamp : TIMESTAMP NOT NULL
+  status : VARCHAR(16) NOT NULL
+  reject_reason : VARCHAR(255)
+  quantity_remaining : INTEGER NOT NULL
+  order_id : BIGINT NOT NULL
+  version : BIGINT NOT NULL
 }
+
 entity "ExecutionReport" as er {
   id : BIGSERIAL [PK] NOT NULL
-  order_book_id : BIGINT [FK] NOT NULL
   order_id : BIGINT NOT NULL
-  exec_type : VARCHAR(32) NOT NULL
-  quantity : INT NOT NULL
-  price : DOUBLE PRECISION NOT NULL
-  timestamp : TIMESTAMP NOT NULL
-  buyerUserId : BIGINT NOT NULL
-  sellerUserId : BIGINT NOT NULL
+  fill_quantity : INTEGER NOT NULL
+  fill_price : DOUBLE PRECISION NOT NULL
+  fill_type : VARCHAR(32) NOT NULL
+  execution_time : TIMESTAMP NOT NULL
+  buyer_user_id : BIGINT NOT NULL
+  seller_user_id : BIGINT NOT NULL
   symbol : VARCHAR(16) NOT NULL
 }
+
+entity "OutboxEvent" as oe {
+  id : BIGSERIAL [PK] NOT NULL
+  event_id : UUID NOT NULL
+  event_type : VARCHAR(64) NOT NULL
+  aggregate_id : VARCHAR(64) NOT NULL
+  payload : TEXT NOT NULL
+  created_at : TIMESTAMP NOT NULL
+  processed_at : TIMESTAMP
+  retry_count : INTEGER NOT NULL DEFAULT 0
+  max_retries : INTEGER NOT NULL DEFAULT 3
+  next_retry_at : TIMESTAMP
+  error_message : TEXT
+}
+
 ob ||--o{ er : "génère"
 @enduml

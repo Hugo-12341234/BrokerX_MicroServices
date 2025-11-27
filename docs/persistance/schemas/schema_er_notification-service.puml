@@ -1,0 +1,10 @@
+@startuml
+' ERD Notification-Service
+entity "NotificationLog" as nl {
+  id : BIGSERIAL [PK] NOT NULL
+  user_id : BIGINT NOT NULL
+  message : TEXT NOT NULL
+  timestamp : TIMESTAMP NOT NULL
+  channel : VARCHAR(50) NOT NULL
+}
+@enduml

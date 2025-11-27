@@ -1,0 +1,12 @@
+@startuml
+' ERD Market-Data-Service
+entity "StockRule" as sr {
+  id : BIGSERIAL [PK] NOT NULL
+  symbol : VARCHAR(16) NOT NULL
+  tick_size : DECIMAL(15,8) NOT NULL
+  min_band : DECIMAL(15,8) NOT NULL
+  max_band : DECIMAL(15,8) NOT NULL
+  price : DECIMAL(15,4) NOT NULL
+  updated_at : TIMESTAMP NOT NULL
+}
+@enduml
