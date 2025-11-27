@@ -25,16 +25,25 @@ package "Services du domaine" #FFF3E0 {
 
 package "Adapteurs" #E6F7FF {
   [OrderAdapter] as OrderAdapter
+
+  package "Event Layer" #FFE0B2 {
+      [MatchingEventListener] as OrderListener
+      [EventPublisher] as EventPublisher
+  }
+
+  [ExternalAdapter] as ExternalAdapter
 }
 
 package "Ports" #FFF9C4 {
   interface "OrderPort" as IOrderPort
   interface "OrderPlacementPort" as IOrderPlacementPort
   interface "PreTradeValidationPort" as IPreTradeValidationPort
+  interface "FeignClientPort" as IFeignClientPort
 }
 
 package "Infrastructure" #E2FFCC {
   database "PostgreSQL Order" as DBOrder
+  component "RabbitMQ" as RabbitMQ
 }
 
 ' --- Flèches principales ---
@@ -46,4 +55,10 @@ OrderSvc ..> IOrderPort
 PreTradeValidationSvc --> IPreTradeValidationPort
 OrderAdapter --> IOrderPort
 "Adapteurs" ..> DBOrder : JDBC
+OrderListener ..> IOrderPort
+OrderSvc ..> EventPublisher
+OrderListener <.. RabbitMQ
+EventPublisher ..> RabbitMQ
+ExternalAdapter --> IFeignClientPort
+OrderSvc ..> IFeignClientPort
 @enduml

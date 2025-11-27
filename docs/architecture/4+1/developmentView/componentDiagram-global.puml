@@ -10,7 +10,7 @@ skinparam nodesep 120
 skinparam ranksep 180
 left to right direction
 
-title "BrokerX - Global Component Diagram"
+title "BrokerX - Global Component Diagram (Phase 3 - Architecture Événementielle)"
 
 actor "Utilisateur" as Utilisateur
 
@@ -24,11 +24,17 @@ component "Swagger UI" as Swagger #F8BBD0
 component "Prometheus" as Prometheus #C8E6C9
 component "Grafana" as Grafana #FFF9C4
 
-package "Microservices" #F5F5F5 {
+package "Microservices" as MS #F5F5F5 {
   component "Auth Service" as AuthSvc
   component "Order Service" as OrderSvc
   component "Wallet Service" as WalletSvc
   component "Matching Service" as MatchingSvc
+  component "Market Data Service" as MarketDataSvc
+  component "Notification Service" as NotificationSvc
+}
+
+package "Message Broker" #FFE0B2 {
+  component "RabbitMQ" as RabbitMQ
 }
 
 package "Databases" #E2FFCC {
@@ -36,7 +42,11 @@ package "Databases" #E2FFCC {
   database "PostgreSQL Order" as DBOrder
   database "PostgreSQL Wallet" as DBWallet
   database "PostgreSQL Matching" as DBMatching
+  database "PostgreSQL Market Data" as DBMarketData
+  database "PostgreSQL Notification" as DBNotification
 }
+
+cloud "SMTP Provider" as SMTP #FFCCCB
 
 ' --- Flèches principales ---
 Utilisateur --> ReactUI : HTTP
@@ -46,16 +56,33 @@ Nginx --> AuthSvc : REST
 Nginx --> OrderSvc : REST
 Nginx --> WalletSvc : REST
 Nginx --> MatchingSvc : REST
+Nginx --> MarketDataSvc : REST
+Nginx --> NotificationSvc : REST
 Gateway --> Swagger : REST Docs
+
+' --- WebSocket Connections ---
+ReactUI --> MarketDataSvc : WebSocket
+ReactUI --> NotificationSvc : WebSocket
+
+' --- Database Connections ---
 AuthSvc --> DBAuth : JDBC
 OrderSvc --> DBOrder : JDBC
 WalletSvc --> DBWallet : JDBC
 MatchingSvc --> DBMatching : JDBC
-Prometheus --> AuthSvc : Metrics
-Prometheus --> OrderSvc : Metrics
-Prometheus --> WalletSvc : Metrics
-Prometheus --> MatchingSvc : Metrics
+MarketDataSvc --> DBMarketData : JDBC
+NotificationSvc --> DBNotification : JDBC
+
+' --- Event-Driven Architecture (RabbitMQ) ---
+OrderSvc --> RabbitMQ : AMQP\n(Publish and Consume Events)
+MatchingSvc --> RabbitMQ : AMQP\n(Publish and Consume Events)
+NotificationSvc --> RabbitMQ : AMQP\n(Consume Events)
+
+' --- External Services ---
+AuthSvc ..> SMTP : Email\n(Verification, MFA)
+NotificationSvc ..> SMTP : Email\n(Notifications)
+
+' --- Monitoring ---
+Prometheus --> MS : Metrics
 Grafana --> Prometheus : Monitoring
 
 @enduml
-

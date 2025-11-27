@@ -8,30 +8,59 @@ skinparam FontColor #404040
 left to right direction
 skinparam nodesep 80
 skinparam ranksep 120
-title "Global Package Diagram"
+
+title "Global Package Diagram (Phase 3 - Architecture Événementielle)"
+
 package "LOG430_BrokerX_MicroServices" as rootPkg #F5F5F5 {
   package "api-gateway" as apiPkg #E8F0FF {}
-  package "auth-service" as authPkg #FFD6A1 {}
-  package "matching-service" as matchPkg #B6EEB6 {}
-  package "order-service" as orderPkg #EBD4B1 {}
-  package "wallet-service" as walletPkg #D9EBFF {}
+
+  package "business-services" as businessPkg #F0F8FF {
+    package "auth-service" as authPkg #FFD6A1 {}
+    package "matching-service" as matchPkg #B6EEB6 {}
+    package "order-service" as orderPkg #EBD4B1 {}
+    package "wallet-service" as walletPkg #D9EBFF {}
+    package "market-data-service" as marketDataPkg #FFE6CC {}
+    package "notification-service" as notificationPkg #E6F3FF {}
+  }
+
+  package "rabbitmq" as rabbitmqPkg #FFEBEE {}
+
   package "frontend" as frontPkg #B9E0F3 {}
+
   package "monitoring" as monPkg #F3E8FF {
     package "grafana" as grafanaPkg #F3E8FF {}
     package "prometheus" as prometheusPkg #F3E8FF {}
   }
-  package "nginx" as nginxPkg #FFF0D9 {}
-}
-apiPkg ..> authPkg : <<REST>>
-apiPkg ..> matchPkg : <<REST>>
-apiPkg ..> orderPkg : <<REST>>
-apiPkg ..> walletPkg : <<REST>>
-frontPkg ..> apiPkg : <<HTTP>>
-monPkg ..> apiPkg : <<monitoring>>
-monPkg ..> authPkg : <<monitoring>>
-monPkg ..> matchPkg : <<monitoring>>
-monPkg ..> orderPkg : <<monitoring>>
-monPkg ..> walletPkg : <<monitoring>>
-nginxPkg <.. apiPkg : <<use>
-@enduml
 
+  package "nginx" as nginxPkg #FFF0D9 {}
+
+}
+
+note top of businessPkg
+Le package "business-services" n'existe pas réellement.
+Il est simplement utilisé ici pour simplifier le diagramme.
+end note
+
+' --- Frontend to API Gateway ---
+frontPkg ..> apiPkg : <<HTTP>>
+
+' --- API Gateway to NGINX ---
+apiPkg ..> nginxPkg : <<HTTP>>
+
+' --- NGINX to Business Services (Load Balancing) ---
+nginxPkg ..> businessPkg : <<REST>>
+
+' --- WebSocket direct connections ---
+frontPkg ..> marketDataPkg : <<WebSocket>>
+frontPkg ..> notificationPkg : <<WebSocket>>
+
+' --- Event-driven architecture (RabbitMQ) ---
+orderPkg <..> rabbitmqPkg : <<AMQP>>
+matchPkg <..> rabbitmqPkg : <<AMQP>>
+notificationPkg <.. rabbitmqPkg : <<AMQP>>
+
+' --- Monitoring ---
+monPkg ..> apiPkg : <<monitoring>>
+monPkg ..> businessPkg : <<monitoring>>
+
+@enduml

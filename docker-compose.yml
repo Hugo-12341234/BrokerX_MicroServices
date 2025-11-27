@@ -16,7 +16,7 @@ services:
       - "15672:15672"  # Port Management UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
-      - ./rabbitmq-definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ./rabbitmq/rabbitmq-definitions.json:/etc/rabbitmq/definitions.json:ro
     networks:
       - brokerx-network
     healthcheck:

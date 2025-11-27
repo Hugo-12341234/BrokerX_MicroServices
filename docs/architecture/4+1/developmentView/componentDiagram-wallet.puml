@@ -19,24 +19,20 @@ package "Controllers" #FFECB3 {
 }
 
 package "Services du domaine" #FFF3E0 {
-    [StockService] as StockSvc
   [WalletDepositService] as WalletDepositSvc
 }
 
 package "Adapteurs" #E6F7FF {
   [TransactionPersistenceAdapter] as TransactionAdapter
   [SimulatedPaymentServiceAdapter] as PaymentAdapter
-  [StockRuleAdapter] as StockRuleAdapter
   [WalletAdapter] as WalletAdapter
   [WalletAuditAdapter] as AuditAdapter
 }
 
 package "Ports" #FFF9C4 {
   interface "TransactionPort" as ITransPort
-  interface "StockRulePort" as IStockRulePort
-  interface "StockPort" as IStockPort
   interface "WalletDepositPort" as IWalletDepositPort
-  interface "AuditPort" as IAuditPort
+  interface "WalletAuditPort" as IAuditPort
   interface "PaymentServicePort" as IPaymentPort
     interface "WalletPort" as IWalletPort
 }
@@ -49,17 +45,13 @@ package "Infrastructure" #E2FFCC {
 Utilisateur ..> WalletCtrl : HTTP
 WalletCtrl ..> WalletDepositSvc
 WalletDepositSvc --> IWalletDepositPort
-WalletDepositSvc ..> IStockPort
-WalletDepositSvc ..> IStockRulePort
 WalletDepositSvc ..> ITransPort
 WalletDepositSvc ..> IPaymentPort
 WalletDepositSvc ..> IAuditPort
 WalletDepositSvc ..> IWalletPort
 TransactionAdapter --> ITransPort
 AuditAdapter --> IAuditPort
-StockRuleAdapter --> IStockRulePort
 PaymentAdapter --> IPaymentPort
 WalletAdapter --> IWalletPort
-StockSvc --> IStockPort
 "Adapteurs" ..> DBWallet : JDBC
 @enduml

@@ -25,6 +25,11 @@ package "Services du domaine" #FFF3E0 {
 package "Adapteurs" #E6F7FF {
   [OrderBookAdapter] as OrderBookAdapter
   [ExecutionReportAdapter] as ExecutionReportAdapter
+
+  package "Event Layer" #FFE0B2 {
+    [OrderPlacedEventListener] as OrderListener
+    [EventPublisher] as EventPublisher
+  }
 }
 
 package "Ports" #FFF9C4 {
@@ -35,6 +40,7 @@ package "Ports" #FFF9C4 {
 
 package "Infrastructure" #E2FFCC {
   database "PostgreSQL Matching" as DBMatching
+  component "RabbitMQ" as RabbitMQ
 }
 
 ' --- Flèches principales ---
@@ -46,4 +52,8 @@ MatchingSvc --> IMatchingPort
 OrderBookAdapter --> IOrderBookPort
 ExecutionReportAdapter --> IExecReportPort
 "Adapteurs" ..> DBMatching : JDBC
+OrderListener ..> IMatchingPort
+MatchingSvc ..> EventPublisher
+OrderListener <.. RabbitMQ
+EventPublisher ..> RabbitMQ
 @enduml
