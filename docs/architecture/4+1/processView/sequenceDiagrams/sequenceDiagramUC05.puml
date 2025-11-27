@@ -19,9 +19,11 @@ participant "Domain(Order)" as Domain
 participant "Adapters (Order, Stock)" as Adapters
 participant "Persistence (JPA Repos)" as Persistence
 participant "API Wallet" as WalletAPI
+participant "API MarketData" as MDAPI
 participant "OutboxService" as Outbox
 participant "Event Publisher" as EventBus
 participant "MatchingEventListener" as Listener
+participant "OutboxScheduler" as Scheduler
 
 note over Persistence
 Contrôles pré-trade : statut du compte, pouvoir d'achat, bandes, ticks, short-sell, etc.
@@ -53,33 +55,30 @@ opt erreur de l'appel API ou wallet inexistant
 end
 
 OrderService -> PreTradeValidationService: validateOrder(user, symbol, side, type, timeInForce, quantity, limitPrice)
+OrderService -> Domain: créer l'ordre()
+Domain --> OrderService: Order
 
 alt erreur de validation ou pré-trade (quantité, prix, pouvoir d'achat, bande de prix, tick size, short-sell, etc.)
-  PreTradeValidationService --> OrderService: ValidationError(raison)
-    OrderService -> Domain: créer l'ordre(REJECTED)
-      Domain --> OrderService: Order
-      OrderService -> Adapters: save(Order)
+    OrderService -> Domain: setStatus(REJECTED)
+    OrderService -> Adapters: save(Order)
     Adapters -> Persistence: save(Order)
     Persistence --> Adapters: Order(REJECTED)
     Adapters --> OrderService: Order(REJECTED)
 
     OrderService -> Outbox: saveEvent("NOTIFICATION_SEND", NotificationEvent)
-    Outbox --> OrderService: ack
 
   OrderService --> OrderController: Order(REJECTED)
   OrderController --> APIGateway: 400 OrderResponse(REJETÉ, raison)
   APIGateway --> Client: 400 OrderResponse(REJETÉ, raison)
 else ordre accepté
-    PreTradeValidationService --> OrderService: ValidationSuccess
-  OrderService -> Domain: créer l'ordre(WORKING)
-    Domain --> OrderService: Order
-    OrderService -> Adapters: save(Order)
+  OrderService -> Domain: setStatus(WORKING)
+  Domain --> OrderService: Order
+  OrderService -> Adapters: save(Order)
   Adapters -> Persistence: save(Order)
   Persistence --> Adapters: Order(WORKING)
   Adapters --> OrderService: Order(WORKING)
 
   OrderService -> Outbox: saveEvent("ORDER_PLACED", OrderPlacedEvent)
-  Outbox --> OrderService: ack
 
   OrderService --> OrderController: Order(WORKING)
   OrderController --> APIGateway: 200 OK OrderResponse(orderId, "WORKING")
@@ -87,12 +86,12 @@ else ordre accepté
 end
 
 == Publication asynchrone des événements ==
-EventBus -> Outbox: processOutboxEvents()
-Outbox -> EventBus: publishEvent(OrderPlacedEvent)
+Scheduler -> EventBus: processOutboxEvents()
+EventBus -> EventBus: publishEvent()
 EventBus --> EventBus: RabbitMQ publish
 
 == Réception événement de matching ==
-EventBus -> Listener: onOrderMatchedEvent(OrderMatchedEvent)
+Listener --> Listener: handleOrderMatched(OrderMatchedEvent)
 Listener -> OrderService: processOrderMatched(OrderMatchedEvent)
 
 OrderService -> Adapters: findById(orderId)
@@ -101,33 +100,28 @@ Persistence --> Adapters: Order
 Adapters --> OrderService: Order
 
 alt ordre trouvé et matching réussi
-    OrderService -> Domain: updateOrderStatus(FILLED/PARTIALLYFILLED)
+    OrderService -> Domain: setStatus(FILLED/PARTIALLYFILLED)
     OrderService -> Adapters: save(Order)
     Adapters -> Persistence: save(Order)
 
-    OrderService -> WalletAPI: POST /api/v1/wallet/updateWallet\n(userId, symbol, quantity, cashAmount)
+    OrderService -> WalletAPI: PUT /api/v1/wallet/updateWallet\n(userId, symbol, quantity, cashAmount)
     WalletAPI --> OrderService: OK
 
-    OrderService -> Outbox: saveEvent("NOTIFICATION_SEND", NotificationEvent)
-    Outbox --> OrderService: ack
+    OrderService -> MDAPI: streamMarketData()
+    MDAPI --> OrderService: OK
 else ordre non trouvé ou erreur matching
-    OrderService -> Domain: updateOrderStatus(REJECTED)
+    OrderService -> Domain: setStatus(REJECTED)
     OrderService -> Adapters: save(Order)
     Adapters -> Persistence: save(Order)
-
-    OrderService -> Outbox: saveEvent("NOTIFICATION_SEND", NotificationEvent)
-    Outbox --> OrderService: ack
 end
 
 == Réception événement de rejet ==
-EventBus -> Listener: onOrderRejectedEvent(OrderRejectedEvent)
+Listener --> Listener: handleOrderRejected(OrderRejectedEvent)
 Listener -> OrderService: processOrderRejected(OrderRejectedEvent)
 
 OrderService -> Adapters: findById(orderId)
-OrderService -> Domain: updateOrderStatus(REJECTED)
+OrderService -> Domain: setStatus(REJECTED)
 OrderService -> Adapters: save(Order)
-
-OrderService -> Outbox: saveEvent("NOTIFICATION_SEND", NotificationEvent)
-Outbox --> OrderService: ack
+Adapters -> Persistence: save(Order)
 
 @enduml

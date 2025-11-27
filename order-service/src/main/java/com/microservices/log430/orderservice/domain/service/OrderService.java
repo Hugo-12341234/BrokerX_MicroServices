@@ -173,47 +173,6 @@ public class OrderService implements OrderPlacementPort {
                 return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé, mais événement non publié : " + e.getMessage());
             }
 
-            /*
-            ==================================================================================
-            ANCIEN CODE SYNCHRONE - CONSERVÉ POUR RÉFÉRENCE (à utiliser dans les listeners)
-            ==================================================================================
-            // Appel au matching-service
-            OrderDTO orderDTO = new OrderDTO(
-                savedOrder.getId(),
-                savedOrder.getClientOrderId(),
-                savedOrder.getUserId(),
-                savedOrder.getSymbol(),
-                savedOrder.getSide().name(),
-                savedOrder.getType().name(),
-                savedOrder.getQuantity(),
-                savedOrder.getPrice(),
-                savedOrder.getDuration().name(),
-                savedOrder.getTimestamp(),
-                savedOrder.getStatus().name(),
-                savedOrder.getRejectReason(),
-                savedOrder.getVersion()
-            );
-            logger.info("orderDTO version : {}", orderDTO.version);
-            MatchingResult matchingResult = null;
-            try {
-                matchingResult = matchingClient.matchOrder(orderDTO);
-            } catch (Exception e) {
-                logger.error("Erreur lors de l'appel au matching-service : {}", e.getMessage(), e);
-                return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé, mais matching non effectué : " + e.getMessage());
-            }
-            // Notification market-data avec le dernier prix et l'ordre book mis à jour
-            notifyMarketData(
-                orderRequest.getSymbol(),
-                matchingResult != null && matchingResult.executions != null && !matchingResult.executions.isEmpty()
-                    ? matchingResult.executions.get(matchingResult.executions.size() - 1).getFillPrice()
-                    : null,
-                matchingResult != null ? matchingResult.updatedOrder : null
-            );
-            ==================================================================================
-            FIN ANCIEN CODE SYNCHRONE
-            ==================================================================================
-            */
-
             // L'ordre est maintenant accepté et l'événement est dans l'outbox
             // Le matching sera traité de façon asynchrone par le matching-service
             return OrderPlacementResult.success(savedOrder.getId(), "Ordre placé avec succès. Le matching sera traité sous peu.");

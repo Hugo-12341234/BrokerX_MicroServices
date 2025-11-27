@@ -1,46 +1,113 @@
 @startuml
-actor "OrderService" as OrderService
-participant APIGateway
-participant "OrderBookController" as Controller
-participant "MatchingService" as Service
-participant "Domain(OrderBook, MatchingResult)" as Domain
-participant "Adapters (OrderBook, Matching)" as Adapters
-participant "Persistence (JPA Repos)" as Persistence
+' UC-07 — Matching d'un ordre (BrokerX)
 
-OrderService -> APIGateway: POST localhost:8079/api/v1/orderbook\nOrderDTO(orderDto)
-APIGateway -> Controller: POST /api/v1/orderbook\nOrderDTO(orderDto)
-Controller -> Service: matchOrder(orderBook)
-Service -> Domain: Nettoyer ordres expirés
+title Sequence Diagram\nUC-07 — Matching d'un ordre (microservices)
+
+skinparam ParticipantPadding 8
+skinparam BoxPadding 6
+skinparam Shadowing false
+skinparam ArrowColor #2c3e50
+skinparam ActorStyle awesome
+autonumber
+
+participant "Event Bus" as EventBus
+participant "OrderPlacedEventListener" as Listener
+participant "MatchingService" as Service
+participant "Domain(OrderBook, ExecutionReport)" as Domain
+participant "Adapters (OrderBook, Execution)" as Adapters
+participant "Persistence (JPA Repos)" as Persistence
+participant "OutboxService" as Outbox
+
+note over Persistence
+Matching engine : nettoyage expirés, priorité prix/temps, gestion FOK/IOC/DAY
+end note
+
+== Réception événement ORDER_PLACED ==
+EventBus -> Listener: handleOrderPlaced(OrderPlacedEvent)
+Listener -> Service: processOrderPlacedEvent(OrderPlacedEvent)
+
+Service -> Service: convertOrderPlacedEventToOrderBook(event)
+Service -> Service: matchOrder(orderBook)
+
+== Nettoyage et insertion ==
+Service -> Service: cleanupExpiredDayOrders(symbol)
 Service -> Adapters: save(orderBook)
 Adapters -> Persistence: save(orderBook)
-Persistence --> Adapters: OrderBook
-Adapters --> Service: OrderBook
-Service -> Adapters: findAllBySymbolAndOppositeSide(symbol, side)
-Adapters -> Persistence: findAllBySymbolAndOppositeSide(symbol, side)
-Persistence --> Adapters: List<Order>
-Adapters --> Service: List<Order>
-Service -> Service: findMatch(orderBook, candidateOrders)
+Persistence --> Adapters: OrderBook(WORKING)
+Adapters --> Service: OrderBook(WORKING)
 
-alt Matching possible
-    Service -> Domain: new ExecutionReport(...)
-    Service -> Adapters: save(executionReport)
-    Adapters -> Persistence: save(executionReport)
-    Persistence --> Adapters: ExecutionReport
-    Adapters --> Service: ExecutionReport
-    Service -> Adapters: updateOrderBook(orderBook)
-    Adapters -> Persistence: save(orderBook)
-    Persistence --> Adapters: OrderBook
-    Adapters --> Service: OrderBook
-    Controller <- Service: MatchingResult (succès)
-    APIGateway <- Controller: 200 OK\nRésultat d'appariement
-    OrderService <- APIGateway: 200 OK\nRésultat d'appariement
-else Matching impossible ou protection
-    Service -> Adapters: updateOrderBook(orderBook) (échec)
-    Adapters -> Persistence: save(orderBook)
-    Persistence --> Adapters: OrderBook
-    Adapters --> Service: OrderBook
-    Controller <- Service: MatchingResult (échec)
-    APIGateway <- Controller: 4XX or 5XX\nRésultat d'échec
-    OrderService <- APIGateway: 4XX or 5XX\nRésultat d'échec
+== Recherche candidats de matching ==
+Service -> Adapters: findAllBySymbol(symbol)
+Adapters -> Persistence: findAllBySymbol(symbol)
+Persistence --> Adapters: List<OrderBook>
+Adapters --> Service: List<OrderBook>
+
+Service -> Service: filterOppositeOrders(orders, side)
+Service -> Service: sortByPriceTimePriority(oppositeOrders)
+
+== Matching loop pour chaque candidat ==
+loop pour chaque candidat compatible
+    Service -> Service: checkPriceMatch(orderBook, candidate)
+
+    alt prix compatible et quantités disponibles
+        Service -> Domain: new ExecutionReport(fillQty, fillPrice, ...)
+        Domain --> Service: ExecutionReport
+
+        Service -> Adapters: save(ExecutionReport)
+        Adapters -> Persistence: save(ExecutionReport)
+        Persistence --> Adapters: ExecutionReport
+        Adapters --> Service: ExecutionReport
+
+        Service -> Domain: updateOrderStatus(orderBook, candidate)
+        Service -> Adapters: save(orderBook)
+        Service -> Adapters: save(candidate)
+        Adapters -> Persistence: save(orderBook)
+        Adapters -> Persistence: save(candidate)
+    end
 end
+
+== Gestion durée d'ordre (FOK/IOC/DAY) ==
+alt FOK non complètement rempli
+    Service -> Domain: setStatus(CANCELLED)
+    Service -> Adapters: save(orderBook)
+    Service -> Adapters: deleteById(orderBook.id)
+else IOC (exécution partielle)
+    Service -> Domain: setStatus(CANCELLED/PARTIALLYFILLED)
+    Service -> Adapters: save(orderBook)
+    Service -> Adapters: deleteById(orderBook.id)
+else DAY (reste dans le carnet ou expiré)
+    alt ordre expiré (24h)
+        Service -> Domain: setStatus(CANCELLED)
+        Service -> Adapters: save(orderBook)
+        Service -> Adapters: deleteById(orderBook.id)
+    else ordre actif
+        Service -> Domain: setStatus(WORKING/PARTIALLYFILLED)
+        Service -> Adapters: save(orderBook)
+    end
+end
+
+== Publication des événements de résultat ==
+alt matching réussi
+    Service -> Service: publishOrderMatched(MatchingResult, OrderPlacedEvent)
+    Service -> Outbox: saveEvent("ORDER_MATCHED", OrderMatchedEvent)
+    Outbox --> Service: ack
+
+    Service -> Service: publishDetailedNotifications(MatchingResult, OrderPlacedEvent)
+    Service -> Outbox: saveEvent("NOTIFICATION_SEND", NotificationEvent)
+    Outbox --> Service: ack
+
+    loop pour chaque exécution
+        Service -> Service: publishExecutionNotifications(ExecutionReport)
+        Service -> Outbox: saveEvent("NOTIFICATION_SEND", NotificationEvent)
+        Outbox --> Service: ack
+    end
+else matching échoué
+    Service -> Service: publishOrderRejected(OrderPlacedEvent, rejectReason)
+    Service -> Outbox: saveEvent("ORDER_REJECTED", OrderRejectedEvent)
+    Outbox --> Service: ack
+
+    Service -> Outbox: saveEvent("NOTIFICATION_SEND", NotificationEvent)
+    Outbox --> Service: ack
+end
+
 @enduml
