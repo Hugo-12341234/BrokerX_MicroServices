@@ -1,7 +1,7 @@
 @startuml
-' UC-05 — Placement d’un ordre (BrokerX)
+' UC-05 — Placement d'un ordre (BrokerX)
 
-title Sequence Diagram\nUC-05 — Placement d’un ordre (microservices)
+title Sequence Diagram\nUC-05 — Placement d'un ordre (microservices)
 
 skinparam ParticipantPadding 8
 skinparam BoxPadding 6
@@ -19,13 +19,15 @@ participant "Domain(Order)" as Domain
 participant "Adapters (Order, Stock)" as Adapters
 participant "Persistence (JPA Repos)" as Persistence
 participant "API Wallet" as WalletAPI
-participant "API Matching" as MatchingAPI
+participant "OutboxService" as Outbox
+participant "Event Publisher" as EventBus
+participant "MatchingEventListener" as Listener
 
 note over Persistence
-Contrôles pré-trade : statut du compte, pouvoir d’achat, bandes, ticks, short-sell, etc.
+Contrôles pré-trade : statut du compte, pouvoir d'achat, bandes, ticks, short-sell, etc.
 end note
 
-== Soumission de l’ordre ==
+== Soumission de l'ordre ==
 Client -> APIGateway: POST localhost:8079/api/v1/orders/place\nOrderRequest(symbol, side, type, timeInForce, quantity, limitPrice, clientOrderId)
 APIGateway -> OrderController: POST /api/v1/orders/place\nOrderRequest(symbol, side, type, timeInForce, quantity, limitPrice, clientOrderId)
 OrderController -> OrderService: placeOrder(symbol, side, type, timeInForce, quantity, limitPrice, userID)
@@ -52,7 +54,7 @@ end
 
 OrderService -> PreTradeValidationService: validateOrder(user, symbol, side, type, timeInForce, quantity, limitPrice)
 
-alt erreur de validation ou pré-trade (quantité, prix, pouvoir d’achat, bande de prix, tick size, short-sell, etc.)
+alt erreur de validation ou pré-trade (quantité, prix, pouvoir d'achat, bande de prix, tick size, short-sell, etc.)
   PreTradeValidationService --> OrderService: ValidationError(raison)
     OrderService -> Domain: créer l'ordre(REJECTED)
       Domain --> OrderService: Order
@@ -60,39 +62,72 @@ alt erreur de validation ou pré-trade (quantité, prix, pouvoir d’achat, band
     Adapters -> Persistence: save(Order)
     Persistence --> Adapters: Order(REJECTED)
     Adapters --> OrderService: Order(REJECTED)
+
+    OrderService -> Outbox: saveEvent("NOTIFICATION_SEND", NotificationEvent)
+    Outbox --> OrderService: ack
+
   OrderService --> OrderController: Order(REJECTED)
   OrderController --> APIGateway: 400 OrderResponse(REJETÉ, raison)
   APIGateway --> Client: 400 OrderResponse(REJETÉ, raison)
 else ordre accepté
     PreTradeValidationService --> OrderService: ValidationSuccess
-  OrderService -> Domain: créer l'ordre(ACCEPTED)
+  OrderService -> Domain: créer l'ordre(WORKING)
     Domain --> OrderService: Order
     OrderService -> Adapters: save(Order)
   Adapters -> Persistence: save(Order)
-  Persistence --> Adapters: Order(ACCEPTED)
-  Adapters --> OrderService: Order(ACCEPTED)
+  Persistence --> Adapters: Order(WORKING)
+  Adapters --> OrderService: Order(WORKING)
 
-  ' Appel API vers le matching service
-  OrderService -> MatchingAPI: POST /api/v1/matching/matchOrder\n(order: Order)
-  alt erreur matching
-    MatchingAPI --> OrderService: error
-    OrderService -> Domain: markAsRejected(order)
+  OrderService -> Outbox: saveEvent("ORDER_PLACED", OrderPlacedEvent)
+  Outbox --> OrderService: ack
+
+  OrderService --> OrderController: Order(WORKING)
+  OrderController --> APIGateway: 200 OK OrderResponse(orderId, "WORKING")
+  APIGateway --> Client: 200 OK OrderResponse(orderId, "WORKING")
+end
+
+== Publication asynchrone des événements ==
+EventBus -> Outbox: processOutboxEvents()
+Outbox -> EventBus: publishEvent(OrderPlacedEvent)
+EventBus --> EventBus: RabbitMQ publish
+
+== Réception événement de matching ==
+EventBus -> Listener: onOrderMatchedEvent(OrderMatchedEvent)
+Listener -> OrderService: processOrderMatched(OrderMatchedEvent)
+
+OrderService -> Adapters: findById(orderId)
+Adapters -> Persistence: findById(orderId)
+Persistence --> Adapters: Order
+Adapters --> OrderService: Order
+
+alt ordre trouvé et matching réussi
+    OrderService -> Domain: updateOrderStatus(FILLED/PARTIALLYFILLED)
     OrderService -> Adapters: save(Order)
     Adapters -> Persistence: save(Order)
-    Persistence --> Adapters: Order(REJECTED)
-    Adapters --> OrderService: Order(REJECTED)
-    OrderService --> OrderController: Order(REJECTED)
-    OrderController --> APIGateway: 400 OrderResponse(REJETÉ, raison)
-    APIGateway --> Client: 400 OrderResponse(REJETÉ, raison)
-  else matching réussi
-    MatchingAPI --> OrderService: success
-    ' Appel API vers le wallet service pour mise à jour portefeuille
-    OrderService -> WalletAPI: POST /api/v1/wallet/updateWallet\n(solde: BigDecimal, stockPositions: Map<String, Integer>)
+
+    OrderService -> WalletAPI: POST /api/v1/wallet/updateWallet\n(userId, symbol, quantity, cashAmount)
     WalletAPI --> OrderService: OK
-    OrderService --> OrderController: Order(ACCEPTED)
-    OrderController --> APIGateway: 200 OK OrderResponse(orderId, "ACCEPTÉ")
-    APIGateway --> Client: 200 OK OrderResponse(orderId, "ACCEPTÉ")
-  end
+
+    OrderService -> Outbox: saveEvent("NOTIFICATION_SEND", NotificationEvent)
+    Outbox --> OrderService: ack
+else ordre non trouvé ou erreur matching
+    OrderService -> Domain: updateOrderStatus(REJECTED)
+    OrderService -> Adapters: save(Order)
+    Adapters -> Persistence: save(Order)
+
+    OrderService -> Outbox: saveEvent("NOTIFICATION_SEND", NotificationEvent)
+    Outbox --> OrderService: ack
 end
+
+== Réception événement de rejet ==
+EventBus -> Listener: onOrderRejectedEvent(OrderRejectedEvent)
+Listener -> OrderService: processOrderRejected(OrderRejectedEvent)
+
+OrderService -> Adapters: findById(orderId)
+OrderService -> Domain: updateOrderStatus(REJECTED)
+OrderService -> Adapters: save(Order)
+
+OrderService -> Outbox: saveEvent("NOTIFICATION_SEND", NotificationEvent)
+Outbox --> OrderService: ack
 
 @enduml

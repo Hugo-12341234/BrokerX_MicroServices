@@ -64,6 +64,7 @@ node "Docker Host" as Docker {
 
         node "Conteneur: wallet-service\n(Spring Boot)" as WalletC {
           artifact "wallet-service.jar"
+          component "Cache In-Memory\n(@Cacheable)" as WalletCache #LightGray
         }
       }
 
@@ -171,7 +172,7 @@ api-gateway : Point d'entrée unique, gère la sécurité et le routage
 nginx-load-balancer : Répartition des requêtes vers les microservices
 auth-service : Microservice d'authentification et gestion des utilisateurs
 order-service : Microservice de gestion des ordres de trading
-wallet-service : Microservice de gestion des portefeuilles et soldes
+wallet-service : Microservice de gestion des portefeuilles et soldes (avec cache in-memory Spring Boot)
 matching-service : Microservice de matching et exécution des transactions
 market-data-service : Microservice de diffusion des données de marché en temps réel
 notification-service : Microservice de notifications et alertes utilisateur
