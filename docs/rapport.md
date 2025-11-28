@@ -1475,19 +1475,128 @@ Nous avons choisi Spring Cloud Gateway comme API Gateway pour BrokerX. Ce choix 
 - Facilité d’évolution et de maintenance des routes et des règles d’accès.
 - Complexité supplémentaire pour la gestion des filtres avancés et du monitoring.
 
+## 12.7 Justification du choix de message broker
+
+# ADR 007 : Choix du message broker
+
+**Statut** : Acceptée\
+**Date** : 2025-11-14
+
+## Contexte
+La migration vers l'architecture événementielle de BrokerX nécessite un message broker robuste pour orchestrer les communications asynchrones entre microservices. Le workflow de placement d'ordre implique plusieurs étapes : validation, matching, notification et mise à jour du portefeuille. Ces opérations doivent être fiables et coordonnées. Deux solutions principales ont été évaluées : RabbitMQ et Apache Kafka.
+
+## Décision
+Nous avons choisi RabbitMQ comme message broker pour BrokerX. Trois raisons principales motivent ce choix :
+
+1. **Simplicité du routage** : RabbitMQ excelle dans les patterns de routage complexes grâce à ses exchanges et routing keys. Pour BrokerX, nous devons router différents types d'événements (ordres, matching, notifications) vers les bons services selon des critères précis. RabbitMQ rend cette configuration simple et intuitive.
+
+2. **Garanties de livraison** : RabbitMQ offre des acknowledgments robustes et des dead letter queues pour gérer les erreurs. Dans le trading, chaque événement (ordre placé, exécuté, rejeté) doit être traité de façon fiable. Si un service tombe en panne, RabbitMQ garantit qu'aucun message n'est perdu et les retraite automatiquement.
+
+3. **Intégration Spring native** : RabbitMQ s'intègre parfaitement avec Spring AMQP, déjà utilisé dans tous nos microservices. Cela simplifie énormément le développement des EventPublishers et EventListeners, réduisant la complexité technique et les risques d'erreur.
+
+Kafka aurait été plus adapté pour du streaming de gros volumes de données, mais BrokerX privilégie la fiabilité et la simplicité de routing sur le débit pur.
+
+## Conséquences
+- Routage flexible et intuitif pour les différents types d'événements
+- Fiabilité maximale avec gestion automatique des erreurs et retraitement
+- Développement simplifié grâce à l'intégration Spring native
+- Débit moindre que Kafka (non critique pour les volumes de BrokerX)
+
+## 12.8 Justification du choix de base de données
+
+# ADR 008 : Choix de la base de données
+
+**Statut** : Acceptée\
+**Date** : 2025-09-14
+
+## Contexte
+Chaque microservice de BrokerX nécessite sa propre base de données pour garantir l'isolation des domaines métier. Le système doit gérer des données critiques (utilisateurs, ordres, transactions financières, audit) avec des exigences fortes de cohérence, intégrité et conformité réglementaire. Plusieurs options ont été évaluées : PostgreSQL, MySQL, MongoDB et des solutions NoSQL spécialisées.
+
+## Décision
+Nous avons choisi PostgreSQL comme système de gestion de base de données pour tous les microservices de BrokerX. Trois raisons principales motivent ce choix :
+
+1. **Conformité ACID et intégrité des données** : PostgreSQL offre des garanties transactionnelles strictes essentielles pour les opérations financières. Les ordres, transactions et positions doivent être cohérents et durables. Les contraintes d'intégrité référentielle et les index uniques préviennent les incohérences critiques dans un système de trading.
+
+2. **Fonctionnalités avancées pour l'audit** : PostgreSQL supporte nativement les triggers, les fonctions stockées et les types de données JSON, facilitant l'implémentation des tables d'audit append-only. Les extensions comme `pgcrypto` permettent le hachage sécurisé des mots de passe directement en base.
+
+3. **Écosystème Java mature** : L'intégration avec Spring Data JPA/Hibernate est native et robuste. Les migrations Flyway sont parfaitement supportées, et les drivers JDBC sont optimisés. Cette compatibilité réduit la complexité technique et accélère le développement.
+
+MySQL aurait pu convenir mais offre moins de fonctionnalités avancées. MongoDB aurait été inadapté pour les transactions ACID critiques du trading.
+
+## Conséquences
+- Garanties ACID strictes pour toutes les opérations financières critiques
+- Fonctionnalités d'audit et de sécurité natives (triggers, fonctions, chiffrement)
+- Intégration parfaite avec l'écosystème Spring/Java existant
+- Coût de performance légèrement supérieur aux solutions NoSQL (non critique pour nos volumes)
+
+## 12.9 Justification du choix de pattern Saga
+
+# ADR 009 : Pattern Saga chorégraphiée vs orchestrée
+
+**Statut** : Acceptée\
+**Date** : 2025-11-14
+
+## Contexte
+L'architecture événementielle de BrokerX nécessite une gestion de la cohérence des transactions distribuées. Le workflow de placement d'ordre implique plusieurs microservices : validation de l'ordre, vérification du solde, matching, mise à jour du portefeuille et envoi de notifications. Deux approches Saga sont possibles : orchestrée (avec un coordinateur central) ou chorégraphiée (avec événements décentralisés).
+
+## Décision
+Nous avons choisi le pattern Saga chorégraphiée pour BrokerX. Trois raisons principales motivent ce choix :
+
+1. **Autonomie des microservices** : Chaque service réagit aux événements RabbitMQ selon sa logique métier sans dépendre d'un orchestrateur central. Le order-service publie `order.placed`, le matching-service écoute et publie `order.matched`, etc. Cette approche respecte l'indépendance des domaines métier.
+
+2. **Résilience et absence de point de défaillance unique** : Aucun orchestrateur central ne peut faire échouer l'ensemble du workflow. Si un service est temporairement indisponible, RabbitMQ conserve les événements en queue jusqu'à son retour. Cette approche améliore la disponibilité globale du système.
+
+3. **Évolutivité simple** : Ajouter un nouveau participant (ex: service de risk-management) ne nécessite que de configurer ses listeners d'événements, sans modifier l'orchestrateur. Les workflows peuvent évoluer de façon décentralisée selon les besoins métier.
+
+L'orchestration aurait été plus adaptée pour des workflows très complexes avec de nombreuses conditions, mais BrokerX privilégie la simplicité et l'autonomie des services.
+
+## Conséquences
+- Indépendance totale des microservices dans les workflows distribués
+- Résilience accrue sans point de défaillance central
+- Évolutivité simplifiée pour ajouter de nouveaux participants
+- Complexité de debugging des workflows distribués (compensée par la traçabilité événementielle)
+
+## 12.10 Justification de l’architecture interne des microservices
+
+# ADR 010 : Architecture interne des microservices - Hexagonale vs MVC
+
+**Statut** : Acceptée\
+**Date** : 2025-11-14
+
+## Contexte
+Chaque microservice de BrokerX nécessite une architecture interne pour organiser la logique métier, les accès aux données et les interfaces externes. Deux approches principales ont été évaluées : l'architecture MVC traditionnelle (Model-View-Controller) largement utilisée avec Spring Boot, et l'architecture hexagonale (ports et adapters) qui sépare strictement la logique métier des préoccupations techniques.
+
+## Décision
+Nous avons choisi l'architecture hexagonale pour structurer l'intérieur de chaque microservice BrokerX. Trois raisons principales motivent ce choix :
+
+1. **Isolation de la logique métier** : L'architecture hexagonale place le domaine métier au centre, complètement isolé des frameworks et des technologies. Les entités (Order, Wallet, User) et les services métier ne dépendent ni de Spring, ni de JPA, ni de RabbitMQ. Cette séparation garantit que les règles de trading, de validation des ordres et de gestion des portefeuilles restent stables même lors des évolutions technologiques.
+
+2. **Testabilité maximale** : La logique métier peut être testée unitairement sans base de données, sans message broker, sans serveur web. Les ports définissent des contrats clairs (OrderRepository, NotificationPort, EventPublisher) qui peuvent être mockés facilement. Cette approche améliore drastiquement la couverture de test et la rapidité d'exécution des tests unitaires.
+
+3. **Évolutivité technique** : Changer de base de données (PostgreSQL vers MongoDB), de message broker (RabbitMQ vers Kafka) ou d'API (REST vers GraphQL) ne nécessite que de modifier les adapters externes, sans impacter la logique métier. Cette flexibilité est cruciale dans un environnement financier où les exigences techniques évoluent rapidement.
+
+L'architecture MVC aurait couplé la logique métier aux frameworks Spring, rendant les tests plus lourds et les évolutions techniques plus risquées.
+
+## Conséquences
+- Logique métier protégée et indépendante des frameworks techniques
+- Testabilité accrue avec tests unitaires rapides et fiables
+- Évolutivité technique facilitée par la séparation ports/adapters
+- Complexité initiale supérieure et courbe d'apprentissage pour les développeurs habitués au MVC traditionnel
+
+
 ---
 
 ### Architecture microservices et évolutivité
 
 BrokerX repose désormais sur une architecture microservices : chaque domaine métier (authentification, ordres, matching, portefeuille) est isolé dans un service indépendant, déployé dans son propre conteneur Docker.
 
-- **Déploiement indépendant** : chaque microservice (auth-service, order-service, wallet-service, matching-service) est packagé et déployé séparément, ce qui facilite la scalabilité et la maintenance.
+- **Déploiement indépendant** : chaque microservice (auth-service, order-service, wallet-service, matching-service, market-data-service, notification-service) est packagé et déployé séparément, ce qui facilite la scalabilité et la maintenance.
 - **Isolation des responsabilités** : la logique métier, la persistance et la sécurité sont propres à chaque service, garantissant la robustesse et la conformité.
-- **Gestion transactionnelle locale** : chaque microservice gère ses transactions de façon autonome, sans complexité distribuée.
 - **Modularité et évolutivité** : l’ajout ou la modification d’un service n’impacte pas les autres ; chaque équipe peut travailler sur son domaine sans dépendance forte.
 - **Intégration facilitée** : les communications inter-services se font via API REST sécurisées, et l’API Gateway centralise le routage, la sécurité et la documentation.
 - **Scalabilité horizontale** : chaque service peut être répliqué selon la charge, et le load balancer (NGINX) répartit le trafic pour garantir la haute disponibilité.
 - **Supervision et observabilité** : chaque microservice expose ses métriques et logs, facilitant le monitoring, la détection d’anomalies et la conformité réglementaire.
+- **Architecture événementielle hybride** : les opérations simples (consultations, authentification) utilisent des appels REST synchrones, tandis que les workflows complexes (placement d'ordre → matching → notification) sont orchestrés via RabbitMQ pour optimiser performances et résilience.
 
 Cette architecture microservices offre à BrokerX une grande flexibilité, une robustesse accrue et une capacité d’évolution rapide pour répondre aux besoins futurs du projet.
 
@@ -1498,7 +1607,7 @@ Cette architecture microservices offre à BrokerX une grande flexibilité, une r
 L’architecture de chaque microservice se compose des couches suivantes :
 - **Domaine** : Entités métier (User, Order, Transaction, Stock…), services métier, ports (interfaces du domaine). Cette couche porte la logique métier, les règles de validation, et les invariants du système.
 - **Application** : Orchestration des cas d’utilisation, coordination des services métier, gestion de la logique applicative. Elle fait le lien entre les besoins métier et les interactions techniques, sans dépendre des frameworks.
-- **Infrastructure** : Implémentation des ports (adapters), persistance, sécurité, intégration avec les services externes. Cette couche traduit les besoins métier en opérations techniques (accès base de données, appels API, gestion de la sécurité).
+- **Infrastructure** : Implémentation des ports (adapters), persistance, sécurité, intégration avec les services externes. Cette couche traduit les besoins métier en opérations techniques (accès base de données, appels API, gestion de la sécurité). C'est aussi cette couche qui fait la gestion de l'architecture événementielle avec toutes les interactions entre le microservice lui-même et RabbitMQ.
 - **Configuration** : Paramétrage de la sécurité, des dépendances, et du démarrage de l’application. Elle assemble les composants, injecte les dépendances, et gère l’environnement d’exécution.
 
 #### Organisation des dépendances
