@@ -1654,16 +1654,16 @@ L’arbre de qualité ci-dessous synthétise les principaux attributs de qualit�
 ### 13.2 Scénarios d’évaluation
 
 **Performance / Traitement des ordres**
-- Le système doit traiter un ordre d’achat ou de vente en moins de 250 ms (P95) et supporter un débit de 800 ordres/seconde. Des tests de performance automatisés doivent valider ces critères (tests de charge avec k6).
+- Le système doit traiter un ordre d’achat ou de vente en moins de 100 ms (P95) et supporter un débit de 1200 ordres/seconde avec l'architecture événementielle. Des tests de performance automatisés doivent valider ces critères (tests de charge avec k6).
 
 **Disponibilité / Résilience**
-- Le système doit garantir une disponibilité de 95.5 %. En cas de panne d’un composant non critique (ex : service d’e-mail), le système doit continuer à accepter les ordres et journaliser l’incident. Des scénarios de test doivent simuler la défaillance de chaque dépendance externe.
+- Le système doit garantir une disponibilité de 99.9 %. En cas de panne d’un composant non critique (ex : service d’e-mail), le système doit continuer à accepter les ordres et journaliser l’incident. En cas de panne d'un composant interagissant avec RabbitMQ, le pattern Outbox doit permettre de conserver les ordres non-traités. Des scénarios de test doivent simuler la défaillance de chaque dépendance externe.
 
 **Sécurité / MFA et KYC**
 - Toute tentative d’accès à une ressource protégée sans authentification MFA ou sans vérification KYC doit être bloquée et journalisée. Les tests automatisés doivent couvrir ces scénarios d’accès non autorisé.
 
 **Testabilité / Couverture**
-- L’utilisation de JaCoCo dans le pipeline CI/CD doit garantir un taux de couverture de code d’au moins 95 % sur les classes métier critiques (services, contrôleurs, entités).
+- L'exécution des tests dans le pipeline CI/CD doit garantir un taux de couverture de code d’au moins 95 % sur les classes métier critiques (services, contrôleurs, entités).
 
 **Testabilité / Indépendance des services externes**
 - Toute logique métier dépendant de services externes (ex : envoi d’e-mails, accès base de données, fournisseurs de données de marché) doit être testable sans ces services réels, via des mocks ou des adapters.
