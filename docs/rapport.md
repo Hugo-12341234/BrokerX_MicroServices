@@ -1146,17 +1146,20 @@ Ce modèle permet de visualiser rapidement les objets métier, leurs interaction
 
 ### 11.2 Persistance
 
-BrokerX adopte une architecture microservices : chaque microservice possède sa propre base PostgreSQL, avec un schéma métier dédié. Les données critiques (utilisateurs, ordres, transactions, MFA, audit) sont isolées par domaine, ce qui garantit la robustesse, la conformité et la scalabilité.
+BrokerX adopte une architecture microservices événementielle : chaque microservice possède sa propre base PostgreSQL, avec un schéma métier dédié. Les données critiques (utilisateurs, ordres, transactions, MFA, audit, etc.) sont isolées par domaine, ce qui garantit la robustesse, la conformité et la scalabilité.
 
-La persistance de chaque microservice s’appuie sur :
-- PostgreSQL : chaque microservice dispose d’une base indépendante, gérée via Docker volumes pour la durabilité.
-- Spring Data JPA/Hibernate : les entités métier sont annotées @Entity, les accès se font via des repositories Spring, assurant l’abstraction et la sécurité.
-- Scripts de migration Flyway : chaque service maintient ses migrations SQL dans son propre dossier, garantissant la reproductibilité et la traçabilité des évolutions de schéma.
-- Données seed : chaque microservice peut insérer ses propres données de démonstration ou de test via des scripts dédiés.
+La persistance de chaque microservice s'appuie sur :
+- **PostgreSQL** : chaque microservice dispose d'une base indépendante, gérée via Docker volumes pour la durabilité.
+- **Spring Data JPA/Hibernate** : les entités métier sont annotées @Entity, les accès se font via des repositories Spring, assurant l'abstraction et la sécurité.
+- **Scripts de migration Flyway** : chaque service maintient ses migrations SQL dans son propre dossier, garantissant la reproductibilité et la traçabilité des évolutions de schéma.
+- **Données seed** : chaque microservice peut insérer ses propres données de démonstration ou de test via des scripts dédiés.
+- **Pattern Outbox** : les microservices participants aux workflows événementiels (order-service, matching-service) utilisent des tables `outbox_event` pour garantir la cohérence entre les opérations métier et la publication d'événements vers RabbitMQ. Cette approche assure la fiabilité de la publication événementielle via des transactions locales.
 
-Aucune donnée métier n’est stockée en mémoire ou dans des fichiers plats : tout est centralisé dans PostgreSQL. Les fichiers statiques (images, documents) sont référencés par leur hash ou URL, mais non stockés dans la base.
+**Architecture événementielle et persistance :** Les services order-service et matching-service implémentent le pattern Outbox avec des tables dédiées (`outbox_event`) qui stockent les événements à publier. Un processus de publication asynchrone lit ces tables et transmet les événements vers RabbitMQ, garantissant qu'aucun événement n'est perdu même en cas de défaillance du message broker. Cette approche maintient la cohérence des données distribuées tout en respectant l'isolation des bases de données par microservice.
 
-La configuration des connexions (URL, credentials) est externalisée dans les variables d’environnement Docker et les fichiers de configuration de chaque microservice.
+Aucune donnée métier n'est stockée en mémoire ou dans des fichiers plats : tout est centralisé dans PostgreSQL. Les fichiers statiques (images, documents) sont référencés par leur hash ou URL, mais non stockés dans la base.
+
+La configuration des connexions (URL, credentials) est externalisée dans les variables d'environnement Docker et les fichiers de configuration de chaque microservice.
 
 #### 11.2.1 Choix ORM ou DAO
 Chaque microservice utilise Spring Data JPA/Hibernate pour la gestion de la persistance. Les entités sont mappées via annotations, les relations sont explicites (OneToMany, ManyToOne, etc.), et les repositories héritent des interfaces Spring Data. Cette approche réduit le code technique, facilite la maintenance et la testabilité, et assure la cohérence entre le modèle objet et la base.
@@ -1207,7 +1210,15 @@ Le code CSS et JS est donc soit inline dans les composants, soit dans des fichie
 
 ### 11.5 Traitement des transactions
 
-BrokerX s’appuie sur Spring Boot pour la gestion des transactions locales au sein du JPA EntityManager. Toutes les opérations critiques (ordres, dépôts, MFA) sont traitées de façon transactionnelle pour garantir la cohérence des données. BrokerX ne supporte pas les transactions distribuées.
+BrokerX combine la gestion des transactions locales via Spring Boot et JPA avec une architecture événementielle pour les workflows distribués.
+
+**Transactions locales :** Toutes les opérations critiques au sein d'un microservice (ordres, dépôts, MFA) sont traitées de façon transactionnelle via l'annotation `@Transactional` pour garantir la cohérence des données locales.
+
+**Cohérence distribuée :** Pour le workflow du placement d'ordre, BrokerX utilise le pattern Outbox couplé à RabbitMQ. Les événements métier sont stockés dans des tables `outbox_event` au sein de la même transaction que les opérations métier, puis publiés de manière asynchrone vers RabbitMQ. Cette approche garantit qu'aucun événement n'est perdu même en cas de défaillance du message broker.
+
+**Pattern Saga chorégraphiée :** Les transactions distribuées sont orchestrées via des Sagas chorégraphiées, où chaque microservice publie des événements et réagit aux événements des autres services. Cette approche maintient l'indépendance des services tout en assurant la cohérence finale des données distribuées.
+
+BrokerX ne supporte pas les transactions distribuées synchrones (2PC), privilégiant la résilience et la scalabilité des microservices via l'architecture événementielle.
 
 ### 11.6 Gestion de session
 
@@ -1223,9 +1234,21 @@ Ce niveau de sécurité est adapté au type de données gérées et aux exigence
 
 Aucune partie du système BrokerX ne présente de risque vital ou d’impact sur la sécurité physique des utilisateurs.
 
-### 11.9 Communications et intégration
+### 11.9 Communication inter-microservices
 
-BrokerX communique principalement via des API REST sécurisées (HTTPS) et SMTP pour l’envoi d’e-mails. Aucune file de messages ou broker interne n’est utilisé : toutes les intégrations externes (KYC, notifications, audit) passent par des appels HTTP (APIs). Les messages ne sont pas persistés en dehors de la base de données métier.
+BrokerX utilise une architecture de communication hybride combinant appels synchrones et événements asynchrones :
+
+**Communication synchrone :** Les opérations simples utilisent des appels HTTP REST entre microservices pour les consultations directes et les validations immédiates (ex : vérification de solde, authentification).
+
+**Communication asynchrone :** Les workflows complexes impliquant plusieurs microservices utilisent une architecture événementielle via RabbitMQ. Le pattern Outbox garantit la fiabilité de la publication d'événements : les événements sont d'abord stockés dans des tables `outbox_event` lors de la transaction métier, puis publiés de manière asynchrone vers RabbitMQ.
+
+**Patterns événementiels :**
+- **Pattern Saga chorégraphiée** : Chaque microservice publie des événements et réagit aux événements des autres services, maintenant l'indépendance tout en assurant la cohérence finale
+- **Pattern Outbox** : Garantit qu'aucun événement n'est perdu, même en cas de défaillance du message broker
+
+**Message Broker :** RabbitMQ orchestre les échanges asynchrones avec des queues dédiées par type d'événement (order.placed, order.matched, notification.sent). Cette approche assure la résilience, la scalabilité et le découplage des microservices.
+
+L'API Gateway centralise l'accès externe et le routage, tandis que le Load Balancer (NGINX) distribue les requêtes vers les instances des microservices, garantissant haute disponibilité et performance.
 
 ### 11.10 Vérifications de plausibilité et de validité
 
@@ -1246,6 +1269,8 @@ Le format d’erreur JSON inclut systématiquement : le code HTTP, un identifi
 
 Les contrôleurs REST de chaque microservice gèrent la conversion des exceptions en réponses HTTP standardisées, et le gateway applique la normalisation du format. Les erreurs critiques sont journalisées pour analyse et audit, assurant la traçabilité et la conformité réglementaire.
 
+**Gestion des erreurs dans les workflows asynchrones :** Pour les opérations événementielles (matching d'ordres, notifications), les erreurs métier sont capturées et transformées en événements d'erreur publiés vers RabbitMQ. Le notification-service écoute ces événements d'erreur et envoie automatiquement des notifications d'erreur aux utilisateurs concernés via WebSocket, assurant un retour d'information en temps réel même pour les opérations asynchrones.
+
 ### 11.12 Journalisation et traçabilité
 
 BrokerX journalise toutes les actions critiques des utilisateurs (connexion, ordres, dépôts, MFA, vérification) dans la table UserAudit de la base PostgreSQL. Les opérations sur les portefeuilles sont spécifiquement tracées dans la table WalletAudit, et tous les événements d’exécution d’ordres sont persistés dans la table ExecutionReport. Chaque entrée d’audit contient l’action, le timestamp, l’IP, le user agent et le token de session.
@@ -1256,34 +1281,26 @@ Pour l’observabilité, BrokerX expose des métriques via Prometheus, permettan
 
 Les noms des loggers correspondent aux packages des classes pour faciliter l’identification des modules dans les logs. La traçabilité métier est garantie par la persistance des logs d’audit en base et la collecte centralisée des métriques et logs techniques.
 
+**Journalisation événementielle :** Les workflows asynchrones bénéficient d'une traçabilité renforcée via la journalisation des événements RabbitMQ. Chaque événement publié (order.placed, order.matched, notification.sent) est tracé avec un identifiant unique, permettant de suivre les Sagas distribuées de bout en bout. Les tables `outbox_event` conservent l'historique de tous les événements publiés, garantissant l'auditabilité des transactions distribuées.
+
 ### 11.13 Configurabilité
 
-Chaque microservice BrokerX dispose de sa propre configuration, isolée dans le dossier src/main/resources (ex : application.properties, application-docker.properties). Les propriétés sensibles (mots de passe, clés JWT, endpoints SMTP) sont injectées via variables d’environnement Docker ou fichiers secrets, jamais en dur dans le code.
+BrokerX adopte une approche de configuration externalisée pour faciliter le déploiement et la gestion des environnements (développement, test, production).
 
-Les principales catégories de configuration sont :
-- **Base de données** : URL, utilisateur, mot de passe, pool de connexions
-- **Sécurité** : clés JWT, durée de validité des tokens, MFA, rôles
-- **Serveur** : port HTTP, contexte, CORS
-- **Monitoring** : endpoints Prometheus, niveau de log, nom du logger
-- **Email** : hôte SMTP, port, credentials
-- **Observabilité** : activation des métriques, traces, logs structurés
+**Configuration des microservices :** Chaque microservice utilise les fichiers `application-properties.yml` et les variables d'environnement Docker pour sa configuration. Les paramètres sensibles (mots de passe de base de données, clés API, secrets JWT) sont externalisés via les variables d'environnement définies dans le `docker-compose.yml`, évitant leur exposition dans le code source.
 
-Chaque microservice suit la convention :
-- `spring.datasource.*` pour la base de données
-- `server.port` pour le port HTTP
-- `jwt.*` pour la sécurité
-- `management.endpoints.*` pour le monitoring
-- `spring.mail.*` pour l’email
+**Configuration de l'infrastructure :**
+- **PostgreSQL** : Les paramètres de connexion (URL, utilisateur, mot de passe) sont configurés via les variables d'environnement Docker pour chaque base de données dédiée par microservice
+- **RabbitMQ** : La configuration du message broker (URL, credentials, queues, exchanges) est externalisée dans les variables d'environnement et les fichiers de configuration Spring AMQP
+- **NGINX** : La configuration du load balancer est définie dans le fichier `nginx.conf`, permettant d'ajuster le routage, les timeouts et la répartition de charge
 
-La configuration est surchargée par environnement (dev, test, prod) et centralisée via Docker Compose ou orchestrateur. Les propriétés communes (ex : monitoring, sécurité) sont harmonisées pour faciliter la supervision et la maintenance.
+**Configuration événementielle :** Les paramètres des patterns Saga et Outbox (intervalles de publication, retry policies, timeouts des événements) sont configurables via les fichiers `application.yml` de chaque microservice participant aux workflows asynchrones.
 
-Exemple :
-- `auth-service` : configuration MFA, JWT, SMTP
-- `order-service` : configuration base de données, logs, endpoints REST
-- `wallet-service` : configuration persistance, monitoring
-- `matching-service` : configuration performance, logs, métriques
+**Observabilité configurable :** Les métriques Prometheus, les dashboards Grafana et les niveaux de logging sont configurables sans recompilation, permettant d'adapter le monitoring aux besoins spécifiques de chaque environnement.
 
-Cette approche garantit la flexibilité, la sécurité et la portabilité de chaque microservice, tout en facilitant la gestion des environnements et la conformité aux standards du projet.
+**Configuration de sécurité :** Les paramètres MFA (durée de validité des codes, nombre de tentatives autorisées), les secrets JWT (clés, durées d'expiration) et les configurations SMTP sont externalisés et modifiables selon l'environnement de déploiement.
+
+Cette approche garantit la portabilité du système entre environnements, facilite les déploiements automatisés et permet une adaptation fine des paramètres opérationnels sans modification du code source.
 
 ### 11.14 Internationalisation
 
@@ -1291,22 +1308,34 @@ L’unique langue supportée par BrokerX est le français. Il n’existe aucun m
 
 ### 11.15 Migration
 
-Le projet BrokerX a initialement été développé sous forme d’application monolithique Java/Spring Boot. Une migration vers une architecture microservices a été réalisée : le code, les modèles métier et les données ont été découpés et répartis dans des microservices indépendants (auth-service, order-service, wallet-service, matching-service), chacun avec sa propre base PostgreSQL.
+Le projet BrokerX a initialement été développé sous forme d'application monolithique Java/Spring Boot. Une migration vers une architecture microservices a été réalisée : le code, les modèles métier et les données ont été découpés et répartis dans des microservices indépendants (auth-service, order-service, wallet-service, matching-service), chacun avec sa propre base PostgreSQL.
 
-La migration a impliqué :
+**Première migration vers les microservices :**
+La migration a impliqué :
 - La séparation du code source en plusieurs projets Maven distincts, un par microservice
-- La refonte des schémas de base de données : chaque microservice possède désormais son propre schéma et ses scripts de migration Flyway
+- La refonte des schémas de base de données : chaque microservice possède désormais son propre schéma et ses scripts de migration Flyway
 - La migration des données existantes du monolithe vers les bases dédiées des microservices, avec adaptation des formats et des relations
-- La mise en place d’une API Gateway et d’un load balancer pour centraliser l’accès et le routage
-- L’adaptation des scripts de déploiement Docker et Docker Compose pour orchestrer les nouveaux services
+- La mise en place d'une API Gateway et d'un load balancer pour centraliser l'accès et le routage
+- L'adaptation des scripts de déploiement Docker et Docker Compose pour orchestrer les nouveaux services
 
-Aucune donnée n’a été perdue : toutes les opérations critiques (utilisateurs, ordres, portefeuilles, MFA, audit) ont été migrées et vérifiées. Le système fonctionne désormais en mode microservices, avec une isolation stricte des domaines métier et une scalabilité accrue.
+**Migration vers l'architecture événementielle :**
+Une seconde évolution majeure a consisté à introduire progressivement l'architecture événementielle pour gérer les workflows complexes impliquant plusieurs microservices :
+
+- **Introduction de RabbitMQ** : Déploiement du message broker pour orchestrer les communications asynchrones entre microservices
+- **Implémentation du pattern Outbox** : Ajout des tables `outbox_event` dans order-service et matching-service pour garantir la cohérence entre les opérations métier et la publication d'événements
+- **Migration des workflows critiques** : Le processus de placement d'ordre a été transformé d'un workflow synchrone vers un workflow événementiel orchestré via des Sagas chorégraphiées
+- **Ajout des composants événementiels** : Développement des EventPublishers, EventListeners et des services de traitement des événements dans chaque microservice participant
+- **Configuration des échanges RabbitMQ** : Mise en place des queues, exchanges et routage pour les différents types d'événements (order.placed, order.matched, notification.sent)
+
+**Approche hybride de migration :** La migration vers l'architecture événementielle a été réalisée de manière progressive, conservant les appels synchrones pour les opérations simples (consultations, authentification) tout en introduisant les événements asynchrones pour les workflows distribués complexes. Cette approche a permis de minimiser les risques et de valider progressivement la fiabilité des patterns Saga et Outbox.
+
+Aucune donnée n'a été perdue lors des migrations : toutes les opérations critiques (utilisateurs, ordres, portefeuilles, MFA, audit) ont été migrées et vérifiées. Le système fonctionne désormais en architecture microservices événementielle hybride, avec une isolation stricte des domaines métier, une scalabilité accrue et une résilience renforcée grâce aux patterns de cohérence distribuée.
 
 ### 11.16 Testabilité
 
 Chaque microservice BrokerX est couvert par des tests automatisés : les services métier, les contrôleurs REST et les entités principales sont testés via JUnit dans le dossier standard `src/test/java` de chaque projet Maven. Les tests d’intégration vérifient les interactions avec la base PostgreSQL dédiée, et des mocks sont utilisés pour les dépendances externes (SMTP, API Gateway).
 
-Le pipeline CI/CD exécute systématiquement tous les tests à chaque build Maven : aucune livraison n’est acceptée si les tests échouent. Les cas d’utilisation critiques (inscription, authentification MFA, dépôt, passage d’ordre, matching) sont systématiquement couverts par des scénarios de test, garantissant la robustesse et la non-régression du système.
+Le pipeline CI/CD exécute systématiquement tous les tests à chaque build Maven : aucune livraison n’est acceptée si les tests échouent. Les cas d’utilisation critiques (inscription, authentification MFA, dépôt, passage d’ordre, matching, etc.) sont systématiquement couverts par des scénarios de test, garantissant la robustesse et la non-régression du système.
 
 La couverture de test est mesurée et documentée : chaque microservice doit atteindre un seuil minimal de couverture sur les classes métier et les contrôleurs. Les tests facilitent la maintenance, l’évolution et la fiabilité de l’architecture microservices.
 
@@ -1318,7 +1347,7 @@ Le build de BrokerX est entièrement automatisé via Maven et le pipeline CI/CD 
 - Packaging des artefacts JAR pour chaque microservice
 - Construction des images Docker via `docker build`
 - Publication des images sur le registre Docker si les tests sont validés
-- Déploiement automatisé sur l’environnement cible (dev, staging, prod) via Docker Compose
+- Déploiement automatisé sur l’environnement cible (dev, prod) via Docker Compose
 
 Les logs de build et de test sont archivés pour audit et traçabilité. Les dépendances sont gérées exclusivement via Maven et npm (pour le frontend React). Aucun artefact n’est livré si la qualité ou la couverture de test minimale n’est atteinte. Si tout passe, un artefact pour le build du projet ainsi qu'un artefact pour le rapport de tests sont générés et stockés.
 
