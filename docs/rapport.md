@@ -845,13 +845,11 @@ Le code de chacun des microservices est structuré selon une approche hexagonale
 La vue scénarios expose les principaux cas d'utilisation du système BrokerX, tels qu'ils sont vécus par les utilisateurs et les systèmes externes. Elle permet de visualiser les interactions entre le client et l'application, ainsi que les dépendances fonctionnelles entre les différents UC.
 
 ### Éléments
-- Acteurs externes : Client (utilisateur principal), Service Paiement Simulé (pour le dépôt), Moteur d'appariement interne (matching), Données de Marché, Fournisseur des données de marché simulé
+- Acteurs externes : Client (utilisateur principal), Service d'Email (SMTP)
 - Cas d'utilisation : Inscription & vérification d'identité, Authentification & MFA, Dépôt dans le portefeuille, Abonnement aux données de marché, Placement d'un ordre, Modification / Annulation d'un ordre, Appariement interne & Exécution (matching), Réception de notifications
 
 ### Relations
-- Le client peut initier chacun des cas d'utilisation principaux, sauf l'appariement interne qui est déclenché automatiquement par le moteur d'appariement interne et les notifications qui sont générées par les autres cas d'utilisation
-- Le dépôt utilise le service de paiement simulé
-- Le placement d'un ordre dépend du solde du portefeuille
+- Le client peut initier chacun des cas d'utilisation principaux, sauf l'appariement interne qui est déclenché automatiquement lorsqu'un placement d'ordre est effectué et les notifications qui sont générées par l'appariement interne
 - Le placement d'un ordre déclenche le cas d'utilisation d'appariement interne & exécution
 - L'appariement interne génère des notifications pour informer le client
 

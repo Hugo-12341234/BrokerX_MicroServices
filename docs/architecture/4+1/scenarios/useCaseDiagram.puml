@@ -1,33 +1,21 @@
 @startuml
-' Diagramme de cas d'utilisation BrokerX — Vue Scénarios (4+1)
+!define LAYOUT top to bottom direction
+!define LAYOUT skinparam minClassWidth 100
 
 title Diagramme de cas d'utilisation — BrokerX
 
 actor Client
-actor "Service Paiement Simulé" as PaymentService
-actor "Moteur d'appariement interne" as MatchingEngine
-actor "Données de Marché" as MarketData
-actor "Fournisseur de données de marché simulé" as MarketDataProvider
+actor "Système\nd'Email" as EmailSystem
 
 rectangle "Application BrokerX" as BrokerXApp {
-  usecase "S'inscrire et vérifier son identité" as UC01
-  usecase "S'authentifier avec MFA" as UC02
-  usecase "Déposer de l'argent dans le portefeuille" as UC03
-  usecase "Abonnement aux données de marché" as UC04
-  usecase "Placer un ordre d'achat ou de vente" as UC05
-  usecase "Modification / Annulation d'un ordre" as UC06
-  usecase "Appariement interne & Exécution (matching)" as UC07
-  usecase "Recevoir des notifications" as UC08
-
-  note right of UC05
-    Contrôles pré-trade réalisés en interne
-    (pouvoir d'achat, bande de prix, tick size, etc.)
-  end note
-  note left of UC07
-    Exécution automatique des ordres selon priorité prix/temps
-    Génération des transactions, mise à jour des états d'ordre
-    Publication des rapports d'exécution
-  end note
+  usecase "UC-01 : S'inscrire et\nvérifier son identité" as UC01
+  usecase "UC-02 : S'authentifier\navec MFA" as UC02
+  usecase "UC-03 : Déposer de l'argent\ndans le portefeuille" as UC03
+  usecase "UC-04 : Abonnement aux\ndonnées de marché" as UC04
+  usecase "UC-05 : Placer un ordre\nd'achat ou de vente" as UC05
+  usecase "UC-06 : Modification /\nAnnulation d'un ordre" as UC06
+  usecase "UC-07 : Appariement interne\n& Exécution (matching)" as UC07
+  usecase "UC-08 : Recevoir des\nnotifications" as UC08
 }
 
 Client --> UC01
@@ -36,14 +24,11 @@ Client --> UC03
 Client --> UC04
 Client --> UC05
 Client --> UC06
-Client --> UC08 : <<reçoit notifications>>
 
-UC03 <-- PaymentService : <<confirme dépôt>>
-UC05 --> UC03 : <<utilise solde portefeuille
-UC04 <-- MarketDataProvider : <<fournit le flux>>
-UC05 --> UC07 : <<déclenche matching>>
-UC07 --> UC08 : <<génère notifications>>
-MatchingEngine --> UC07
-UC07 --> MarketData : <<influence>>
+UC01 ..> EmailSystem : <<uses>>
+UC02 ..> EmailSystem : <<uses>>
+UC08 ..> EmailSystem : <<uses>>
+UC05 --> UC07 : <<includes>>
+UC07 --> UC08 : <<includes>>
 
 @enduml
