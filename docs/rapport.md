@@ -1681,11 +1681,11 @@ La migration vers une architecture microservices apporte de nouveaux risques tec
 **1. Complexité de l’orchestration et du monitoring**
 - La gestion de plusieurs microservices indépendants nécessite une orchestration fine (Docker Compose, CI/CD), un monitoring centralisé (Prometheus, Grafana) et une supervision des logs. Un défaut de configuration peut entraîner des pannes difficiles à diagnostiquer.
 
-**2. Cohérence des données et absence de transactions distribuées**
-- Chaque microservice possède sa propre base PostgreSQL : il n’existe pas de transaction globale entre services. Un échec partiel lors d’une opération multi-service (ex : dépôt + ordre) peut générer des incohérences métier.
+**2. Défaillance de RabbitMQ**
+- La dépendance au message broker RabbitMQ introduit un risque critique : si RabbitMQ tombe en panne, tous les workflows asynchrones s'arrêtent (matching d'ordres, notifications, mises à jour de portefeuille). Cette défaillance paralyserait les opérations de trading les plus importantes. Pour mitiger ce risque, le pattern Outbox garantit la persistance des événements non publiés dans les bases locales des microservices, permettant de rejouer les événements une fois RabbitMQ rétabli. Un clustering RabbitMQ peut être envisagé pour éliminer ce point de défaillance unique, et un monitoring constant des queues permet de détecter rapidement toute anomalie.
 
 **3. Risque de latence et de surcharge réseau**
-- Les appels inter-services via API REST augmentent la latence et la charge réseau, surtout en cas de forte sollicitation (800 ordres/s). Un monitoring précis du throughput et des temps de réponse est nécessaire.
+- Les appels inter-services via API REST augmentent la latence et la charge réseau, surtout en cas de forte sollicitation. Un monitoring précis du throughput et des temps de réponse est nécessaire.
 
 **4. Disponibilité et tolérance aux pannes**
 - La disponibilité globale dépend de la résilience de chaque microservice et du load balancer (NGINX). Une panne du gateway ou du load balancer peut rendre l’ensemble du système indisponible.
@@ -1696,8 +1696,8 @@ La migration vers une architecture microservices apporte de nouveaux risques tec
 **6. Testabilité et mocks**
 - Les dépendances externes (SMTP, fournisseurs de données de marché) doivent être systématiquement mockées pour garantir la testabilité. Un défaut de mock peut fausser les résultats des tests automatisés.
 
-**7. Migration et gestion des versions**
-- La migration du monolithe vers les microservices, ainsi que le versionnage des APIs, peut générer des incompatibilités ou des pertes de données si les scripts Flyway ou les contrats d’API ne sont pas synchronisés.
+**7. Duplication d'événements et gestion de l'idempotence**
+- Les mécanismes de retry automatique de RabbitMQ et la nature distribuée des systèmes peuvent conduire à la duplication d'événements, risquant de traiter plusieurs fois un même ordre ou d'envoyer des notifications en double. Cette duplication pourrait créer des incohérences de positions ou des expériences utilisateur dégradées. L'idempotence des handlers d'événements constitue la première ligne de défense, complétée par des clés de déduplication uniques pour chaque événement et une validation systématique des états avant traitement, garantissant qu'un événement dupliqué n'aura aucun impact sur l'intégrité du système.
 
 **8. Scalabilité et gestion du cache**
 - L’utilisation d’un cache in-memory (Caffeine) par instance peut entraîner des problèmes de données obsolètes (stale) ou de surconsommation mémoire si la configuration n’est pas maîtrisée.
@@ -1761,6 +1761,21 @@ Tableau 14. Glossaire métier BrokerX
 | Docker Compose     | Outil d’orchestration des conteneurs pour le déploiement des microservices.                           |
 | Idempotence        | Propriété garantissant qu’une opération répétée n’a pas d’effet supplémentaire.                       |
 | Stateless          | Qualifie une API ou un service qui ne conserve pas d’état de session côté serveur.                    |
+| Pattern Outbox     | Pattern événementiel garantissant la cohérence entre opérations métier et publication d'événements via une table locale. |
+| RabbitMQ           | Message broker asynchrone utilisé pour orchestrer les communications événementielles entre microservices. |
+| Saga               | Pattern de gestion des transactions distribuées via une séquence d'opérations compensables. |
+| Saga chorégraphiée | Type de Saga où chaque service publie et écoute des événements de façon décentralisée, sans orchestrateur central. |
+| Message Broker     | Composant middleware qui gère le routage et la livraison des messages asynchrones entre services. |
+| Événement          | Message asynchrone représentant un fait métier (ex: order.placed, order.matched) publié via RabbitMQ. |
+| EventPublisher     | Composant responsable de la publication d'événements vers le message broker. |
+| EventListener      | Composant qui écoute et traite les événements reçus du message broker. |
+| Queue              | File d'attente RabbitMQ stockant les événements en attente de traitement par un service. |
+| Exchange           | Composant RabbitMQ qui route les événements vers les bonnes queues selon des règles définies. |
+| Dead Letter Queue  | Queue spéciale RabbitMQ recevant les événements qui n'ont pas pu être traités après plusieurs tentatives. |
+| Acknowledgment     | Mécanisme RabbitMQ confirmant la réception et le traitement réussi d'un événement. |
+| Correlation ID     | Identifiant unique permettant de tracer un workflow événementiel distribué entre plusieurs services. |
+| Workflow asynchrone| Processus métier impliquant plusieurs microservices orchestrés via des événements RabbitMQ. |
+| Cohérence finale   | Principe où les données distribuées convergent vers un état cohérent après propagation des événements. |
 
 # Fin de la documentation arc42
 
