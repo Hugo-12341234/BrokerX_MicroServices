@@ -2207,10 +2207,13 @@ Vérifiez que vous avez bien les dossiers et fichiers suivants à la racine du d
 - `auth-service/`
 - `docs/` (documentation)
 - `frontend/` (React)
+- `market-data-service/`
 - `matching-service/`
 - `monitoring`
 - `nginx`
+- `notification-service/`
 - `order-service/`
+- `rabbitmq/`
 - `wallet-service/`
 - `docker-compose.yml`
 - `pom.xml`
@@ -2226,7 +2229,7 @@ Assurez-vous que votre Docker Desktop est ouvert, ouvrez un terminal dans le dos
 docker-compose up --build -d
 ```
 
-Tous les microservices (auth-service, wallet-service, order-service, matching-service), l’API Gateway, PostgreSQL, Swagger, NGINX, Prometheus et Grafana sont lancés en arrière-plan
+Tous les microservices (auth-service, wallet-service, order-service, matching-service, market-data-service, notification-service), l’API Gateway, PostgreSQL, Swagger, NGINX, RabbitMQ Prometheus et Grafana sont lancés en arrière-plan
 
 Pour démarrer plusieurs instances d’un microservice (ex : order-service) :
 
@@ -2234,7 +2237,7 @@ Pour démarrer plusieurs instances d’un microservice (ex : order-service) 
 docker compose up --scale order-service=3 -d
 ```
 
-Ceci marche pour chacun des 4 microservices (auth-service, matching-service, order-service, wallet-service), mais il est plus pertinent pour le order-service dans le contexte de notre projet.
+Ceci marche pour chacun des 6 microservices (auth-service, matching-service, order-service, wallet-service, market-data-service, notification-service), mais il est plus pertinent pour le order-service dans le contexte de notre projet.
 
 Le load balancer NGINX répartira le trafic entre les instances.
 
