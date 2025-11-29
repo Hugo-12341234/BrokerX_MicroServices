@@ -1946,6 +1946,44 @@ Ces résultats démontrent que l’architecture monolithique ne parvient pas à 
 
 ---
 
+## Test de charge — Architecture event-driven avec message broker (RabbitMQ)
+
+### Contexte
+Ce test a pour objectif d’évaluer les performances du **service des ordres** dans une architecture **event-driven** en utilisant RabbitMQ comme message broker, afin de les comparer à celles de l’architecture microservices et de l'architecture monolithique.  
+Les objectifs visés étaient :
+- **≥ 1200 ordres/seconde**
+- **Latence P95 ≤ 100 ms**
+
+Le test a été réalisé dans les mêmes conditions matérielles limitées que les précédents, soit :
+- Une **machine virtuelle** avec peu de CPU et de RAM pour exécuter le système.
+- Un **laptop** peu performant servant à exécuter le test de charge.
+
+---
+
+### Résultats observés
+
+#### Grafana — Monitoring en temps réel
+![Grafana - Monolithique](docs/monitoring/graphs_event_driven.png)
+
+- **Traffic :** Environ 300–400 requêtes/seconde au pic.
+- **Latence :** Le temps de réponse moyen du service dépasse largement les attentes, avec un **P95 d’environ 12 secondes**.
+- **Erreurs :** Plusieurs erreurs 5xx observées à partir du niveau de l’API Gateway, indiquant des difficultés à maintenir la charge.
+- **Saturation :** Le CPU atteint environ 15–20%, avec une mémoire stable, mais la latence s’allonge rapidement sous charge.
+
+#### Résumé du test K6
+![K6 - Résultats Monolithique](docs/monitoring/stats_event_driven.png)
+
+- **Requêtes totales :** 26 374
+- **Taux moyen :** ~88 requêtes/seconde
+- **Latence moyenne :** 5.11 s
+- **P90 :** 11.04 s
+- **P95 :** 12.37 s
+- **Taux d’échec :** 0% (aucune requête échouée)
+
+Ces résultats démontrent que l’architecture monolithique ne parvient pas à soutenir la charge ni à respecter les contraintes de latence définies. Le système reste fonctionnel, mais ses performances sont limitées par la nature centralisée de l’architecture et le manque de parallélisation interne.
+
+---
+
 ## Comparaison — Microservices (Gateway) vs Monolithique (A/B direct)
 
 | Critère | Monolithique                 | Microservices | Amélioration |
