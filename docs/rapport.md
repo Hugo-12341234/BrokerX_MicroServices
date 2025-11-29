@@ -1928,7 +1928,7 @@ Le test a été réalisé dans les mêmes conditions matérielles limitées que 
 ![Grafana - Monolithique](docs/monitoring/graphs_monolithique.png)
 
 - **Traffic :** Environ 300–400 requêtes/seconde au pic.
-- **Latence :** Le temps de réponse moyen du service dépasse largement les attentes, avec un **P95 d’environ 12 secondes**.
+- **Latence :** Le temps de réponse moyen du service dépasse largement les attentes, avec un **P95 d’environ 3 secondes**.
 - **Erreurs :** Plusieurs erreurs 5xx observées à partir du niveau de l’API Gateway, indiquant des difficultés à maintenir la charge.
 - **Saturation :** Le CPU atteint environ 15–20%, avec une mémoire stable, mais la latence s’allonge rapidement sous charge.
 
@@ -1963,55 +1963,79 @@ Le test a été réalisé dans les mêmes conditions matérielles limitées que 
 ### Résultats observés
 
 #### Grafana — Monitoring en temps réel
-![Grafana - Monolithique](docs/monitoring/graphs_event_driven.png)
+![Grafana - Event-driven](docs/monitoring/graphs_event_driven.png)
 
-- **Traffic :** Environ 300–400 requêtes/seconde au pic.
-- **Latence :** Le temps de réponse moyen du service dépasse largement les attentes, avec un **P95 d’environ 12 secondes**.
-- **Erreurs :** Plusieurs erreurs 5xx observées à partir du niveau de l’API Gateway, indiquant des difficultés à maintenir la charge.
-- **Saturation :** Le CPU atteint environ 15–20%, avec une mémoire stable, mais la latence s’allonge rapidement sous charge.
+- **Traffic :** Environ 700 requêtes/seconde au pic.
+- **Latence :** Le P95 remonte à environ **1.5 secondes**, principalement dû à l’accumulation dans la file lorsque la charge dépasse le rythme réel de traitement.
+- **Erreurs :** Aucune erreur 5xx observée — le broker absorbe la surcharge au lieu de la propager aux services.
+- **Saturation :** CPU autour de 20–25% avec une mémoire stable.
 
 #### Résumé du test K6
-![K6 - Résultats Monolithique](docs/monitoring/stats_event_driven.png)
+![K6 - Résultats Event-driven](docs/monitoring/stats_event_driven.png)
 
-- **Requêtes totales :** 26 374
-- **Taux moyen :** ~88 requêtes/seconde
-- **Latence moyenne :** 5.11 s
-- **P90 :** 11.04 s
-- **P95 :** 12.37 s
-- **Taux d’échec :** 0% (aucune requête échouée)
-
-Ces résultats démontrent que l’architecture monolithique ne parvient pas à soutenir la charge ni à respecter les contraintes de latence définies. Le système reste fonctionnel, mais ses performances sont limitées par la nature centralisée de l’architecture et le manque de parallélisation interne.
-
----
-
-## Comparaison — Microservices (Gateway) vs Monolithique (A/B direct)
-
-| Critère | Monolithique                 | Microservices | Amélioration |
-|----------|------------------------------|----------------|---------------|
-| **Débit (RPS)** | ~88 req/s                    | ~92 req/s | +5% |
-| **P95 Latence** | 12.37 s                      | 8.42 s | -32% |
-| **Taux d’erreur** | 5–10% (5xx communs)          | 0% | Stabilité accrue |
-| **Saturation CPU** | 15–20%                       | 20–30% | Meilleure utilisation des ressources |
-| **Évolutivité** | Limitée (bloc unique)        | Forte (services isolés) | Distribution plus efficace |
-| **Résilience** | Un seul point de défaillance | Isolation des services | Tolérance aux pannes accrue |
+- **Requêtes totales :** 44 210
+- **Taux moyen :** ~147 requêtes/seconde
+- **Latence moyenne :** 2.98 s
+- **P90 :** 5.3 s
+- **P95 :** 5.89 s
+- **Taux d’échec :** 0%
 
 ---
 
 ### Analyse
-Malgré des conditions matérielles restreintes, l’architecture **microservices** démontre une **meilleure répartition de la charge** et une **latence globale réduite**.  
-La séparation des responsabilités entre `api-gateway` et `order-service` permet une meilleure **scalabilité horizontale** et un **traitement plus stable** des requêtes sous forte charge.
+Malgré une latence mesurée élevée dans K6, l’architecture **event-driven** présente les meilleurs résultats globaux parmi les trois modèles testés.  
+Les valeurs élevées de latence ne sont pas causées par un ralentissement du service, mais par la **mise en file des messages** lorsque la charge dépasse temporairement la capacité de traitement.
 
-En comparaison, le monolithique souffre d’une **latence élevée** et d’un **manque de parallélisme**, qui limitent sa capacité à maintenir des performances constantes lorsque le trafic augmente.
+Contrairement aux architectures synchrones :
+
+- Le monolithique et les microservices voient immédiatement la **latence exploser** et produisent des **erreurs** en cas de saturation.
+- L’event-driven, lui, **absorbe la charge sans défaillance**, et l’intégralité des messages est traitée sans perte.
+
+RabbitMQ permet :
+
+1. **Un découplage total** entre producteurs et consommateurs.
+2. **Un lissage naturel des pics de charge**.
+3. **Une résilience très élevée**, aucune requête n’échoue même sous forte pression.
+4. **Une stabilité supérieure**, car le système ne bloque jamais en surcharge.
 
 ---
 
 ### Conclusion
-L’architecture **microservices améliore nettement la performance et la stabilité** du système :
-- Temps de réponse plus rapide (latence P95 réduite de plus de 30%)
-- Meilleure gestion de la charge et absence d’erreurs critiques
-- Répartition efficace du travail entre les services
+L’architecture **event-driven** démontre une **résilience**, une **stabilité** et une **gestion de charge nettement supérieures** aux architectures monolithiques et microservices, tout en maintenant un traitement fiable sans aucune erreur.
 
-Même dans un environnement limité en ressources, les microservices offrent une **architecture plus robuste, scalable et performante** que le modèle monolithique.
+---
+
+## Comparaison — Microservices (Gateway) vs Monolithique (A/B direct) vs Event-driven (RabbitMQ)
+
+| Critère | Monolithique | Microservices | Event-driven | Observations                                                         |
+|---------|--------------|----------------|-------------|----------------------------------------------------------------------|
+| **Débit (RPS / Events)** | ~88 req/s | ~92 req/s | ~147 req/s  | L’event-driven absorbe largement plus de charge                      |
+| **P95 Latence** | 12.37 s | 8.42 s | 5.89 s      | L’event-driven garde une latence interne basse                       |
+| **Taux d’erreur** | 5–10% | 0% | 0%          | Le broker et les microservices évitent les erreurs |
+| **Saturation CPU** | 15–20% | 20–30% | 20–25%      | Utilisation équilibrée, pas de saturation bloquante                  |
+| **Évolutivité** | Faible | Bonne | Excellente  | Scaling horizontal trivial côté consommateurs                        |
+| **Résilience** | Faible | Bonne | Très élevée | Le système reste stable même en surcharge                            |
+| **Mode de traitement** | Synchrone | Synchrone | Asynchrone | Avantage majeur de l'asynchrone : découplage complet                 |
+
+---
+
+### Analyse
+Les trois architectures montrent des comportements radicalement différents sous charge :
+
+- **Monolithique :**  
+  Forte latence, erreurs 5xx, mauvaise absorption des pics. Peu apte à supporter un trafic élevé.
+
+- **Microservices synchrones :**  
+  Meilleure répartition de la charge, moins d’erreurs, mais toujours soumis aux limitations d’un appel direct entre services. La latence reste élevée sous surcharge.
+
+- **Event-driven :**  
+  Offre les meilleurs résultats :
+    - Pas d’erreurs
+    - Trafic absorbé sans effondrement
+    - Résilience exceptionnelle grâce au broker
+    - Haute scalablilité grâce au modèle consommateur-asynchrone
+
+Même dans un environnement matériel très limité, l’architecture événementielle est nettement supérieure en performance globale et en robustesse opérationnelle. L'architecture purement en microservices donne des résultats acceptables, qui pourraient suffir dans le cadre d'un plus petit projet. L'architecture monolithique montre ses limites dès que la charge augmente.
 
 ## Test de charge — Évaluation du load balancer (NGINX)
 
