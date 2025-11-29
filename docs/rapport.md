@@ -1,6 +1,5 @@
 # Table des matières
 [Table des matières](#table-des-matières)
-- [Table des matières](#table-des-matières)
 - [Début de la documentation arc42](#début-de-la-documentation-arc42)
 - [1. Introduction \& Objectifs](#1-introduction--objectifs)
   - [1.1 Objectifs métier](#11-objectifs-métier)
