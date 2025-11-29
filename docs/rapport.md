@@ -2399,7 +2399,17 @@ Ce guide explique comment réaliser chaque fonctionnalité principale de BrokerX
 
 ---
 
-## 4. Placement d’un ordre (UC-05)
+## 4. Abonnement aux données de marché (UC-04)
+
+1. Lorsque vous êtes dans votre tableau de bord principal, cliquez sur le bouton "Marché".
+2. Sélectionnez le symbole (ex : AAPL) que vous désirez voir et cliquez sur "S’abonner à [symbole]".
+3. Les données de marché en temps réel pour le symbole sélectionné s’affichent.
+4. Les données sont mises à jour automatiquement à chaque fois qu'un ordre est placé sur ce symbole.
+5. Pour vous désabonner, cliquez sur le bouton "Se désabonner" situé à la droite du bouton d'abonnement au symbole correspondant.
+
+---
+
+## 5. Placement d’un ordre (UC-05)
 
 1. Cliquez sur le bouton "Placer un ordre".
 2. Choisissez le symbole, le type d’ordre (Marché ou Limite), le côté (Achat ou Vente), la quantité, la durée et le prix si nécessaire.
@@ -2408,17 +2418,33 @@ Ce guide explique comment réaliser chaque fonctionnalité principale de BrokerX
 
 ---
 
-## 5. Appariement d’un ordre (UC-07)
+## 6. Modification / Annulation d’un ordre (UC-06)
+
+1. Dans l'écran du tableau de bord principal, tous les ordres sont affichés.
+2. À la droite de chaque ordre, les boutons "Modifier" et "Annuler" sont présent.
+3. Pour annuler un ordre, cliquez sur "Annuler", puis confirmez que vous voulez annuler cet ordre.
+4. Si l'annulation est invalide, un message d'erreur s'affichera.
+5. Si l'annulation est valide, le statut de l'ordre sera modifié à "CANCELLED" dans le tableau de bord.
+6. Pour modifier un ordre, cliquez sur "Modifier". Remplissez les champs nécessaires (prix, quantité, durée) et cliquez sur "Enregistrer".
+7. Si la modification est invalide, un message d'erreur s'affichera.
+8. Si la modification est valide, les nouvelles valeurs de l'ordre seront mises à jour dans le tableau de bord.
+
+---
+
+## 7. Appariement d’un ordre (UC-07)
 
 1. Dans votre dashboard, cliquez sur le bouton "Créer 4 Ordres Seed" pour générer des ordres de vente et obtenir un matching.
 2. Effectuez les mêmes étapes que pour le placement d’un ordre (voir section 4) pour créer un ordre d’achat correspondant.
-3. Si un ordre correspondant est trouvé, un message de confirmation s’affiche : `Ordre accepté !
-   ID: 148075
-   Statut: ACCEPTE
-   Détails:
-   Ordre DAY entièrement exécuté : 1 fulfilled. Exécutions: Deal: 1 AAPL @ 100.00 entre acheteur 1 et vendeur 9999`
-![Ordre apparié](docs/matching_success.png)
+3. Si un ordre correspondant est trouvé, une notification s’affiche avec tous les détails de la transaction.
+![Ordre apparié](docs/img.png)
 4. Cliquez sur "Retour au dashboard" et observez que votre solde de portefeuille a changé et que vous avez un stock_position de plus.
+
+---
+
+## 8. Confirmation d'exécution & Notifications (UC-08)
+
+1. Les notifications aparaissent automatiquement dans l’interface web après chaque ordre placé.
+2. La notification contient tous les détails par rapport à l'exécution de l'ordre placé.
 
 ---
 
@@ -2426,6 +2452,6 @@ Ce guide explique comment réaliser chaque fonctionnalité principale de BrokerX
 - Si vous voulez tester le token, fermez votre onglet, puis réouvrez une onglet et tapez l'url [http://localhost:3000/dashboard](http://localhost:3000/dashboard). Vous aurez directement accès sans avoir à vous reconnecter.
 - Toutes les opérations sensibles nécessitent un compte actif et une authentification MFA.
 - En cas d’erreur (mot de passe incorrect, code MFA expiré, fonds insuffisants…), un message explicatif s’affiche à l’écran.
-- Les notifications importantes (vérification, MFA, confirmation) sont envoyées par e-mail.
+- Les notifications importantes (vérification, MFA) sont envoyées par e-mail.
 
 Ce guide couvre l’ensemble des parcours utilisateur principaux pour la démonstration de BrokerX.

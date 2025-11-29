@@ -27,7 +27,8 @@ function MarketPage() {
           }
         });
         const data = await response.json();
-        setSymbols(data.symbols || []);
+        const filteredSymbols = (data.symbols || []).filter(symbol => symbol !== 'GOOG');
+        setSymbols(filteredSymbols);
       } catch (err) {
         setSymbols([]);
       }
