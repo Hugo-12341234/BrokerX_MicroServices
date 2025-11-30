@@ -12,7 +12,8 @@ CREATE TABLE order_book (
     status VARCHAR(16) NOT NULL,
     reject_reason VARCHAR(255),
     quantity_remaining INT NOT NULL,
-    order_id BIGINT NOT NULL
+    order_id BIGINT NOT NULL,
+    version BIGINT DEFAULT 0 NOT NULL
 );
 
 CREATE INDEX idx_order_book_user_id ON order_book(user_id);

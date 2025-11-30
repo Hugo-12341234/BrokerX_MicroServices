@@ -261,24 +261,58 @@ public class MatchingService implements MatchingPort {
     }
 
     private List<OrderBook> cleanupExpiredDayOrders(String symbol) {
+        logger.info("=== DÉBUT CLEANUP pour symbol: {} ===", symbol);
+
         List<OrderBook> dayOrders = orderBookPort.findAllBySymbol(symbol);
         LocalDateTime now = LocalDateTime.now();
         List<OrderBook> modifiedOrders = new ArrayList<>();
+
+        logger.info("CLEANUP: {} ordres trouvés pour symbol {}, now={}", dayOrders.size(), symbol, now);
+
         for (OrderBook order : dayOrders) {
+            logger.info("CLEANUP CHECK: id={}, clientOrderId={}, userId={}, symbol={}, duration={}, timestamp={}, status={}",
+                    order.getId(), order.getClientOrderId(), order.getUserId(), order.getSymbol(),
+                    order.getDuration(), order.getTimestamp(), order.getStatus());
+
             if ("DAY".equalsIgnoreCase(order.getDuration())) {
                 LocalDateTime orderTime = order.getTimestamp();
-                if (orderTime != null && orderTime.plusHours(24).isBefore(now)) {
-                    logger.info("Ordre DAY expiré détecté et supprimé : clientOrderId={}, timestamp={}",
-                            order.getClientOrderId(), orderTime);
+
+                if (orderTime == null) {
+                    logger.error("CLEANUP ERROR: Ordre DAY avec timestamp NULL - id={}, clientOrderId={}, SUPPRESSION FORCÉE",
+                            order.getId(), order.getClientOrderId());
                     order.setStatus("Cancelled");
                     orderBookPort.save(order);
                     modifiedOrders.add(order);
                     orderBookPort.deleteById(order.getId());
+                    continue;
                 }
+
+                LocalDateTime expirationTime = orderTime.plusHours(24);
+                boolean isExpired = expirationTime.isBefore(now);
+
+                logger.info("CLEANUP DAY: clientOrderId={}, orderTime={}, expirationTime={}, now={}, isExpired={}",
+                        order.getClientOrderId(), orderTime, expirationTime, now, isExpired);
+
+                if (isExpired) {
+                    logger.warn("CLEANUP: SUPPRESSION ordre DAY expiré - clientOrderId={}, orderTime={}, expirationTime={}",
+                            order.getClientOrderId(), orderTime, expirationTime);
+                    order.setStatus("Cancelled");
+                    orderBookPort.save(order);
+                    modifiedOrders.add(order);
+                    orderBookPort.deleteById(order.getId());
+                } else {
+                    logger.info("CLEANUP: Ordre DAY VALIDE conservé - clientOrderId={}", order.getClientOrderId());
+                }
+            } else {
+                logger.info("CLEANUP: Ordre non-DAY ignoré - clientOrderId={}, duration={}",
+                        order.getClientOrderId(), order.getDuration());
             }
         }
+
+        logger.info("=== FIN CLEANUP pour symbol: {}, {} ordres supprimés ===", symbol, modifiedOrders.size());
         return modifiedOrders;
     }
+
 
     @Override
     public OrderBook modifyOrder(String clientOrderId, OrderBook orderBook) {
@@ -329,8 +363,8 @@ public class MatchingService implements MatchingPort {
 
     @Override
     public void processOrderPlacedEvent(OrderPlacedEvent orderPlacedEvent) {
-        logger.info("Début du processOrderPlacedEvent pour clientOrderId={}, userId={}, symbol={}",
-                   orderPlacedEvent.getClientOrderId(), orderPlacedEvent.getUserId(), orderPlacedEvent.getSymbol());
+        logger.info("Début du processOrderPlacedEvent pour clientOrderId={}, userId={}, symbol={}, version={}",
+                   orderPlacedEvent.getClientOrderId(), orderPlacedEvent.getUserId(), orderPlacedEvent.getSymbol(), orderPlacedEvent.getVersion());
         try {
             // Conversion de l'événement en OrderBook
             OrderBook orderBook = convertOrderPlacedEventToOrderBook(orderPlacedEvent);
@@ -356,7 +390,6 @@ public class MatchingService implements MatchingPort {
      */
     private OrderBook convertOrderPlacedEventToOrderBook(OrderPlacedEvent event) {
         OrderBook orderBook = new OrderBook();
-        orderBook.setId(event.getId());
         orderBook.setOrderId(event.getId()); // Assigner l'orderId depuis l'événement
         orderBook.setClientOrderId(event.getClientOrderId());
         orderBook.setUserId(event.getUserId());

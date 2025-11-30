@@ -10,7 +10,8 @@ CREATE TABLE orders (
     duration VARCHAR(16) NOT NULL,
     timestamp TIMESTAMP(3) NOT NULL,
     status VARCHAR(16) NOT NULL,
-    reject_reason VARCHAR(255)
+    reject_reason VARCHAR(255),
+    version BIGINT DEFAULT 0 NOT NULL
 );
 
 CREATE INDEX idx_orders_user_id ON orders(user_id);

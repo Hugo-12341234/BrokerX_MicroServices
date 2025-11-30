@@ -31,6 +31,8 @@ public class DebugController {
             List<OrderBookEntity> seedOrders = new ArrayList<>();
             long baseOrderId = System.currentTimeMillis();
 
+            LocalDateTime recentTimestamp = LocalDateTime.now().minusMinutes(1);
+
             logger.debug("Creating AAPL seed order");
             // Créer les mêmes ordres que dans la migration V5
             OrderBookEntity appleOrder = new OrderBookEntity();
@@ -42,7 +44,7 @@ public class DebugController {
             appleOrder.setQuantity(10);
             appleOrder.setPrice(100.0);
             appleOrder.setDuration("DAY");
-            appleOrder.setTimestamp(LocalDateTime.now());
+            appleOrder.setTimestamp(recentTimestamp);
             appleOrder.setStatus("Working");
             appleOrder.setQuantityRemaining(10);
             appleOrder.setOrderId(baseOrderId + 1);
@@ -58,7 +60,7 @@ public class DebugController {
             msftOrder.setQuantity(10);
             msftOrder.setPrice(200.0);
             msftOrder.setDuration("DAY");
-            msftOrder.setTimestamp(LocalDateTime.now());
+            msftOrder.setTimestamp(recentTimestamp);
             msftOrder.setStatus("Working");
             msftOrder.setQuantityRemaining(10);
             msftOrder.setOrderId(baseOrderId + 2);
@@ -74,32 +76,15 @@ public class DebugController {
             tslaOrder.setQuantity(15);
             tslaOrder.setPrice(150.0);
             tslaOrder.setDuration("DAY");
-            tslaOrder.setTimestamp(LocalDateTime.now());
+            tslaOrder.setTimestamp(recentTimestamp);
             tslaOrder.setStatus("Working");
             tslaOrder.setQuantityRemaining(15);
             tslaOrder.setOrderId(baseOrderId + 3);
             tslaOrder.setVersion(0L);
 
-            logger.debug("Creating GOOG seed order");
-            OrderBookEntity googOrder = new OrderBookEntity();
-            googOrder.setClientOrderId("seed-GOOG-" + System.currentTimeMillis());
-            googOrder.setUserId(9999L);
-            googOrder.setSymbol("GOOG");
-            googOrder.setSide("VENTE");
-            googOrder.setType("LIMITE");
-            googOrder.setQuantity(17);
-            googOrder.setPrice(1200.0);
-            googOrder.setDuration("DAY");
-            googOrder.setTimestamp(LocalDateTime.now());
-            googOrder.setStatus("Working");
-            googOrder.setQuantityRemaining(17);
-            googOrder.setOrderId(baseOrderId + 4);
-            googOrder.setVersion(0L);
-
             seedOrders.add(appleOrder);
             seedOrders.add(msftOrder);
             seedOrders.add(tslaOrder);
-            seedOrders.add(googOrder);
 
             logger.info("Saving {} seed orders to database", seedOrders.size());
             // Sauvegarder tous les ordres
