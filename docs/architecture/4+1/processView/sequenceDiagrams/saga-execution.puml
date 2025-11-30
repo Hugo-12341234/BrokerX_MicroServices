@@ -33,7 +33,7 @@ else order rejected
 
     RabbitMQ -> NS: consume('notification.send.queue')
 
-    OS -> Client: WebSocket: Order Rejected
+    NS -> Client: WebSocket: Order Rejected
 end
 
 OS --> Client: 200 OK (Order Placed)
