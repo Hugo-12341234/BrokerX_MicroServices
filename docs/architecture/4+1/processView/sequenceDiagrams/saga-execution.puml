@@ -1,0 +1,41 @@
+@startuml
+title Order Execution Saga (Architecture Événementielle)
+
+actor Client
+participant "Order Service" as OS
+participant "Matching Service" as MS
+participant "Wallet Service" as WS
+participant "Notification Service" as NS
+database RabbitMQ
+
+Client -> OS: POST /orders (Place Order)
+OS -> OS: Validate & Save Order
+OS -> RabbitMQ: publish('order.exchange', 'order.placed', OrderPlacedEvent)
+RabbitMQ -> MS: consume('order.placed.queue')
+
+MS -> MS: Process Matching
+
+alt order matched
+    MS -> RabbitMQ: publish('matching.exchange', 'order.matched', OrderMatchedEvent)
+    MS -> RabbitMQ: publish('notification.exchange', 'notification.send', NotificationEvent)
+    RabbitMQ -> OS: consume('order.matched.queue')
+
+    OS -> WS: POST /wallets/update (Update Portfolios)
+    WS --> OS: 200 OK
+
+    RabbitMQ -> NS: consume('notification.send.queue')
+
+    NS -> Client: WebSocket: Order Executed
+else order rejected
+    MS -> RabbitMQ: publish('matching.exchange', 'order.rejected', OrderRejectedEvent)
+    MS -> RabbitMQ: publish('notification.exchange', 'notification.send', NotificationEvent)
+    RabbitMQ -> OS: consume('order.rejected.queue')
+
+    RabbitMQ -> NS: consume('notification.send.queue')
+
+    OS -> Client: WebSocket: Order Rejected
+end
+
+OS --> Client: 200 OK (Order Placed)
+
+@enduml

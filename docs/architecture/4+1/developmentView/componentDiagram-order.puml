@@ -55,7 +55,7 @@ OrderSvc ..> IOrderPort
 PreTradeValidationSvc --> IPreTradeValidationPort
 OrderAdapter --> IOrderPort
 "Adapteurs" ..> DBOrder : JDBC
-OrderListener ..> IOrderPort
+OrderListener ..> IOrderPlacementPort
 OrderSvc ..> EventPublisher
 OrderListener <.. RabbitMQ
 EventPublisher ..> RabbitMQ

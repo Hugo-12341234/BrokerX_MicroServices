@@ -973,6 +973,10 @@ Cette vue permet de comprendre la logique métier profonde du système, d’assu
 #### UC05 — Séquence
 ![UC05 - Séquence](docs/architecture/4+1/processView/sequenceDiagrams/sequenceDiagramUC05.png)
 
+#### UC05 — Séquence (High-Level)
+Ce diagramme a pour but de montrer le flow d'exécution du UC05 avec l'implémentation de Saga Chorégraphiée. Le diagramme est donc plus high level pour bien comprendre les interactions avec RabbitMQ et l'exécution du UC avec Saga.
+![UC05 - Séquence High-Level](docs/architecture/4+1/processView/sequenceDiagrams/saga-execution.png)
+
 #### UC05 — Activité
 ![UC05 - Activité](docs/architecture/4+1/processView/activityDiagrams/activityDiagramUC05.png)
 
