@@ -21,4 +21,4 @@ docker-compose up --build -d
 
 ## 📄 Additional Resources
 
-- [📄 Download the project report in French (PDF)](./docs/rapport.pdf)
+- [📄 Download the project report in French (PDF)](https://github.com/Hugo-12341234/BrokerX_MicroServices/raw/master/docs/rapport.pdf)
